@@ -13,7 +13,7 @@ use ordrumbox_core::num::{clamp, round2};
 use ordrumbox_core::{Macros, Pattern, Scales, Style, Styles, Track};
 
 use super::melodic;
-use super::structure::{SectionElement, Structure, random_key_offset, random_scale, section_harmony};
+use super::structure::{Structure, random_key_offset, random_scale, section_harmony};
 use crate::compose;
 
 /// The pattern's style key (in `Pattern::extra`).
@@ -96,7 +96,7 @@ impl<'a> AutoGenerator<'a> {
     }
 
     /// A random source for `compose`: the track's seed, else one draw.
-    fn line_rng(&mut self, track: &Track, salt: u64) -> ordrumbox_core::Rng {
+    pub(super) fn line_rng(&mut self, track: &Track, salt: u64) -> ordrumbox_core::Rng {
         compose::line_rng(track, salt, self.rnd)
     }
 }

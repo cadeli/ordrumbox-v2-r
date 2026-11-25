@@ -8,7 +8,6 @@ use crate::assign::TrackSound;
 use crate::kit::SampleBank;
 use crate::midi::{KeyMap, Target, track_targets};
 
-
 /// The strip each of `tracks` takes its sidechain key from: the one named by
 /// its `sidechain_source`, none when the name is empty, unknown, or its own.
 /// A track is named by its instrument, so a key follows its track through a

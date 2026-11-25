@@ -6,13 +6,14 @@
 
 use super::auto::{
     AutoGenerator, BASS_PRESET, Harmony, Options, TOOLBAR_AUTO, apply_variation, drum_tracks, generate_pattern,
-    generate_track, melodic_variant, pattern_harmony, pattern_style, random_density, style_name_of,
+    generate_track, melodic_variant, partner_of, pattern_harmony, pattern_style, random_density, style_name_of,
 };
-use super::structure::section_harmony;
+use super::structure::{SectionElement, section_harmony};
 use super::table;
+use crate::compose;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
-use ordrumbox_core::{Note, Pattern, Track};
+use ordrumbox_core::{Macros, Note, Pattern, Style, Track};
 
 /// AUTO: every unlocked track of `pattern` in auto mode, or, when one is,
 /// all of them out of it. Whether auto mode is now on.
@@ -231,7 +232,7 @@ pub fn change_track(g: &mut AutoGenerator<'_>, index: u64, pattern: &mut Pattern
     };
     let style = pattern_style(g, pattern);
     let macros = Macros::of(pattern);
-    let element = g.structure.element(index);
+    let element = g.structure().element(index);
     if kind.is_drum() {
         let track = &pattern.tracks[t];
         if element.loop_in_element == 0 || track.notes.is_empty() {
@@ -271,7 +272,7 @@ fn line_moves(track: &Track, style: &Style, macros: Macros, element: &SectionEle
 pub fn run_loop(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, index: u64) -> bool {
     let all = pattern.extra.get("autoGen").is_some_and(Value::is_true);
     let style = g.style(&style_name_of(pattern).unwrap_or_default());
-    let element = g.structure.element(index);
+    let element = g.structure().element(index);
     let macros = Macros::of(pattern);
     let mut changed = false;
     for t in 0..pattern.tracks.len() {

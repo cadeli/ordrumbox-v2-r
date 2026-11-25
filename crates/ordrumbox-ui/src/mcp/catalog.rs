@@ -504,5 +504,4 @@ mod tests {
         let auto_mode = updates.get("properties").unwrap().get("autoMode").unwrap();
         assert!(description(auto_mode).starts_with(GENERATION_RULE));
     }
-
 }

@@ -180,7 +180,10 @@ mod tests {
             Some("Unknown tool: nope")
         );
         let code = |v: &Value| v.get("error").unwrap().get("code").unwrap().as_f64();
-        assert_eq!(code(&run(r#"{"jsonrpc":"2.0","id":4,"method":"resources/list"}"#)), Some(f64::from(ErrorCode::MethodNotFound.code())));
+        assert_eq!(
+            code(&run(r#"{"jsonrpc":"2.0","id":4,"method":"resources/list"}"#)),
+            Some(f64::from(ErrorCode::MethodNotFound.code()))
+        );
         assert_eq!(code(&run("{not json")), Some(f64::from(ErrorCode::ParseError.code())));
         let bad = r#"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"echo","arguments":[]}}"#;
         assert_eq!(code(&run(bad)), Some(f64::from(ErrorCode::InvalidParams.code())));
