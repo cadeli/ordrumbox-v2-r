@@ -31,6 +31,27 @@ pub fn wrap(x: f64, period: f64) -> f64 {
     if r == period { 0.0 } else { r }
 }
 
+/// Largest whole number an `f64` holds exactly (2^53 − 1).
+const MAX_EXACT_WHOLE: f64 = 9_007_199_254_740_991.0;
+
+/// `x` as a whole number, if it is one: no fraction, from 0 to 2^53 − 1
+/// (past it an `f64` no longer holds every whole number). For a count or
+/// an index read from a file or given by a client: narrow it with `try_from`.
+#[must_use]
+pub fn whole(x: f64) -> Option<u64> {
+    // Whole and in range: the conversion loses nothing.
+    (x.fract() == 0.0 && (0.0..=MAX_EXACT_WHOLE).contains(&x)).then_some(x as u64)
+}
+
+/// `x` rounded down to a `u32`, saturating: below 0 (and NaN) is 0, past
+/// `u32::MAX` is `u32::MAX`. For a position already checked, or one where
+/// the nearest step is what is wanted.
+#[must_use]
+pub fn floor_u32(x: f64) -> u32 {
+    // `as` from a float saturates and maps NaN to 0: the wanted rounding.
+    x.floor() as u32
+}
+
 /// `x` as the UI shows it: its shortest form (`140`, `0.5`), zero without a
 /// sign (a value rounded from just under 0 is `-0.0`).
 pub fn text(x: f64) -> String {
@@ -98,5 +119,23 @@ mod tests {
         assert_eq!(text((-0.3f64).round()), "0");
         assert_eq!(text(-2.0), "-2");
         assert_eq!(text(0.1 + 0.2), "0.30000000000000004");
+    }
+
+    #[test]
+    fn whole_numbers_are_whole_from_0_and_exact() {
+        assert_eq!(whole(0.0), Some(0));
+        assert_eq!(whole(8080.0), Some(8080));
+        assert_eq!(whole(MAX_EXACT_WHOLE), Some(9_007_199_254_740_991));
+        for not_whole in [8080.5, -1.0, MAX_EXACT_WHOLE + 2.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(whole(not_whole), None, "{not_whole}");
+        }
+    }
+
+    #[test]
+    fn floor_u32_rounds_down_and_saturates() {
+        assert_eq!(floor_u32(3.9), 3);
+        assert_eq!(floor_u32(-0.5), 0);
+        assert_eq!(floor_u32(f64::NAN), 0);
+        assert_eq!(floor_u32(1e12), u32::MAX);
     }
 }

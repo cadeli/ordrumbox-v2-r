@@ -57,7 +57,8 @@ impl Ring {
         Self { slots: [const { AtomicU32::new(0) }; RING], head: AtomicUsize::new(0), tail: AtomicUsize::new(0) }
     }
 
-    /// Queue `note`; false when the ring is full.
+    /// Queue `note`; false when the ring is full and it is lost.
+    #[must_use]
     pub fn push(&self, note: NoteOn) -> bool {
         let tail = self.tail.load(Ordering::Relaxed);
         if tail.wrapping_sub(self.head.load(Ordering::Acquire)) >= RING {
@@ -89,6 +90,15 @@ impl Ring {
 
 /// What the MIDI thread feeds and the audio callback reads.
 pub static NOTES: Ring = Ring::new();
+/// Notes lost to a full ring since the UI last asked.
+static LOST: AtomicUsize = AtomicUsize::new(0);
+
+/// Queue `note` for the audio callback, counting it in [`LOST`] when the ring is full.
+fn queue(note: NoteOn) {
+    if !NOTES.push(note) {
+        LOST.fetch_add(1, Ordering::Relaxed);
+    }
+}
 
 /// The note on a MIDI message is, if it is one (a note on at velocity 0 is a note off).
 pub fn note_on(message: &[u8]) -> Option<NoteOn> {
@@ -129,6 +139,14 @@ pub struct Input {
     pub name: String,
 }
 
+impl Input {
+    /// The notes lost to a full ring since the last call, if any.
+    pub fn take_error(&self) -> Option<String> {
+        let lost = LOST.swap(0, Ordering::Relaxed);
+        (lost > 0).then(|| format!("MIDI in: {lost} notes lost, too many at once"))
+    }
+}
+
 impl std::fmt::Debug for Input {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Input").field("name", &self.name).finish_non_exhaustive()
@@ -138,7 +156,7 @@ impl std::fmt::Debug for Input {
 /// Open the port `choice` names, its notes going to [`NOTES`] and to `ui`,
 /// which `waker` then wakes, with its control changes and the starts and
 /// stops of the clock followed. `Ok(None)`: no port to open (none chosen,
-/// none connected, or the port chosen is not).
+/// or none connected); the port chosen by its name and not connected is an error.
 pub fn open(choice: &MidiPort, ui: Sender<Event>, waker: Waker) -> Result<Option<Input>, String> {
     let input = MidiInput::new("orDrumbox").map_err(|e| format!("MIDI: {e}"))?;
     let ports = input.ports();
@@ -147,7 +165,12 @@ pub fn open(choice: &MidiPort, ui: Sender<Event>, waker: Waker) -> Result<Option
         MidiPort::First => ports.first(),
         MidiPort::Named(wanted) => ports.iter().find(|p| input.port_name(p).is_ok_and(|name| name == *wanted)),
     };
-    let Some(port) = port else { return Ok(None) };
+    let Some(port) = port else {
+        return match choice {
+            MidiPort::Named(wanted) => Err(format!("MIDI input: \"{wanted}\" not found")),
+            _ => Ok(None),
+        };
+    };
     let name = input.port_name(port).map_err(|e| format!("MIDI: {e}"))?;
     let connection = input
         .connect(
@@ -159,7 +182,7 @@ pub fn open(choice: &MidiPort, ui: Sender<Event>, waker: Waker) -> Result<Option
                     None => note_on(message).map(|note| match ordrumbox_engine::pattern_key(note.channel, note.key) {
                         Some(pattern) => Event::Pattern(pattern),
                         None => {
-                            NOTES.push(note);
+                            queue(note);
                             Event::Note(note)
                         }
                     }),

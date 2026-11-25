@@ -196,7 +196,7 @@ impl Tools<'_> {
                 new_tracks.push(track.clone());
             }
             let steps_per_beat = existing.map_or(DEFAULT_STEPS_PER_BEAT, |t| t.steps_per_beat).max(1);
-            if step / steps_per_beat as u32 >= MAX_BEATS as u32 {
+            if beat_and_step(step, steps_per_beat).is_none_or(|(beat, _)| beat >= MAX_BEATS) {
                 return Err(format!(
                     "{at}.step: {step} is past the {MAX_BEATS} beats of a pattern ({steps_per_beat} steps a beat)"
                 ));
@@ -214,7 +214,8 @@ impl Tools<'_> {
                     Some(t) => t,
                     None => editor.add_track(p, track, DEFAULT_STEPS_PER_BEAT).ok_or("no room for a track")?,
                 };
-                let (beat, beat_step) = beat_and_step(*step, editor.library().patterns[p].tracks[t].steps_per_beat);
+                let (beat, beat_step) = beat_and_step(*step, editor.library().patterns[p].tracks[t].steps_per_beat)
+                    .ok_or("the step is past the pattern")?;
                 grow_pattern(editor, p, beat + 1);
                 let notes = &editor.library().patterns[p].tracks[t].notes;
                 let n = match notes.iter().position(|n| n.beat == beat && n.step == beat_step) {
@@ -251,7 +252,8 @@ impl Tools<'_> {
                 .ok_or_else(|| format!("{at}.trackName: the pattern has no track \"{}\"", track.trim()))?;
             let step = optional_whole(item, "step").map_err(|e| format!("{at}.{e}"))?;
             let step = step.ok_or_else(|| format!("{at}.step is required"))?;
-            let (beat, beat_step) = beat_and_step(step, pattern.tracks[t].steps_per_beat);
+            let (beat, beat_step) = beat_and_step(step, pattern.tracks[t].steps_per_beat)
+                .ok_or_else(|| format!("{at}.step: {step} is past any pattern"))?;
             if !planned.contains(&(t, beat, beat_step)) {
                 planned.push((t, beat, beat_step));
             }

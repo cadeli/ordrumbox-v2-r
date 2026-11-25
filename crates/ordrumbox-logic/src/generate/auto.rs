@@ -523,16 +523,22 @@ pub fn restyle_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options
 /// style (a seed drawn first when it has none). The same settings make the
 /// same lines.
 pub fn recompose(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) {
-    if pattern.extra.get(PATTERN_SEED).and_then(Value::as_f64).is_none() {
+    if seed_of(pattern).is_none() {
         let seed = (g.random() * SEED_RANGE).floor();
         pattern.extra.insert(PATTERN_SEED, Value::Number(seed));
     }
     seeded_lines(g, pattern, &Options::default());
 }
 
-/// `generate_pattern` drawing from the pattern's seed.
+/// The pattern's seed, if it has one: a whole number from 0.
+fn seed_of(pattern: &Pattern) -> Option<u64> {
+    pattern.extra.get(PATTERN_SEED).and_then(Value::as_f64).and_then(ordrumbox_core::num::whole)
+}
+
+/// `generate_pattern` drawing from the pattern's seed (its callers write
+/// one first: 0 is never drawn from in practice).
 fn seeded_lines(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &Options) {
-    let seed = pattern.extra.get(PATTERN_SEED).and_then(Value::as_f64).map_or(0, |s| s as u64);
+    let seed = seed_of(pattern).unwrap_or(0);
     let mut rng = ordrumbox_core::Rng::new(seed);
     let mut rnd = || rng.next_f64();
     generate_pattern(&mut AutoGenerator::new(g.scales, g.styles, &mut rnd), pattern, options);

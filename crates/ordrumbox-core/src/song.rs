@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use crate::automation::{AutomationLane, AutomationTarget, STEPS_PER_MEASURE};
 use crate::ids::{slugify, unique_id};
 use crate::json::{Object, Value};
+use crate::num::floor_u32;
 use crate::record::Issue;
 
 /// Beats in one 4/4 measure.
@@ -166,7 +167,7 @@ impl Song {
             }
             clips.push(SongClip {
                 pattern_id: reference.to_owned(),
-                start_measure: start.min(f64::from(u32::MAX)) as u32,
+                start_measure: floor_u32(start),
                 length_measures: count,
             });
         }

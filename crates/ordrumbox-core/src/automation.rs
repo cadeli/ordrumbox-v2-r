@@ -20,7 +20,7 @@
 mod file;
 mod target;
 
-use crate::num::{db_to_gain, gain_to_db};
+use crate::num::{db_to_gain, floor_u32, gain_to_db};
 use crate::{Pattern, Song, Track};
 
 /// Steps of a beat on an automation lane.
@@ -242,7 +242,7 @@ impl AutomationLane {
     /// drawn line); a switch, or a level set on one step alone, holds.
     #[must_use]
     pub fn value_at_position(&self, position: f64) -> Option<f64> {
-        let step = position.max(0.0).floor().min(f64::from(u32::MAX)) as u32;
+        let step = floor_u32(position);
         let value = self.value_at(step)?;
         let at = self.points.partition_point(|point| point.step < step);
         let next = match self.points.get(at..) {

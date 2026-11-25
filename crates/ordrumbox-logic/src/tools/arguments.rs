@@ -5,6 +5,7 @@ use super::NOT_EDITED;
 
 use crate::editor::Editor;
 use ordrumbox_core::json::{Object, Value};
+use ordrumbox_core::num::whole;
 use ordrumbox_core::{Library, Pattern, SetField, Track};
 
 /// Argument `key`, which must be a string.
@@ -30,10 +31,10 @@ pub fn optional_number(args: &Value, key: &str) -> Result<Option<f64>, String> {
 
 /// A whole number from 0 (a step, a measure, an index).
 pub fn optional_whole(args: &Value, key: &str) -> Result<Option<u32>, String> {
-    match optional_number(args, key)? {
-        None => Ok(None),
-        Some(n) if n >= 0.0 && n.fract() == 0.0 && n <= f64::from(u32::MAX) => Ok(Some(n as u32)),
-        Some(n) => Err(format!("{key}: {n} is not a whole number from 0")),
+    let Some(n) = optional_number(args, key)? else { return Ok(None) };
+    match whole(n).and_then(|n| u32::try_from(n).ok()) {
+        Some(n) => Ok(Some(n)),
+        None => Err(format!("{key}: {n} is not a whole number from 0")),
     }
 }
 

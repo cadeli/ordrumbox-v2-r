@@ -147,7 +147,7 @@ impl KitSet {
     /// The samples of kit `kit` scaled to a 0 dB peak; how many.
     pub fn normalize(&mut self, kit: usize) -> Result<usize, String> {
         let urls: Vec<String> =
-            self.kits.get(kit).map(|k| k.samples.iter().map(|i| i.path.clone()).collect()).unwrap_or_default();
+            self.kits.get(kit).ok_or("no such kit")?.samples.iter().map(|i| i.path.clone()).collect();
         let mut count = 0;
         for url in urls {
             let Some(buffer) = self.buffers.get(&url) else { continue };

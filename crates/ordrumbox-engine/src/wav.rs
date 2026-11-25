@@ -54,15 +54,17 @@ pub fn decode(bytes: &[u8]) -> Result<SampleBuffer, WavError> {
     let mut at = 12;
     while let (Some(id), Some(size)) = (bytes.get(at..at + 4), u32_at(bytes, at + 4)) {
         let start = at + 8;
+        // Past `usize` (a 16-bit system): longer than any file, so to its end.
+        let size = usize::try_from(size).unwrap_or(usize::MAX);
         // A data chunk longer than the file (truncated download) keeps what is there.
-        let end = start.saturating_add(size as usize).min(bytes.len());
+        let end = start.saturating_add(size).min(bytes.len());
         let body = &bytes[start..end];
         match id {
             b"fmt " => format = Some(parse_format(body)?),
             b"data" => data = Some(body),
             _ => {}
         }
-        at = end + (size as usize & 1); // chunks are word-aligned
+        at = end + (size & 1); // chunks are word-aligned
     }
     let format = format.ok_or(WavError::MissingChunk("fmt "))?;
     let data = data.ok_or(WavError::MissingChunk("data"))?;

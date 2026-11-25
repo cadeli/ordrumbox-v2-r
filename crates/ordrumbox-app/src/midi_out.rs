@@ -143,7 +143,7 @@ impl Drop for Output {
 }
 
 /// Open the port `choice` names. `Ok(None)`: no port to open (none chosen,
-/// or the one chosen is not connected).
+/// or none connected); the port chosen by its name and not connected is an error.
 pub fn open(choice: &MidiPort) -> Result<Option<Output>, String> {
     let output = MidiOutput::new("orDrumbox").map_err(|e| format!("MIDI out: {e}"))?;
     let ports = output.ports();
@@ -152,7 +152,12 @@ pub fn open(choice: &MidiPort) -> Result<Option<Output>, String> {
         MidiPort::First => ports.first(),
         MidiPort::Named(wanted) => ports.iter().find(|p| output.port_name(p).is_ok_and(|name| name == *wanted)),
     };
-    let Some(port) = port else { return Ok(None) };
+    let Some(port) = port else {
+        return match choice {
+            MidiPort::Named(wanted) => Err(format!("MIDI output: \"{wanted}\" not found")),
+            _ => Ok(None),
+        };
+    };
     let name = output.port_name(port).map_err(|e| format!("MIDI out: {e}"))?;
     let connection = output.connect(port, "orDrumbox out").map_err(|e| format!("MIDI out {name}: {e}"))?;
     // What the engine queued while no port was open is not for this one.

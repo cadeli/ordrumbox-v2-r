@@ -4,7 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 use std::sync::Arc;
 
 use ordrumbox_engine::kit::edit::{put_kit, set_instruments_from_names};
@@ -50,11 +50,14 @@ impl KitSet {
         if dir.join(KIT_FILE).is_file() {
             return self.import_kit_folder(dir);
         }
-        let mut files: Vec<PathBuf> = fs::read_dir(dir)
-            .map_err(|e| format!("{}: {e}", dir.display()))?
-            .filter_map(|e| Some(e.ok()?.path()))
-            .filter(|p| p.is_file() && is_wav(p))
-            .collect();
+        let entries = fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        let mut files = Vec::new();
+        for entry in entries {
+            let path = entry.map_err(|e| format!("{}: {e}", dir.display()))?.path();
+            if path.is_file() && is_wav(&path) {
+                files.push(path);
+            }
+        }
         if files.is_empty() {
             return Err("No audio files found in selected directory".into());
         }

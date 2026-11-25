@@ -122,7 +122,11 @@ impl App {
             self.open_midi();
             redraw = true;
         }
-        if let Some(error) = self.midi_out.as_ref().and_then(midi_out::Output::take_error) {
+        let errors = [
+            self.midi.as_ref().and_then(midi::Input::take_error),
+            self.midi_out.as_ref().and_then(midi_out::Output::take_error),
+        ];
+        for error in errors.into_iter().flatten() {
             self.ui.session.say(&error);
             redraw = true;
         }

@@ -4,6 +4,7 @@
 
 use super::{AutomationLane, AutomationPoint, AutomationTarget, kept};
 use crate::json::{Object, Value};
+use crate::num::floor_u32;
 use crate::record::Issue;
 
 impl AutomationLane {
@@ -103,5 +104,5 @@ fn point_from_json(raw: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Aut
     if let Some(raw) = value.filter(|&v| kept(v) != v) {
         issues.push(Issue::new(format!("{at}.value"), format!("{raw} kept as {}", kept(raw))));
     }
-    Some(AutomationPoint { step: step.floor() as u32, value: value.map(kept) })
+    Some(AutomationPoint { step: floor_u32(step), value: value.map(kept) })
 }

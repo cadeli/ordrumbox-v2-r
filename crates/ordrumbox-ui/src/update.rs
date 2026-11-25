@@ -15,6 +15,7 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ordrumbox_core::json::{self, Object, Value};
+use ordrumbox_core::num;
 
 /// This program's version.
 pub const CURRENT: &str = env!("CARGO_PKG_VERSION");
@@ -73,10 +74,11 @@ impl Settings {
         for (key, value) in object.iter() {
             match (key, value) {
                 ("check", Value::Bool(check)) => settings.check = *check,
-                ("lastCheck", value) if value.as_f64().is_some_and(|s| s >= 0.0 && s.fract() == 0.0) => {
-                    settings.last_check = value.as_f64().map(|s| s as u64);
-                }
-                ("check" | "lastCheck", value) => issues.push(format!("updates.{key}: wrong type ({value}), ignored")),
+                ("lastCheck", value) => match value.as_f64().and_then(num::whole) {
+                    Some(seconds) => settings.last_check = Some(seconds),
+                    None => issues.push(format!("updates.{key}: not a whole number of seconds ({value}), ignored")),
+                },
+                ("check", value) => issues.push(format!("updates.{key}: wrong type ({value}), ignored")),
                 (key, _) => issues.push(format!("updates.{key}: unknown setting, ignored")),
             }
         }

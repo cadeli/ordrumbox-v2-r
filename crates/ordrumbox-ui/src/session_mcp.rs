@@ -46,8 +46,8 @@ impl Session {
         }
     }
 
-    /// Run the MCP calls waiting, and show a connection that failed to
-    /// open; whether there was either.
+    /// Run the MCP calls waiting, and show a connection that failed or a
+    /// link that stopped; whether there was any.
     pub fn poll_mcp(&mut self) -> bool {
         let mut called = false;
         while let Some(incoming) = self.mcp.as_ref().and_then(mcp_link::Server::poll) {
@@ -57,6 +57,10 @@ impl Session {
                     request.answer(outcome);
                 }
                 mcp_link::Incoming::Failed(message) => self.tell(message),
+                mcp_link::Incoming::Stopped => {
+                    self.mcp = None;
+                    self.tell("MCP: the link stopped; start orDrumbox again to use it".to_owned());
+                }
             }
             called = true;
         }

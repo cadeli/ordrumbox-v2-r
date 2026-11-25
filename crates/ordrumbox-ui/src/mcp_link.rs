@@ -12,11 +12,12 @@
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, Receiver, SendError, Sender};
+use std::sync::mpsc::{self, Receiver, SendError, Sender, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
 use ordrumbox_core::json::{self, Value};
+use ordrumbox_core::num;
 use ordrumbox_logic::tools::object;
 
 use crate::update::Waker;
@@ -48,12 +49,15 @@ impl Request {
     }
 }
 
-/// What the listener passes to the window: a call, or a connection it
-/// failed to accept (told once per run of failures).
+/// What the listener passes to the window: a call, a connection it
+/// failed to accept (told once per run of failures) or that ended on an
+/// error, or the end of the link.
 #[derive(Debug)]
 pub enum Incoming {
     Call(Request),
     Failed(String),
+    /// The listener stopped: no call can come any more.
+    Stopped,
 }
 
 /// The app's end: a listener on a thread of its own, the calls it took.
@@ -87,8 +91,11 @@ impl Server {
 
     /// The next call or failure waiting, if any.
     pub fn poll(&self) -> Option<Incoming> {
-        // Disconnected: the listener stopped, and so did the calls.
-        self.requests.try_recv().ok()
+        match self.requests.try_recv() {
+            Ok(incoming) => Some(incoming),
+            Err(TryRecvError::Empty) => None,
+            Err(TryRecvError::Disconnected) => Some(Incoming::Stopped),
+        }
     }
 }
 
@@ -123,9 +130,11 @@ fn accept(listener: &TcpListener, token: &str, sender: &Sender<Incoming>, waker:
         failing = false;
         let (token, sender, waker) = (token.to_owned(), sender.clone(), waker.clone());
         thread::spawn(move || {
-            match serve(stream, &token, &sender, &waker) {
-                // An I/O error ends the connection: the bridge reports it.
-                Ok(()) | Err(_) => {}
+            // The bridge reports the error to its client; the window says it too.
+            if let Err(e) = serve(stream, &token, &sender, &waker)
+                && sender.send(Incoming::Failed(format!("MCP: a connection ended: {e}"))).is_ok()
+            {
+                waker.wake();
             }
         });
     }
@@ -138,7 +147,7 @@ fn read_line(reader: &mut impl BufRead) -> io::Result<Option<String>> {
     if count == 0 {
         return Ok(None);
     }
-    if !line.ends_with('\n') && count as u64 == MAX_LINE_BYTES {
+    if !line.ends_with('\n') && u64::try_from(count).is_ok_and(|count| count == MAX_LINE_BYTES) {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "line too long"));
     }
     Ok(Some(line))
@@ -209,12 +218,13 @@ impl Connection {
     fn open(endpoint: &Path) -> Result<Self, String> {
         let text = std::fs::read_to_string(endpoint).map_err(|e| format!("{}: {e}", endpoint.display()))?;
         let value = json::parse(&text).map_err(|e| format!("{}: {e}", endpoint.display()))?;
-        let port = value.get("port").and_then(Value::as_f64).filter(|p| (1.0..=65535.0).contains(p));
+        let port = value.get("port").and_then(Value::as_f64).and_then(num::whole).and_then(|p| u16::try_from(p).ok());
+        let port = port.filter(|&p| p > 0);
         let token = value.get("token").and_then(Value::as_str);
         let (Some(port), Some(token)) = (port, token) else {
             return Err(format!("{}: no port or no token", endpoint.display()));
         };
-        let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port as u16));
+        let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
         let stream = TcpStream::connect_timeout(&address, CONNECT_TIMEOUT).map_err(|e| format!("{address}: {e}"))?;
         stream.set_read_timeout(Some(REPLY_TIMEOUT)).map_err(|e| e.to_string())?;
         let mut connection =

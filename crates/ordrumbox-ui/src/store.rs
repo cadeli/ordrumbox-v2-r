@@ -195,10 +195,15 @@ pub fn load_setting(path: &Path, key: &str) -> Result<Option<json::Value>, Strin
 /// cannot be read or is not a JSON object is an error, never written over.
 pub fn save_setting(path: &Path, key: &str, value: json::Value) -> io::Result<()> {
     let mut settings = match fs::read_to_string(path) {
-        Ok(text) => json::parse(&text)
-            .ok()
-            .and_then(|v| v.as_object().cloned())
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "not a JSON object, not written over"))?,
+        Ok(text) => {
+            let not_written =
+                |why: String| io::Error::new(io::ErrorKind::InvalidData, format!("{why}, not written over"));
+            json::parse(&text)
+                .map_err(|e| not_written(e.to_string()))?
+                .as_object()
+                .cloned()
+                .ok_or_else(|| not_written("not a JSON object".to_owned()))?
+        }
         Err(e) if e.kind() == io::ErrorKind::NotFound => json::Object::new(),
         Err(e) => return Err(e),
     };
