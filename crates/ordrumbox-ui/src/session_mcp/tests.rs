@@ -201,7 +201,7 @@ fn a_synth_preset_takes_matrix_lines() {
         r#"{"matrix.source1":"lfo3"}"#,
         r#"{"matrix.target1":"nowhere"}"#,
         r#"{"matrix.amount1":1.5}"#,
-        r#"{"matrix.source9":"lfo1"}"#,
+        r#"{"matrix.source12":"lfo1"}"#,
     ] {
         let args = format!(r#"{{"preset":"wobble","settings":{refused}}}"#);
         assert!(call(&mut s, "updateSynthPreset", &args).is_err(), "{refused}");
@@ -212,12 +212,13 @@ fn a_synth_preset_takes_matrix_lines() {
 fn synth_presets_are_designed() {
     let mut s = session();
     let args = r#"{"preset":"acid","settings":{"vco1.wave":"sawtooth","filter.freq":800,"filter.slope":24,
-        "lfo.depth":0.3,"bypassFilter":false}}"#;
+        "lfo.freq":2,"bypassFilter":false}}"#;
     let made = call(&mut s, "createSynthPreset", args).unwrap();
     assert_eq!(get(&made, &["settings", "vco1", "wave"]).as_str(), Some("sawtooth"));
     assert_eq!(get(&made, &["settings", "filter", "slope"]).as_f64(), Some(24.0));
-    // Setting the LFO's depth aims it at the filter, as the editor does.
-    assert_eq!(get(&made, &["settings", "lfo", "target"]).as_str(), Some("filter.freq"));
+    // Setting an LFO aims it at the filter through the matrix, as the editor does.
+    assert_eq!(get(&made, &["settings", "matrix", "source1"]).as_str(), Some("lfo1"));
+    assert_eq!(get(&made, &["settings", "matrix", "target1"]).as_str(), Some("filter.freq"));
     assert!(call(&mut s, "createSynthPreset", r#"{"preset":"ACID"}"#).is_err(), "the key is taken");
     let refused = [
         r#"{"preset":"acid","settings":{"filter.freq":5}}"#,

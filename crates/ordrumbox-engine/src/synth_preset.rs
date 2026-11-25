@@ -11,10 +11,11 @@ use ordrumbox_dsp::SynthPatch;
 use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;
 use ordrumbox_dsp::synth::patch::{
-    Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, ModEnvTarget, NoiseMode, PitchEnv, SynthBypass, SynthLfo,
+    Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, NoiseMode, PitchEnv, SynthBypass, SynthLfo,
 };
 use ordrumbox_dsp::synth::{MAX_PITCH_ENV_SEMITONES, MAX_UNISON};
 
+pub mod legacy_modulation;
 pub mod tags;
 
 /// `C3_FREQ`, Hz: the pitch of ratio 1.
@@ -43,14 +44,10 @@ pub const PITCH_ENV_DECAY_RANGE: (f64, f64) = (0.005, 1.0);
 pub const PITCH_ENV_DECAY_DEFAULT: f64 = 0.05;
 /// What a line of a preset's `matrix` reads, by code.
 pub const MATRIX_SOURCES: [&str; 8] = ["off", "lfo1", "lfo2", "env", "modEnv", "velocity", "key", "random"];
-const MOD_ENV_TARGETS: [&str; 5] = ["off", "filter", "pitch", "fm", "shape"];
-/// The LFO targets by their name in a preset (two names for the filter envelope amount).
+/// The LFO targets by their name in a preset (two names for the filter envelope amount;
+/// older names: [`legacy_modulation`]).
 const LFO_TARGETS: [(&str, LfoTarget); 42] = [
     ("NOT", LfoTarget::Off),
-    ("FLT", LfoTarget::Filter),
-    ("VCO1", LfoTarget::Osc1),
-    ("VCO2", LfoTarget::Osc2),
-    ("VCO3", LfoTarget::Osc3),
     ("masterVolume", LfoTarget::Volume),
     ("vco1.gain", LfoTarget::Osc1Gain),
     ("vco1.detune", LfoTarget::Osc1Detune),
@@ -88,7 +85,15 @@ const LFO_TARGETS: [(&str, LfoTarget); 42] = [
     ("pitchEnv.amount", LfoTarget::PitchEnvAmount),
     ("pitchEnv.decay", LfoTarget::PitchEnvDecay),
     ("vco2.ring", LfoTarget::Osc2Ring),
+    ("filter.open", LfoTarget::FilterOpen),
+    ("pitch", LfoTarget::Pitch),
+    ("fm.boost", LfoTarget::FmBoost),
+    ("shape", LfoTarget::Shape),
 ];
+
+/// The targets that are no control of the editor but an effect on several:
+/// open the filter, the pitch of the three oscillators, more FM, the shape.
+pub const EFFECT_TARGETS: [&str; 4] = ["filter.open", "pitch", "fm.boost", "shape"];
 /// `SYNC_NOTE_HZ`: LFO cycles per beat-second for each sync label.
 const SYNC_NOTE_HZ: [(&str, f64); 7] = [
     ("1/1", 0.25),
@@ -113,7 +118,8 @@ impl SynthPresets {
     /// What of the presets a patch cannot read, and plays as its default
     /// instead: a preset that is not an object, a group of one that is not
     /// an object, a value in a group that is not a number, text or yes/no,
-    /// a level that is not a number.
+    /// a level that is not a number, an older LFO or modulation envelope
+    /// target the matrix has no free line for.
     #[must_use]
     pub fn issues(&self) -> Vec<Issue> {
         let mut issues = Vec::new();
@@ -129,6 +135,12 @@ impl SynthPresets {
                 } else if PRESET_NUMBERS.contains(&name) && value.to_number().is_none() {
                     issues.push(Issue::new(at, refusal(value)));
                 }
+            }
+            let mut upgraded = preset.clone();
+            legacy_modulation::upgrade(&mut upgraded);
+            for group in legacy_modulation::stranded(&upgraded) {
+                let text = "no free line in the matrix for this target: not played";
+                issues.push(Issue::new(format!("{key}.{group}.target"), text.to_owned()));
             }
         }
         issues
@@ -345,10 +357,8 @@ fn bypass_flags(preset: &Value) -> SynthBypass {
 /// The LFO an `lfo` object of a preset describes, its sync read at `bpm`.
 fn synth_lfo(lfo: Option<&Value>, bpm: f64) -> SynthLfo {
     SynthLfo {
-        target: lfo_target(get(lfo, "target")),
         wave: choice(get(lfo, "wave"), &WAVES, &Wave::ALL),
         freq: sync_to_hz(get(lfo, "sync"), bpm).unwrap_or_else(|| finite(get(lfo, "freq"), 0.0)),
-        depth: finite(get(lfo, "depth"), 0.0),
     }
 }
 
@@ -366,6 +376,8 @@ fn pitch_env(pitch_env: Option<&Value>) -> PitchEnv {
 
 /// The `update` message `WorkletSynthVoice` sends for `note` with `preset`.
 pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
+    let preset = legacy_modulation::upgraded(preset);
+    let preset = preset.as_ref();
     let gs = Some(preset);
     let at = |key: &str| get(gs, key);
     let note_ratio = finite(Some(&Value::Number(note.ratio)), 1.0).max(MIN_NOTE_RATIO);
@@ -380,8 +392,6 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let filter = at("filter");
     let env = at("envelope");
     let mod_env = at("modEnvelope");
-    let mod_target = get(mod_env, "target");
-    let is_mod_env_on = mod_target.and_then(Value::as_str).is_some_and(|t| !t.is_empty() && t != "off");
     let fm = at("fm");
     let unison = at("unison");
 
@@ -417,8 +427,6 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         fm_amount: clamp(finite(get(fm, "amount"), 0.0), 0.0, 1.0),
         fm_algorithm: clamp(finite(get(fm, "algo"), 0.0).round(), 0.0, 4.0),
         mod_envelope: adsr(mod_env, 0.0),
-        mod_env_target: choice(mod_target, &MOD_ENV_TARGETS, &ModEnvTarget::ALL),
-        mod_env_depth: if is_mod_env_on { 1.0 } else { 0.0 },
         unison_count: unison_count(get(unison, "count")),
         unison_detune: clamp(finite(get(unison, "detune"), 0.0), 0.0, 100.0),
         unison_spread: clamp(finite(get(unison, "spread"), 0.0), 0.0, 1.0),
@@ -537,12 +545,16 @@ mod tests {
 
     #[test]
     fn lfo_sync_and_targets() {
-        let preset =
-            json::parse(r#"{"lfo":{"target":"filter.Q","wave":"random","freq":3,"sync":"1/8"},"lfo2":{"target":"x"}}"#)
-                .unwrap();
+        let preset = json::parse(
+            r#"{"lfo":{"target":"filter.Q","depth":0.3,"wave":"random","freq":3,"sync":"1/8"},"lfo2":{"target":"x"}}"#,
+        )
+        .unwrap();
         let patch = synth_patch(&preset, SynthNote { ratio: 1.0, velocity: 0.5, pan: 0.0, bpm: 90.0 });
-        assert_eq!((patch.lfo1.target, patch.lfo1.wave, patch.lfo1.freq), (LfoTarget::FilterQ, Wave::Random, 3.0));
-        assert_eq!(patch.lfo2.target, LfoTarget::Off);
+        assert_eq!((patch.lfo1.wave, patch.lfo1.freq), (Wave::Random, 3.0));
+        // An older LFO target is a line of the matrix; one without depth plays nothing.
+        let mut routes = [MatrixRoute::default(); MATRIX_SIZE];
+        routes[0] = MatrixRoute { source: MatrixSource::Lfo1, target: LfoTarget::FilterQ, amount: 0.3 };
+        assert_eq!(patch.matrix, routes);
         assert_eq!(note_seconds(120.0, 4), 0.125);
     }
 

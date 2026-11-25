@@ -1,4 +1,4 @@
-//! What the synth editor plots and animates: the LFO modulation, the scope,
+//! What the synth editor plots and animates: what the LFOs add through the matrix, the scope,
 //! the envelope and the filter curve.
 
 use ordrumbox_core::json::{Object, Value};
@@ -6,53 +6,53 @@ use ordrumbox_core::lfo;
 use ordrumbox_core::num::gain_to_db;
 use ordrumbox_dsp::synth::ring;
 
-use super::{EXTRA_METAS, FM_DEVIATION, OSC2_SYNCS, WAVES, lfo_scale, number, slope, text};
+use super::{EXTRA_METAS, FM_DEVIATION, LFOS, OSC2_SYNCS, WAVES, lfo_scale, number, routes_of, slope, text};
 
-/// The LFOs playing (not bypassed): LFO1, LFO2.
-fn lfos(draft: &Object) -> [Option<&Object>; 2] {
-    let lfo = |group: &str, flag: &str| {
-        (!draft.get(flag).is_some_and(Value::is_true)).then(|| draft.get(group)?.as_object()).flatten()
-    };
-    [lfo("lfo", "bypassLfo1"), lfo("lfo2", "bypassLfo2")]
+/// The LFOs playing (not bypassed), each with the matrix source it is.
+fn playing_lfos(draft: &Object) -> impl Iterator<Item = (&Object, &'static str)> {
+    LFOS.iter().filter(|lfo| !draft.get(lfo.bypass_flag).is_some_and(Value::is_true)).filter_map(|lfo| {
+        let group = draft.get(lfo.group)?.as_object()?;
+        Some((group, lfo.source))
+    })
 }
 
-/// The modulation an LFO adds to its target at `time` seconds, in the
-/// target's units: tempo sync wins over the frequency.
-pub fn lfo_mod(lfo: &Object, time: f64, bpm: f64) -> f64 {
-    let target = lfo.get("target").and_then(Value::as_str).unwrap_or_default();
-    let scale = lfo_scale(target);
-    if scale == 0.0 {
-        return 0.0;
-    }
+/// The value of `lfo` at `time` seconds, -1 to 1 (0 when stopped): tempo
+/// sync wins over the frequency.
+#[must_use]
+pub fn lfo_value(lfo: &Object, time: f64, bpm: f64) -> f64 {
     let freq = crate::synth_preset::sync_to_hz(lfo.get("sync"), bpm)
         .unwrap_or_else(|| lfo.get("freq").and_then(Value::to_number).unwrap_or(0.0));
-    let depth = lfo.get("depth").and_then(Value::to_number).unwrap_or(0.0);
-    if freq <= 0.0 || depth <= 0.0 {
+    if freq <= 0.0 {
         return 0.0;
     }
     let wave = lfo.get("wave").and_then(Value::as_str).unwrap_or("sine");
     let code = WAVES.iter().position(|w| *w == wave).unwrap_or(0) as f64;
-    lfo::waveform(time * freq, code) * depth * scale
+    lfo::waveform(time * freq, code)
 }
 
-/// The modulation the playing LFOs add to `path` at `time`.
+/// The modulation the playing LFOs add to `path` at `time`, through the
+/// lines of the matrix, in the units of `path`.
 pub fn lfo_mod_on(draft: &Object, path: &str, time: f64, bpm: f64) -> f64 {
-    lfos(draft)
-        .into_iter()
-        .flatten()
-        .filter(|l| l.get("target").and_then(Value::as_str) == Some(path))
-        .map(|l| lfo_mod(l, time, bpm))
+    let scale = lfo_scale(path);
+    if scale == 0.0 {
+        return 0.0;
+    }
+    playing_lfos(draft)
+        .map(|(lfo, source)| {
+            let amount: f64 = routes_of(draft, source).filter(|(target, _)| *target == path).map(|(_, a)| a).sum();
+            if amount == 0.0 { 0.0 } else { lfo_value(lfo, time, bpm) * amount * scale }
+        })
         .sum()
 }
 
-/// The controls an LFO is on: its target, when it
-/// has depth and is not bypassed.
+/// Whether a line of the matrix sends a playing LFO somewhere.
+pub fn is_any_lfo_routed(draft: &Object) -> bool {
+    playing_lfos(draft).any(|(_, source)| routes_of(draft, source).next().is_some())
+}
+
+/// Whether a line of the matrix sends a playing LFO to `path`.
 pub fn lfo_targeted(draft: &Object, path: &str) -> bool {
-    lfos(draft).into_iter().flatten().any(|l| {
-        l.get("target").and_then(Value::as_str) == Some(path)
-            && path != "NOT"
-            && l.get("depth").and_then(Value::as_f64).unwrap_or(0.0) > 0.0
-    })
+    playing_lfos(draft).any(|(_, source)| routes_of(draft, source).any(|(target, _)| target == path))
 }
 
 // ─── What the canvases plot ──────────────────────────────────────────────────
@@ -236,11 +236,10 @@ pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, f64
     let fc = (fc + lfo_mod_on(draft, "filter.freq", time, bpm))
         .clamp(ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ);
     let q = (q + lfo_mod_on(draft, "filter.Q", time, bpm)).clamp(0.1, 24.0);
-    let depth = lfos(draft)
-        .into_iter()
-        .flatten()
-        .filter(|l| l.get("target").and_then(Value::as_str) == Some("filter.freq"))
-        .map(|l| l.get("depth").and_then(Value::as_f64).unwrap_or(0.0))
+    let depth = playing_lfos(draft)
+        .flat_map(|(_, source)| routes_of(draft, source))
+        .filter(|(target, _)| *target == "filter.freq")
+        .map(|(_, amount)| amount.abs())
         .fold(0.0f64, f64::max);
     let band = (depth > 0.0).then(|| {
         (

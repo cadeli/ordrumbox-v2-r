@@ -50,25 +50,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "BASS_SQUARE": {
@@ -122,25 +117,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "BASS_SUB": {
@@ -194,25 +184,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "BASS_PLUCK": {
@@ -266,25 +251,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "BASS_ACID": {
@@ -338,25 +318,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "BASS_FM": {
@@ -410,25 +385,25 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.003,
       "decay": 0.15,
       "sustain": 0,
-      "release": 0.08,
-      "target": "fm"
+      "release": 0.08
+    },
+    "matrix": {
+      "source1": "modEnv",
+      "target1": "fm.boost",
+      "amount1": 1.0
     }
   },
   "SYNTHLEAD_SAW": {
@@ -482,25 +457,20 @@
       "release": 0.15
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SYNTHLEAD_SQUARE": {
@@ -554,25 +524,28 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "vco1.detune",
       "wave": "sine",
       "freq": 5.5,
-      "depth": 0.12,
       "sync": "off"
     },
     "lfo2": {
-      "target": "vco2.detune",
       "wave": "sine",
       "freq": 5.5,
-      "depth": 0.12,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "vco1.detune",
+      "amount1": 0.12,
+      "source2": "lfo2",
+      "target2": "vco2.detune",
+      "amount2": 0.12
     }
   },
   "SYNTHLEAD_SUPERSAW": {
@@ -631,25 +604,20 @@
       "release": 0.3
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SYNTHPAD_WARM": {
@@ -703,25 +671,20 @@
       "release": 1.2
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SYNTHPAD_SWEEP": {
@@ -775,25 +738,25 @@
       "release": 1.5
     },
     "lfo": {
-      "target": "filter.freq",
       "wave": "sine",
       "freq": 0.15,
-      "depth": 0.6,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "filter.freq",
+      "amount1": 0.6
     }
   },
   "PIANO_EPIANO": {
@@ -847,25 +810,20 @@
       "release": 0.4
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "PIANO_CLAV": {
@@ -919,25 +877,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "ORGAN_DRAWBAR": {
@@ -991,25 +944,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "ORGAN_PERC": {
@@ -1063,25 +1011,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "BRASS_SYNTH": {
@@ -1135,25 +1078,20 @@
       "release": 0.2
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "BRASS_STAB": {
@@ -1207,25 +1145,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "STRINGS_ENSEMBLE": {
@@ -1279,25 +1212,25 @@
       "release": 0.8
     },
     "lfo": {
-      "target": "vco1.detune",
       "wave": "sine",
       "freq": 4.5,
-      "depth": 0.06,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "vco1.detune",
+      "amount1": 0.06
     }
   },
   "STRINGS_PIZZ": {
@@ -1351,25 +1284,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CROMAPERC_BELL": {
@@ -1423,25 +1351,20 @@
       "release": 0.8
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CROMAPERC_MARIMBA": {
@@ -1495,25 +1418,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CHH_SYNTH": {
@@ -1566,25 +1484,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "OHH_SYNTH": {
@@ -1637,25 +1550,20 @@
       "release": 0.15
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "KICK_SYNTH": {
@@ -1708,25 +1616,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.003,
       "decay": 0.09,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -1788,25 +1691,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TOM_SYNTH": {
@@ -1859,25 +1757,20 @@
       "release": 0.2
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CLAP_SYNTH": {
@@ -1930,25 +1823,25 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "masterVolume",
       "wave": "sawtooth",
       "freq": 70,
-      "depth": 0.7,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "masterVolume",
+      "amount1": 0.7
     }
   },
   "COWBELL_SYNTH": {
@@ -2002,25 +1895,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CRASH_SYNTH": {
@@ -2073,25 +1961,20 @@
       "release": 0.5
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "BASS_TOUCH": {
@@ -2145,25 +2028,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     },
     "matrix": {
       "source1": "velocity",
@@ -2243,25 +2121,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 2.0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     },
     "matrix": {
       "source1": "lfo1",
@@ -2341,25 +2214,20 @@
       "release": 1.2
     },
     "lfo": {
-      "target": "NOT",
       "wave": "triangle",
       "freq": 0.25,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     },
     "matrix": {
       "source1": "random",
@@ -2439,25 +2307,20 @@
       "release": 0.4
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     },
     "matrix": {
       "source1": "velocity",
@@ -2537,27 +2400,27 @@
       "release": 0.03
     },
     "lfo": {
-      "target": "vco1.detune",
       "wave": "sine",
       "freq": 6,
-      "depth": 0.08,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     },
-    "bypassFilter": true
+    "bypassFilter": true,
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "vco1.detune",
+      "amount1": 0.08
+    }
   },
   "CHIP_PULSE": {
     "instrument": "SYNTHLEAD",
@@ -2611,27 +2474,27 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "vco1.width",
       "wave": "sine",
       "freq": 1.5,
-      "depth": 0.3,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     },
-    "bypassFilter": true
+    "bypassFilter": true,
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "vco1.width",
+      "amount1": 0.3
+    }
   },
   "CHIP_BASS": {
     "instrument": "BASS",
@@ -2684,25 +2547,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     },
     "bypassFilter": true
   },
@@ -2758,25 +2616,20 @@
       "release": 0.03
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.08,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -2841,25 +2694,20 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     },
     "bypassFilter": true
   },
@@ -2913,25 +2761,20 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.1,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "bypassFilter": true,
     "matrix": {
@@ -2996,25 +2839,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     },
     "bypassFilter": true
   },
@@ -3070,25 +2908,28 @@
       "release": 0.6
     },
     "lfo": {
-      "target": "VCO1",
       "wave": "sawtooth",
       "freq": 1.8,
-      "depth": 0.7,
       "sync": "off"
     },
     "lfo2": {
-      "target": "VCO2",
       "wave": "sawtooth",
       "freq": 1.8,
-      "depth": 0.7,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "vco1.octave",
+      "amount1": 0.5833333333333334,
+      "source2": "lfo2",
+      "target2": "vco2.octave",
+      "amount2": 0.5833333333333334
     }
   },
   "DUB_MELODICA": {
@@ -3143,25 +2984,28 @@
       "release": 0.16
     },
     "lfo": {
-      "target": "vco1.detune",
       "wave": "sine",
       "freq": 5.2,
-      "depth": 0.1,
       "sync": "off"
     },
     "lfo2": {
-      "target": "vco2.detune",
       "wave": "sine",
       "freq": 5.2,
-      "depth": 0.1,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "vco1.detune",
+      "amount1": 0.1,
+      "source2": "lfo2",
+      "target2": "vco2.detune",
+      "amount2": 0.1
     }
   },
   "DUB_SKANK": {
@@ -3216,25 +3060,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_KICK": {
@@ -3287,25 +3126,20 @@
       "release": 0.3
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.045,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -3367,25 +3201,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_CLAP": {
@@ -3438,25 +3267,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_RIMSHOT": {
@@ -3509,25 +3333,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_CHH": {
@@ -3580,25 +3399,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_OHH": {
@@ -3651,25 +3465,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_CRASH": {
@@ -3722,25 +3531,20 @@
       "release": 0.5
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_RIDE": {
@@ -3793,25 +3597,20 @@
       "release": 0.5
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_LO_TOM": {
@@ -3864,25 +3663,20 @@
       "release": 0.15
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.03,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -3944,25 +3738,20 @@
       "release": 0.15
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.03,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -4024,25 +3813,20 @@
       "release": 0.15
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.03,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -4104,25 +3888,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_CONGAS": {
@@ -4175,25 +3954,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_HI_CONGAS": {
@@ -4246,25 +4020,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_CLAVES": {
@@ -4317,25 +4086,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_MARACAS": {
@@ -4388,25 +4152,20 @@
       "release": 0.015
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR808_COWBELL": {
@@ -4459,25 +4218,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_KICK": {
@@ -4530,25 +4284,20 @@
       "release": 0.15
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.02,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -4610,25 +4359,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_CLAP": {
@@ -4681,25 +4425,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_RIMSHOT": {
@@ -4752,25 +4491,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_CHH": {
@@ -4823,25 +4557,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_OHH": {
@@ -4894,25 +4623,20 @@
       "release": 0.15
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_CRASH": {
@@ -4965,25 +4689,20 @@
       "release": 0.5
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_RIDE": {
@@ -5036,25 +4755,20 @@
       "release": 0.5
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_LO_TOM": {
@@ -5107,25 +4821,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.09,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -5187,25 +4896,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.09,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -5267,25 +4971,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.09,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -5347,25 +5046,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_SHAKER": {
@@ -5418,25 +5112,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR909_TAMBOURINE": {
@@ -5489,25 +5178,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_HI_BONGOS": {
@@ -5560,25 +5244,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_LO_BONGOS": {
@@ -5631,25 +5310,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_OHI_CONGAS": {
@@ -5702,25 +5376,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_HI_CONGAS": {
@@ -5773,25 +5442,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_LO_CONGAS": {
@@ -5844,25 +5508,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_HI_TIMBAL": {
@@ -5915,25 +5574,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_LO_TIMBAL": {
@@ -5986,25 +5640,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_HI_WOODBLOCK": {
@@ -6057,25 +5706,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_LO_WOODBLOCK": {
@@ -6128,25 +5772,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_CLAVES": {
@@ -6199,25 +5838,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_COWBELL": {
@@ -6271,25 +5905,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_TRIANGLE": {
@@ -6342,25 +5971,20 @@
       "release": 0.5
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_MARACAS": {
@@ -6413,25 +6037,20 @@
       "release": 0.015
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_CABA": {
@@ -6484,25 +6103,20 @@
       "release": 0.03
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_GUIRO": {
@@ -6555,25 +6169,25 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "masterVolume",
       "wave": "square",
       "freq": 32,
-      "depth": 0.5,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "masterVolume",
+      "amount1": 0.5
     }
   },
   "LAT_CASTENET": {
@@ -6626,25 +6240,20 @@
       "release": 0.008
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "LAT_CUICA": {
@@ -6697,25 +6306,25 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.06,
       "decay": 0.18,
       "sustain": 0,
-      "release": 0.05,
-      "target": "pitch"
+      "release": 0.05
+    },
+    "matrix": {
+      "source1": "modEnv",
+      "target1": "pitch",
+      "amount1": 1.0
     }
   },
   "LAT_WHISTLE": {
@@ -6768,25 +6377,25 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "VCO1",
       "wave": "square",
       "freq": 22,
-      "depth": 0.09,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "vco1.octave",
+      "amount1": 0.075
     }
   },
   "TR606_KICK": {
@@ -6839,25 +6448,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.02,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -6919,25 +6523,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR606_CHH": {
@@ -6990,25 +6589,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR606_OHH": {
@@ -7061,25 +6655,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR606_CRASH": {
@@ -7132,25 +6721,20 @@
       "release": 0.4
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TR606_LO_TOM": {
@@ -7203,25 +6787,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.02,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -7283,25 +6862,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.02,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -7363,25 +6937,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_SNARE": {
@@ -7434,25 +7003,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_RIMSHOT": {
@@ -7505,25 +7069,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_CHH": {
@@ -7576,25 +7135,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_OHH": {
@@ -7647,25 +7201,20 @@
       "release": 0.15
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_TAMBOURINE": {
@@ -7718,25 +7267,20 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_GUIRO": {
@@ -7789,25 +7333,25 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "masterVolume",
       "wave": "square",
       "freq": 28,
-      "depth": 0.5,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "masterVolume",
+      "amount1": 0.5
     }
   },
   "CR78_MARACAS": {
@@ -7860,25 +7404,20 @@
       "release": 0.015
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_CLAVES": {
@@ -7931,25 +7470,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_COWBELL": {
@@ -8002,25 +7536,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_HI_BONGOS": {
@@ -8073,25 +7602,20 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_LO_BONGOS": {
@@ -8144,25 +7668,20 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "CR78_CONGAS": {
@@ -8215,25 +7734,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SDS_KICK": {
@@ -8286,25 +7800,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.08,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -8366,25 +7875,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.04,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "pitchEnv": {
       "amount": 12,
@@ -8441,25 +7945,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.35,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -8521,25 +8020,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.32,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -8601,25 +8095,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.3,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -8681,25 +8170,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.28,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -8761,25 +8245,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.015,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -8841,25 +8320,20 @@
       "release": 0.5
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.03,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "pitchEnv": {
       "amount": 12,
@@ -8916,25 +8390,20 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TRAP_CLAP": {
@@ -8987,25 +8456,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TRAP_CHH": {
@@ -9058,25 +8522,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TRAP_OHH": {
@@ -9129,25 +8588,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "TRAP_RIMSHOT": {
@@ -9200,25 +8654,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "MIN_KICK": {
@@ -9271,25 +8720,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.015,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -9351,25 +8795,20 @@
       "release": 0.005
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "MIN_CHH": {
@@ -9422,25 +8861,20 @@
       "release": 0.005
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "MIN_OHH": {
@@ -9493,25 +8927,20 @@
       "release": 0.03
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "MIN_CLAP": {
@@ -9564,25 +8993,20 @@
       "release": 0.03
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "MIN_SNARE": {
@@ -9635,25 +9059,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "MIN_PERC": {
@@ -9706,25 +9125,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "MIN_HIT": {
@@ -9777,25 +9191,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.05,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "pitchEnv": {
       "amount": 12,
@@ -9852,25 +9261,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_KICK": {
@@ -9923,25 +9327,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_SNARE": {
@@ -9994,25 +9393,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_BRUSH": {
@@ -10065,25 +9459,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_CYMBAL": {
@@ -10136,25 +9525,20 @@
       "release": 0.25
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_CHH": {
@@ -10207,25 +9591,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_HI_BONGOS": {
@@ -10278,25 +9657,20 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_LO_BONGOS": {
@@ -10349,25 +9723,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_CONGAS": {
@@ -10420,25 +9789,20 @@
       "release": 0.07
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_CLAVES": {
@@ -10491,25 +9855,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_WOODBLOCK": {
@@ -10562,25 +9921,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_MARACAS": {
@@ -10633,25 +9987,20 @@
       "release": 0.02
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_COWBELL": {
@@ -10704,25 +10053,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_OHH": {
@@ -10775,25 +10119,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_CLAP": {
@@ -10846,25 +10185,20 @@
       "release": 0.06
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_RIMSHOT": {
@@ -10917,25 +10251,20 @@
       "release": 0.01
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_LO_TOM": {
@@ -10988,25 +10317,20 @@
       "release": 0.1
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_TOM": {
@@ -11059,25 +10383,20 @@
       "release": 0.09
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_HI_TOM": {
@@ -11130,25 +10449,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_CRASH": {
@@ -11201,25 +10515,20 @@
       "release": 0.5
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_TAMBOURINE": {
@@ -11272,25 +10581,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_BASS": {
@@ -11343,25 +10647,20 @@
       "release": 0.12
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SR601_LEAD": {
@@ -11414,25 +10713,28 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "vco1.detune",
       "wave": "sine",
       "freq": 6.0,
-      "depth": 0.1,
       "sync": "off"
     },
     "lfo2": {
-      "target": "vco2.detune",
       "wave": "sine",
       "freq": 6.0,
-      "depth": 0.1,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "vco1.detune",
+      "amount1": 0.1,
+      "source2": "lfo2",
+      "target2": "vco2.detune",
+      "amount2": 0.1
     }
   },
   "SR601_PAD": {
@@ -11485,25 +10787,28 @@
       "release": 0.8
     },
     "lfo": {
-      "target": "vco3.detune",
       "wave": "sine",
       "freq": 0.8,
-      "depth": 0.15,
       "sync": "off"
     },
     "lfo2": {
-      "target": "filter.freq",
       "wave": "sine",
       "freq": 0.8,
-      "depth": 0.3,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
+    },
+    "matrix": {
+      "source1": "lfo1",
+      "target1": "vco3.detune",
+      "amount1": 0.15,
+      "source2": "lfo2",
+      "target2": "filter.freq",
+      "amount2": 0.3
     }
   },
   "PUNCH_KICK": {
@@ -11556,25 +10861,20 @@
       "release": 0.08
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.05,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "matrix": {
       "source1": "velocity",
@@ -11636,25 +10936,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.001,
       "decay": 0.03,
       "sustain": 0,
-      "release": 0.05,
-      "target": "off"
+      "release": 0.05
     },
     "pitchEnv": {
       "amount": 12,
@@ -11711,25 +11006,20 @@
       "release": 0.4
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "PUNCH_CLAP": {
@@ -11782,25 +11072,20 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "PUNCH_HIT": {
@@ -11853,25 +11138,20 @@
       "release": 0.15
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "PUNCH_CHH": {
@@ -11924,25 +11204,20 @@
       "release": 0.03
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "PUNCH_OHH": {
@@ -11995,25 +11270,20 @@
       "release": 0.05
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "PUNCH_CRASH": {
@@ -12066,25 +11336,20 @@
       "release": 0.03
     },
     "lfo": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
-      "release": 0.1,
-      "target": "off"
+      "release": 0.1
     }
   },
   "SYNTHLEAD_SYNC": {
@@ -12139,25 +11404,20 @@
       "release": 0.18
     },
     "lfo": {
-      "target": "vco2.octave",
       "wave": "sine",
       "freq": 0.6,
-      "depth": 0.08,
       "sync": "off"
     },
     "lfo2": {
-      "target": "NOT",
       "wave": "sine",
       "freq": 0,
-      "depth": 0,
       "sync": "off"
     },
     "modEnvelope": {
       "attack": 0.002,
       "decay": 0.35,
       "sustain": 0.25,
-      "release": 0.2,
-      "target": "off"
+      "release": 0.2
     },
     "matrix": {
       "source1": "modEnv",
@@ -12165,7 +11425,10 @@
       "amount1": 0.6,
       "source2": "velocity",
       "target2": "vco2.octave",
-      "amount2": 0.2
+      "amount2": 0.2,
+      "source3": "lfo1",
+      "target3": "vco2.octave",
+      "amount3": 0.08
     }
   }
 }

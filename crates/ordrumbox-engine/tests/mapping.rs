@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Library, lfo};
+use ordrumbox_dsp::synth::patch::MatrixSource;
 use ordrumbox_dsp::{StripSettings, SynthPatch};
 use ordrumbox_engine::strip_settings::strip_settings;
 use ordrumbox_engine::synth_preset::{SynthNote, synth_patch};
@@ -227,10 +228,14 @@ fn patch_fields(p: &SynthPatch) -> Vec<(String, f64)> {
     add("pan", p.pan);
     add("velocity", p.velocity);
     for (i, l) in [(1, p.lfo1), (2, p.lfo2)] {
-        add(&format!("lfo{i}Target"), f64::from(l.target.code()));
         add(&format!("lfo{i}Wave"), f64::from(l.wave.code()));
         add(&format!("lfo{i}Freq"), l.freq);
-        add(&format!("lfo{i}Depth"), l.depth);
+    }
+    // The lines that read something: where an older preset's LFO targets land.
+    for (n, route) in p.matrix.iter().enumerate().filter(|(_, r)| r.source != MatrixSource::Off) {
+        add(&format!("matrix{}Source", n + 1), f64::from(route.source.code()));
+        add(&format!("matrix{}Target", n + 1), f64::from(route.target.code()));
+        add(&format!("matrix{}Amount", n + 1), route.amount);
     }
     add("filterEnvAmt", p.filter_env_amount);
     add("fmAmount", p.fm_amount);
@@ -239,8 +244,6 @@ fn patch_fields(p: &SynthPatch) -> Vec<(String, f64)> {
     add("modEnvDecay", p.mod_envelope.decay);
     add("modEnvSustain", p.mod_envelope.sustain);
     add("modEnvRelease", p.mod_envelope.release);
-    add("modEnvTarget", f64::from(p.mod_env_target.code()));
-    add("modEnvDepth", p.mod_env_depth);
     let b = p.bypass;
     for (key, on) in [
         ("bypassNoise", b.noise),

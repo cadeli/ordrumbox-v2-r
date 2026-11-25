@@ -5,9 +5,7 @@ use ordrumbox_core::json::Value;
 
 use super::{FILTER_TYPES, MATRIX_SIZE, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES, lfo_targets};
 
-/// The mod envelope's targets and the LFO syncs (value, label).
-pub const MOD_ENV_TARGETS: [(&str, &str); 5] =
-    [("off", "Off"), ("filter", "Filter"), ("pitch", "Pitch"), ("fm", "FM"), ("shape", "Shape")];
+/// The LFO syncs (value, label).
 /// The labels of what oscillator 2 syncs to, in the order of [`OSC2_SYNCS`].
 pub const OSC2_SYNC_LABELS: [&str; 2] = ["Off", "VCO1"];
 /// The labels of the noise's modes, in the order of [`NOISE_MODES`].
@@ -26,7 +24,7 @@ pub const LFO_SYNCS: [(&str, &str); 8] = [
 ];
 
 /// The controls set from a list (`filter.slope` holds numbers).
-pub const CHOICE_PATHS: [&str; 15 + 2 * MATRIX_SIZE] = [
+pub const CHOICE_PATHS: [&str; 12 + 2 * MATRIX_SIZE] = [
     "vco1.wave",
     "vco2.wave",
     "vco3.wave",
@@ -37,9 +35,6 @@ pub const CHOICE_PATHS: [&str; 15 + 2 * MATRIX_SIZE] = [
     "noise.filterType",
     "filter.slope",
     "noise.mode",
-    "modEnvelope.target",
-    "lfo.target",
-    "lfo2.target",
     "lfo.sync",
     "lfo2.sync",
     "matrix.source1",
@@ -58,6 +53,12 @@ pub const CHOICE_PATHS: [&str; 15 + 2 * MATRIX_SIZE] = [
     "matrix.target7",
     "matrix.source8",
     "matrix.target8",
+    "matrix.source9",
+    "matrix.target9",
+    "matrix.source10",
+    "matrix.target10",
+    "matrix.source11",
+    "matrix.target11",
 ];
 
 /// Whether `path` is `matrix.<name><n>` for a line `n` of the matrix.
@@ -76,8 +77,6 @@ pub fn choices(path: &str) -> Option<Vec<&'static str>> {
         "filter.slope" => values(&FILTER_SLOPES),
         "noise.mode" => NOISE_MODES.to_vec(),
         "vco2.sync" => OSC2_SYNCS.to_vec(),
-        "modEnvelope.target" => values(&MOD_ENV_TARGETS),
-        "lfo.target" | "lfo2.target" => lfo_targets(),
         "lfo.sync" | "lfo2.sync" => values(&LFO_SYNCS),
         _ if is_matrix_line(path, "source") => MATRIX_SOURCES.to_vec(),
         _ if is_matrix_line(path, "target") => lfo_targets(),

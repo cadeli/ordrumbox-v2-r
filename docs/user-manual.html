@@ -956,7 +956,7 @@ A built-in preset you have not changed plays as the assets hold it.</p>
 
 <h3>Cards</h3>
 <p>Four tabs of cards. Each card has a power button; touching a control of a card that is off switches it on
-(an oscillator to 0.5, also when its ring or sync is touched, FM to 0.3, the noise to 0.15, an LFO onto the filter, the mod envelope onto the filter).
+(an oscillator to 0.5, also when its ring or sync is touched, FM to 0.3, the noise to 0.15, an LFO onto the filter on a free line of the matrix, the mod envelope opening the filter on a free line).
 A knob an LFO moves is purple and follows it. The pills under the cards show the modules in use.</p>
 
 <h4>OSC tab</h4>
@@ -994,20 +994,17 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 <tr><td>drive</td><td>0–1</td><td>Saturation into the filter.</td></tr>
 <tr><td>slope</td><td>12 dB, 24 dB</td><td>Per octave.</td></tr>
 <tr><td><strong>FltEnv</strong></td><td>Env</td><td>0–1</td><td>How far the envelope opens the filter.</td></tr>
-<tr><td rowspan="2"><strong>ModEnv</strong></td><td>attack, decay, sustain, release</td><td>0–0.5 s, 0–1 s, 0–1, 0–0.5 s</td><td>A second envelope.</td></tr>
-<tr><td>target</td><td>Off, Filter, Pitch, FM, Shape</td><td>What it modulates.</td></tr>
+<tr><td><strong>ModEnv</strong></td><td>attack, decay, sustain, release</td><td>0–0.5 s, 0–1 s, 0–1, 0–0.5 s</td><td>A second envelope. What it moves, and how far, is set in the matrix: a line with the source modEnv.</td></tr>
 </table>
 
 <h4>MOD tab</h4>
 <table>
 <tr><th>Card</th><th>Control</th><th>Range</th><th>What it does</th></tr>
-<tr><td rowspan="5"><strong>LFO1</strong>, <strong>lfo2</strong></td><td>target</td><td>off, or any synth control</td><td>What the LFO moves.</td></tr>
-<tr><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform. The triangle stays between the LFO's ends, starting at the lower one, like the sine.</td></tr>
+<tr><td rowspan="3"><strong>LFO1</strong>, <strong>lfo2</strong></td><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform. The triangle stays between the LFO's ends, starting at the lower one, like the sine.</td></tr>
 <tr><td>freq</td><td>0.01–5 Hz</td><td>Rate (when not synced).</td></tr>
-<tr><td>depth</td><td>0–1</td><td>Amount.</td></tr>
-<tr><td>sync</td><td>free, 1/1, 1/2, 1/4, 1/8, 1/16, 1/8T, 1/16T</td><td>Lock the rate to the tempo (T = triplet).</td></tr>
-<tr><td rowspan="3"><strong>Matrix</strong></td><td>source</td><td>off, lfo1, lfo2, env, modEnv, velocity, key, random</td><td>What drives the line: an LFO, the amplitude or the modulation envelope, the note's velocity, its key (pitch), or a random value per note. Eight lines.</td></tr>
-<tr><td>target</td><td>off, or any synth control</td><td>What the line moves, as an LFO's target does.</td></tr>
+<tr><td>sync</td><td>free, 1/1, 1/2, 1/4, 1/8, 1/16, 1/8T, 1/16T</td><td>Lock the rate to the tempo (T = triplet). What an LFO moves, and how far, is set in the matrix: a line with the source lfo1 or lfo2.</td></tr>
+<tr><td rowspan="3"><strong>Matrix</strong></td><td>source</td><td>off, lfo1, lfo2, env, modEnv, velocity, key, random</td><td>What drives the line: an LFO, the amplitude or the modulation envelope, the note's velocity, its key (pitch), or a random value per note. Eleven lines.</td></tr>
+<tr><td>target</td><td>off, any synth control, filter.open, pitch, fm.boost, shape</td><td>What the line moves. The last four act on several controls: <strong>filter.open</strong> opens the filter towards its top (all the way at 1), <strong>pitch</strong> moves the three oscillators (an octave at 1), <strong>fm.boost</strong> adds FM (twice the FM amount at 1), <strong>shape</strong> raises the oscillators' gains towards full.</td></tr>
 <tr><td>amount</td><td>−1 to +1</td><td>How much of a full swing of the target the source is worth; below 0 it works the other way. A line with no source or a zero amount does nothing.</td></tr>
 <tr><td rowspan="6"><strong>noise</strong></td><td>mix</td><td>0–1</td><td>Noise level.</td></tr>
 <tr><td>mode</td><td>White, Long, Short</td><td>White is a new random value every sample. Long and Short are a console's shift register (15 and 7 bits): a grainy rumble, and a short loop that buzzes at a pitch.</td></tr>
@@ -1025,7 +1022,7 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 <tr><td>pitchPunch</td><td>0–1</td><td>A pitch drop at the start of the note (up to two octaves): kicks and toms.</td></tr>
 <tr><td><strong>Env</strong></td><td>attack, decay, sustain, release</td><td>0–0.5 s, 0–1 s, 0–1, 0–0.5 s</td><td>The amplitude envelope, drawn with its shape.</td></tr>
 <tr><td rowspan="2"><strong>Pitch Env</strong></td><td>Amount</td><td>−48 to +48 semitones (default 0: off)</td><td>Where the note's pitch starts: above it (kicks, toms, zaps) or below it. It then falls back to the note exponentially, as an analog drum does. All three oscillators and the sub follow it.</td></tr>
-<tr><td>Decay</td><td>5 ms – 1 s (default 50 ms)</td><td>How long the offset takes to fall to a hundredth of itself. Short for a kick's click, longer for a tom's sweep. Both controls are LFO and matrix targets: velocity on Amount hits harder notes higher.</td></tr>
+<tr><td>Decay</td><td>5 ms – 1 s (default 50 ms)</td><td>How long the offset takes to fall to a hundredth of itself. Short for a kick's click, longer for a tom's sweep. Both controls are matrix targets: velocity on Amount hits harder notes higher.</td></tr>
 </table>
 
 <!-- ───────────────────────────────────────────────────────────── -->

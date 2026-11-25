@@ -345,15 +345,7 @@ impl Session {
 
     /// An LFO moves a knob or the plots: keep redrawing.
     pub fn synth_animating(&self) -> bool {
-        self.synth_open()
-            && self.synth_editor.edit.as_ref().is_some_and(|e| {
-                ["lfo", "lfo2"].iter().any(|g| {
-                    let target = model::get(&e.draft, &format!("{g}.target")).and_then(Value::as_str).unwrap_or("NOT");
-                    target != "NOT"
-                        && model::number(&e.draft, &format!("{g}.depth")).unwrap_or(0.0) > 0.0
-                        && model::lfo_targeted(&e.draft, target)
-                })
-            })
+        self.synth_open() && self.synth_editor.edit.as_ref().is_some_and(|e| model::is_any_lfo_routed(&e.draft))
     }
 
     // ─── The controls ────────────────────────────────────────────────────────

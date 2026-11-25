@@ -12,7 +12,7 @@
 
 use crate::scale::Scale;
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS};
+use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS, TABS};
 use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES, OSC2_SYNCS, WAVES};
 
 use crate::canvas::{Canvas, Rgb, text_width};
@@ -92,9 +92,6 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     if key == "wave" || path == "filter.type" || path == "noise.filterType" || path == "fm.algo" {
         return Field::None;
     }
-    if path == "modEnvelope.target" {
-        return list(&MOD_ENV_TARGETS);
-    }
     if path == "filter.slope" {
         return list(&FILTER_SLOPES);
     }
@@ -108,15 +105,6 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     }
     if model::extra_default(path).is_some() {
         return Field::Knob;
-    }
-    if is_lfo && key == "target" {
-        let targets = model::lfo_targets();
-        return Field::List(
-            targets
-                .iter()
-                .map(|t| ((*t).to_owned(), if *t == "NOT" { "off".to_owned() } else { (*t).to_owned() }))
-                .collect(),
-        );
     }
     if is_lfo && key == "sync" {
         return list(&LFO_SYNCS);
@@ -551,6 +539,7 @@ mod tests {
         let plain = draft();
         let (card, fields) = rects(&plain);
         assert_eq!(fields.len(), 3 * ordrumbox_engine::MATRIX_SIZE);
+        assert!(card.y + card.h <= layout.area.y + layout.area.h, "{card:?} below {:?}", layout.area);
         assert!(fields.iter().all(|r| r.x >= card.x && r.x + r.w <= card.x + card.w && r.y + r.h <= card.y + card.h));
         // A line set changes no place.
         let mut set = draft();

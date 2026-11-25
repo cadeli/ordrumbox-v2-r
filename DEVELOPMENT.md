@@ -267,6 +267,27 @@ The synth has three chip controls, read from a preset when present and written o
 after the others in `LfoTarget::ALL`, so no code moved), which rewrote `synth_editor_rust.txt` (engine: more targets
 in the LFO lines; the audio renders are unchanged). Their names keep them out of the auto-assign, so no row of `assign_tests/data.rs` changed.
 
+The matrix is the only routing of the synth: an LFO and the modulation envelope have no target of their own
+any more. The LFO card keeps wave, rate and sync, the ModEnv card its four times (`SynthLfo` loses `target` and
+`depth`; `SynthPatch` loses `mod_env_target`, `mod_env_depth` and `ModEnvTarget`). What the modulation
+envelope moved by itself is four targets of the matrix, after the others in `LfoTarget::ALL`: `filter.open`
+(towards the top of the filter), `pitch` (the three oscillators, an octave at 1), `fm.boost` (FM × (1 + value))
+and `shape` (gains towards 1). They are worked out where they are used, from the sources of that very sample
+(`modulation::Late`), so that they read the modulation envelope as it is, as the envelope's target did. The
+matrix has eleven lines (`MATRIX_SIZE`): an older preset's eight, its two LFO targets and its envelope's always
+fit. `LfoTarget` is one control each: it loses `Filter`, the twin of `FilterFreq`, and `Osc1`..`Osc3` (1000
+cents on the slot of `OscNDetune`). An older preset is read as today's (`synth_preset/legacy_modulation.rs`),
+with the same sound: `FLT` as `filter.freq`, `VCO1`..`VCO3` as `vcoN.octave` with the depth or amount
+×1000/1200; each LFO's target and depth as a line `lfoN` → target at that depth, and `modEnvelope.target` as
+a line `modEnv` → its target at 1, on the first free lines. The editor and the MCP tools upgrade a preset as
+they open it, so it is saved so; a target with no free line (a hand-made file only) is not played and is
+reported at start (`SynthPresets::issues`). The factory presets were rewritten so (19 LFO targets and 2
+envelope targets moved to the matrix). An LFO touched with nowhere to go takes a free line onto `filter.freq`
+at 0.5, the modulation envelope one onto `filter.open` at 1; the editor's knobs and filter curve follow the
+LFO lines of the matrix. The audio snapshots are unchanged; this rewrote `mapping_rust.txt` (engine: the LFO
+lines give wave and rate, then the lines of the matrix in use) and `synth_editor_rust.txt` (engine: an LFO's
+value without a target, the new targets, and eleven lines in the drafts).
+
 The synth has a pitch envelope and two links from oscillator 1 to oscillator 2
 (`ordrumbox-dsp/src/synth/pitch_env.rs`, `cross_mod.rs`). `pitchEnv` (`amount`, −48 to 48 semitones, and
 `decay`, 5 ms to 1 s, the time to fall to a hundredth) is a group of the editor's defaults (an ENV-tab card);

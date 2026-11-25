@@ -27,11 +27,11 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
     "filterEnv":{"filterEnvelopeAmount":0},
     "fm":{"amount":0,"algo":0},
     "unison":{"count":1,"detune":0,"spread":0},
-    "lfo":{"target":"NOT","wave":"sine","freq":0,"depth":0,"sync":"off"},
-    "lfo2":{"target":"NOT","wave":"sine","freq":0,"depth":0,"sync":"off"},
+    "lfo":{"wave":"sine","freq":0,"sync":"off"},
+    "lfo2":{"wave":"sine","freq":0,"sync":"off"},
     "noise":{"mix":0,"filterType":"highpass","filterFreq":1000,"filterQ":1},
     "envelope":{"attack":0,"decay":0.12,"sustain":1,"release":0.05},
-    "modEnvelope":{"attack":0,"decay":0.12,"sustain":0,"release":0.1,"target":"off"},
+    "modEnvelope":{"attack":0,"decay":0.12,"sustain":0,"release":0.1},
     "pitchEnv":{"amount":0,"decay":0.05}}"#;
 
 /// Fields added since the first presets, shown last in their card and written
@@ -81,7 +81,7 @@ const fn meta(path: &'static str, min: f64, max: f64, step: f64, unit: &'static 
 }
 
 /// Every numeric control, in the editor's order (the LFO targets follow it).
-pub const METAS: [Meta; 35] = [
+pub const METAS: [Meta; 33] = [
     meta("masterVolume", 0.0, 1.0, 0.01, ""),
     meta("subGain", 0.0, 1.0, 0.01, ""),
     meta("pitchPunch", 0.0, 1.0, 0.01, ""),
@@ -102,9 +102,7 @@ pub const METAS: [Meta; 35] = [
     meta("filter.drive", 0.0, 1.0, 0.01, ""),
     Meta { label: Some("Env"), ..meta("filterEnv.filterEnvelopeAmount", 0.0, 1.0, 0.01, "") },
     Meta { log: true, ..meta("lfo.freq", 0.01, 5.0, 0.01, "Hz") },
-    meta("lfo.depth", 0.0, 1.0, 0.01, ""),
     Meta { log: true, ..meta("lfo2.freq", 0.01, 5.0, 0.01, "Hz") },
-    meta("lfo2.depth", 0.0, 1.0, 0.01, ""),
     meta("noise.mix", 0.0, 1.0, 0.01, ""),
     Meta {
         log: true,
@@ -139,6 +137,9 @@ pub const MATRIX_AMOUNTS: [Meta; MATRIX_SIZE] = [
     meta("matrix.amount6", -1.0, 1.0, 0.01, ""),
     meta("matrix.amount7", -1.0, 1.0, 0.01, ""),
     meta("matrix.amount8", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount9", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount10", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount11", -1.0, 1.0, 0.01, ""),
 ];
 
 /// The pitch envelope's controls: its offset and its decay.
@@ -190,8 +191,8 @@ pub fn find_meta(path: &str) -> Option<&'static Meta> {
     metas().find(|m| m.path == path)
 }
 
-/// What an LFO or a line of the matrix can modulate (`SYNTH_LFO_TARGETS`): off, then every control but the
-/// LFOs', the unison's and the matrix's.
+/// What a line of the matrix can modulate (`SYNTH_LFO_TARGETS`): off, every control but the
+/// LFOs', the unison's and the matrix's, then the effects on several ([`crate::synth_preset::EFFECT_TARGETS`]).
 pub fn lfo_targets() -> Vec<&'static str> {
     std::iter::once("NOT")
         .chain(
@@ -199,10 +200,11 @@ pub fn lfo_targets() -> Vec<&'static str> {
                 .map(|m| m.path)
                 .filter(|p| !["lfo.", "lfo2.", "unison.", "matrix."].iter().any(|group| p.starts_with(group))),
         )
+        .chain(crate::synth_preset::EFFECT_TARGETS)
         .collect()
 }
 
-/// What one unit of an LFO's wave is worth on a target, in the draft's
+/// What one unit of a matrix source is worth on a target, in the draft's
 /// units: the synth's own swing, with an octave target in octaves (the
 /// synth moves it in cents).
 #[must_use]
@@ -316,8 +318,10 @@ pub fn set(draft: &mut Object, path: &str, value: Value) -> bool {
     }
 }
 
-/// Fill what `draft` lacks with the group defaults (`hydrate`).
+/// Fill what `draft` lacks with the group defaults (`hydrate`), once its older
+/// LFO settings are brought up to date ([`crate::synth_preset::legacy_modulation`]).
 pub fn hydrate(draft: &mut Object) {
+    crate::synth_preset::legacy_modulation::upgrade(draft);
     for (key, default) in defaults().iter() {
         let Value::Object(children) = default else {
             if draft.get(key).is_none() {
@@ -416,8 +420,9 @@ pub fn toggle_card(draft: &mut Object, group: &str) {
 }
 
 /// A group off by default switched on when one of its controls is touched: an oscillator at gain 0 to 0.5, FM to 0.3, the noise
-/// to 0.15, an LFO onto the filter (depth 0.5 unless that is the depth
-/// being set), the mod envelope onto the filter. The paths it changed.
+/// to 0.15, an LFO onto the filter (a free line of the matrix at 0.5, when
+/// no line reads it), the mod envelope opening the filter (a free line at
+/// 1). The paths it changed.
 pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
     let Some((group, key)) = path.split_once('.') else { return Vec::new() };
     let mut changed = Vec::new();
@@ -442,17 +447,13 @@ pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
         set(draft, "noise.mix", Value::from(0.15));
         draft.insert("bypassNoise", Value::Bool(false));
         changed.push("noise.mix".into());
-    } else if matches!(group, "lfo" | "lfo2")
-        && matches!(key, "wave" | "freq" | "depth" | "sync")
-        && text(draft, &format!("{group}.target")) == Some("NOT")
+    } else if let Some(lfo) = LFOS.iter().find(|lfo| lfo.group == group)
+        && matches!(key, "wave" | "freq" | "sync")
+        && !is_routed(draft, lfo.source)
     {
-        set(draft, &format!("{group}.target"), Value::from("filter.freq"));
-        draft.insert(if group == "lfo" { "bypassLfo1" } else { "bypassLfo2" }, Value::Bool(false));
-        if key != "depth" && number(draft, &format!("{group}.depth")).unwrap_or(0.0) == 0.0 {
-            set(draft, &format!("{group}.depth"), Value::from(0.5));
-            changed.push(format!("{group}.depth"));
-        }
-        changed.push(format!("{group}.target"));
+        // An LFO touched with nowhere to go: onto the filter, at half, on the first free line.
+        draft.insert(lfo.bypass_flag, Value::Bool(false));
+        changed.extend(add_route(draft, lfo.source, "filter.freq", 0.5));
     } else if group == "matrix"
         && let Some(n) = key.strip_prefix("source")
         && text(draft, &format!("matrix.target{n}")) == Some("NOT")
@@ -466,13 +467,59 @@ pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
         }
     } else if group == "modEnvelope"
         && matches!(key, "attack" | "decay" | "sustain" | "release")
-        && text(draft, "modEnvelope.target") == Some("off")
+        && !is_routed(draft, MOD_ENV_SOURCE)
     {
-        set(draft, "modEnvelope.target", Value::from("filter"));
+        // Onto the filter, all the way, on the first free line.
         draft.insert("bypassModEnv", Value::Bool(false));
-        changed.push("modEnvelope.target".into());
+        changed.extend(add_route(draft, MOD_ENV_SOURCE, "filter.open", 1.0));
     }
     changed
+}
+
+/// An LFO of the editor: its group, the matrix source it is, its bypass flag.
+#[derive(Debug)]
+pub struct Lfo {
+    pub group: &'static str,
+    pub source: &'static str,
+    pub bypass_flag: &'static str,
+}
+
+/// The two LFOs.
+pub const LFOS: [Lfo; 2] = [
+    Lfo { group: "lfo", source: "lfo1", bypass_flag: "bypassLfo1" },
+    Lfo { group: "lfo2", source: "lfo2", bypass_flag: "bypassLfo2" },
+];
+
+/// The lines of the matrix of `draft` that read `source` and move something:
+/// target and amount.
+pub fn routes_of<'a>(draft: &'a Object, source: &'a str) -> impl Iterator<Item = (&'a str, f64)> + 'a {
+    (1..=MATRIX_SIZE).filter_map(move |n| {
+        let target = text(draft, &format!("matrix.target{n}")).filter(|t| *t != "NOT")?;
+        let amount = number(draft, &format!("matrix.amount{n}")).filter(|a| *a != 0.0)?;
+        (text(draft, &format!("matrix.source{n}")) == Some(source)).then_some((target, amount))
+    })
+}
+
+/// Whether a line of the matrix of `draft` sends `source` somewhere.
+#[must_use]
+pub fn is_routed(draft: &Object, source: &str) -> bool {
+    routes_of(draft, source).next().is_some()
+}
+
+/// The matrix source the modulation envelope is.
+const MOD_ENV_SOURCE: &str = "modEnv";
+
+/// Set the first line of the matrix of `draft` that reads nothing to
+/// `source` → `target` at `amount`; the paths it changed (none when every
+/// line is in use).
+fn add_route(draft: &mut Object, source: &str, target: &str, amount: f64) -> Vec<String> {
+    let Some(n) = (1..=MATRIX_SIZE).find(|n| text(draft, &format!("matrix.source{n}")) == Some("off")) else {
+        return Vec::new();
+    };
+    set(draft, &format!("matrix.source{n}"), Value::from(source));
+    set(draft, &format!("matrix.target{n}"), Value::from(target));
+    set(draft, &format!("matrix.amount{n}"), Value::from(amount));
+    ["source", "target", "amount"].map(|name| format!("matrix.{name}{n}")).into()
 }
 
 /// The module pills under the cards: label, active.
@@ -480,7 +527,6 @@ pub fn modules(draft: &Object) -> Vec<(&'static str, bool)> {
     let n = |path: &str| number(draft, path).unwrap_or(0.0);
     let flag = |key: &str| draft.get(key).is_some_and(Value::is_true);
     let gain = |v: usize| number(draft, &format!("vco{v}.gain")).unwrap_or(if v == 1 { 1.0 } else { 0.0 });
-    let target = |path: &str, off: &str| text(draft, path).unwrap_or(off) != off;
     let env_amount = number(draft, "filterEnv.filterEnvelopeAmount")
         .or_else(|| number(draft, "filter.filterEnvelopeAmount"))
         .unwrap_or(0.0);
@@ -490,10 +536,10 @@ pub fn modules(draft: &Object) -> Vec<(&'static str, bool)> {
         ("VCO3", gain(3) > 0.01),
         ("Filter", !flag("bypassFilter")),
         ("Envelope", !flag("bypassEnv")),
-        ("LFO1", !flag("bypassLfo1") && target("lfo.target", "NOT") && n("lfo.depth") > 0.0),
-        ("LFO2", !flag("bypassLfo2") && target("lfo2.target", "NOT") && n("lfo2.depth") > 0.0),
+        ("LFO1", !flag("bypassLfo1") && is_routed(draft, "lfo1")),
+        ("LFO2", !flag("bypassLfo2") && is_routed(draft, "lfo2")),
         ("FM", !flag("bypassFm") && n("fm.amount") > 0.001),
-        ("Mod", !flag("bypassModEnv") && target("modEnvelope.target", "off")),
+        ("Mod", !flag("bypassModEnv") && is_routed(draft, MOD_ENV_SOURCE)),
         ("Noise", !flag("bypassNoise") && n("noise.mix") > 0.001),
         ("Filter Env", !flag("bypassFilterEnv") && env_amount > 0.001),
         ("Pitch Env", n("pitchEnv.amount") != 0.0),
@@ -529,13 +575,19 @@ mod tests {
         assert_eq!(implicit_enable(&mut d, "vco2.wave"), ["vco2.gain"]);
         assert_eq!(number(&d, "vco2.gain"), Some(0.5));
         assert!(implicit_enable(&mut d, "vco2.wave").is_empty());
-        assert_eq!(implicit_enable(&mut d, "lfo.freq"), ["lfo.depth", "lfo.target"]);
-        assert_eq!(text(&d, "lfo.target"), Some("filter.freq"));
-        assert_eq!(implicit_enable(&mut d, "lfo2.depth"), ["lfo2.target"]);
-        assert_eq!(number(&d, "lfo2.depth"), Some(0.0));
+        // An LFO touched with nowhere to go is routed to the filter, on the first free line.
+        assert_eq!(implicit_enable(&mut d, "lfo.freq"), ["matrix.source1", "matrix.target1", "matrix.amount1"]);
+        assert_eq!(text(&d, "matrix.source1"), Some("lfo1"));
+        assert_eq!(text(&d, "matrix.target1"), Some("filter.freq"));
+        assert!(implicit_enable(&mut d, "lfo.wave").is_empty());
+        assert_eq!(implicit_enable(&mut d, "lfo2.sync"), ["matrix.source2", "matrix.target2", "matrix.amount2"]);
         assert_eq!(implicit_enable(&mut d, "fm.algo"), ["fm.amount"]);
         assert_eq!(implicit_enable(&mut d, "noise.filterQ"), ["noise.mix"]);
-        assert_eq!(implicit_enable(&mut d, "modEnvelope.decay"), ["modEnvelope.target"]);
+        assert_eq!(
+            implicit_enable(&mut d, "modEnvelope.decay"),
+            ["matrix.source3", "matrix.target3", "matrix.amount3"]
+        );
+        assert_eq!(text(&d, "matrix.target3"), Some("filter.open"));
         assert!(implicit_enable(&mut d, "vco1.wave").is_empty());
         // Power: an oscillator keeps its gain aside.
         toggle_card(&mut d, "vco2");

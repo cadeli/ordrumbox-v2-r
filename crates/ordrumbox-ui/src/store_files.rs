@@ -29,19 +29,16 @@ fn asset(name: &str) -> String {
 }
 
 /// The text settings a synth preset takes, beside its numeric controls.
-const PRESET_TEXTS: [(&str, &str); 12] = [
+const PRESET_TEXTS: [(&str, &str); 9] = [
     ("vco1.wave", "square"),
     ("vco2.wave", "triangle"),
     ("vco3.wave", "random"),
     ("filter.type", "bandpass"),
     ("noise.filterType", "lowpass"),
     ("noise.mode", "short"),
-    ("lfo.target", "filter.freq"),
     ("lfo.wave", "sawtooth"),
     ("lfo.sync", "1/8T"),
-    ("lfo2.target", "vco1.detune"),
     ("lfo2.wave", "square"),
-    ("modEnvelope.target", "pitch"),
 ];
 
 /// A preset with every control of the synth editor away from its default:

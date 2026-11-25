@@ -6,8 +6,8 @@ use super::*;
 
 impl SynthVoice {
     /// The frequencies of the three oscillators for this sample, Hz: detune,
-    /// pitch punch, the pitch envelope's ratio, FM and what the modulation
-    /// envelope at `mod_level` adds, which also raises `gains` when it shapes.
+    /// pitch punch, the pitch envelope's ratio, FM and what the `late` values
+    /// of the matrix add (pitch, more FM), which also raise `gains` (shape).
     #[inline]
     pub(super) fn frequencies(
         &self,
@@ -15,7 +15,7 @@ impl SynthVoice {
         b: &Block,
         mods: &Mods,
         gains: &mut [f64; 3],
-        (mod_level, pitch_env): (f64, f64),
+        (late, pitch_env): (&LateMods, f64),
         t: f64,
     ) -> [f64; 3] {
         let mut detuned = [0.0; 3];
@@ -38,27 +38,20 @@ impl SynthVoice {
         if !p.bypass.fm && fm_amount > SILENT {
             (f1, f2) = fm_frequencies(fm_amount, algorithm, carriers, self.raw_oscillators(p, b, detuned));
         }
-        if mod_level <= SILENT {
-            return [f1, f2, f3];
+        let pitch = late[Late::Pitch];
+        if pitch.abs() > SILENT {
+            let ratio = ((pitch * 1200.0) * LN2_OVER_1200).exp();
+            [f1, f2, f3] = [f1 * ratio, f2 * ratio, f3 * ratio];
         }
-        // Only while the modulation envelope is up, and always the same arm.
-        match b.mod_target {
-            ModEnvTarget::Pitch => {
-                let pitch = ((p.mod_env_depth * mod_level * 1200.0) * LN2_OVER_1200).exp();
-                [f1, f2, f3] = [f1 * pitch, f2 * pitch, f3 * pitch];
-            }
-            ModEnvTarget::Fm if !p.bypass.fm => {
-                let amount = fm_amount * p.mod_env_depth * mod_level;
-                if amount > SILENT {
-                    let (a, b) = fm_frequencies(amount, algorithm, carriers, self.raw_oscillators(p, b, detuned));
-                    f1 += a - carriers.0;
-                    f2 += b - carriers.1;
-                }
-            }
-            ModEnvTarget::Shape => {
-                *gains = gains.map(|gain| clamp(gain + p.mod_env_depth * mod_level * (1.0 - gain), 0.0, 1.0));
-            }
-            ModEnvTarget::Off | ModEnvTarget::Filter | ModEnvTarget::Fm => {}
+        let boost = fm_amount * late[Late::FmBoost];
+        if !p.bypass.fm && boost > SILENT {
+            let (a, b) = fm_frequencies(boost, algorithm, carriers, self.raw_oscillators(p, b, detuned));
+            f1 += a - carriers.0;
+            f2 += b - carriers.1;
+        }
+        let shape = late[Late::Shape];
+        if shape.abs() > SILENT {
+            *gains = gains.map(|gain| clamp(gain + shape * (1.0 - gain), 0.0, 1.0));
         }
         [f1, f2, f3]
     }

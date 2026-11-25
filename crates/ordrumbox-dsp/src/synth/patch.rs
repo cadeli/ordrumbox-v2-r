@@ -4,17 +4,11 @@
 use crate::lfo::Wave;
 use crate::slope::FilterMode;
 
-/// What an LFO modulates, in the order of the preset files' codes (0 to 40).
+/// What a line of the matrix modulates: one control each.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LfoTarget {
     #[default]
     Off,
-    /// The filter cutoff (as [`Self::FilterFreq`]).
-    Filter,
-    /// The pitch of an oscillator, widely (1000 cents at full depth).
-    Osc1,
-    Osc2,
-    Osc3,
     Volume,
     Osc1Gain,
     Osc1Detune,
@@ -55,16 +49,20 @@ pub enum LfoTarget {
     PitchEnvDecay,
     /// How far oscillator 1 ring-modulates oscillator 2.
     Osc2Ring,
+    /// Opens the filter towards its top: at 1, all the way.
+    FilterOpen,
+    /// The pitch of the three oscillators, an octave at 1.
+    Pitch,
+    /// More FM: at 1, twice the FM amount.
+    FmBoost,
+    /// Raises the oscillators' gains towards 1: at 1, all at full.
+    Shape,
 }
 
 impl LfoTarget {
     /// Every target, each at its code.
     pub const ALL: [Self; 41] = [
         Self::Off,
-        Self::Filter,
-        Self::Osc1,
-        Self::Osc2,
-        Self::Osc3,
         Self::Volume,
         Self::Osc1Gain,
         Self::Osc1Detune,
@@ -101,33 +99,11 @@ impl LfoTarget {
         Self::PitchEnvAmount,
         Self::PitchEnvDecay,
         Self::Osc2Ring,
+        Self::FilterOpen,
+        Self::Pitch,
+        Self::FmBoost,
+        Self::Shape,
     ];
-
-    /// Its code: its place in [`Self::ALL`].
-    #[must_use]
-    pub const fn code(self) -> u8 {
-        self as u8
-    }
-}
-
-/// What the modulation envelope moves, in the order of the preset files' codes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ModEnvTarget {
-    #[default]
-    Off,
-    /// Opens the filter.
-    Filter,
-    /// Raises the pitch, an octave at full depth.
-    Pitch,
-    /// Adds FM.
-    Fm,
-    /// Raises the oscillators' gains towards 1.
-    Shape,
-}
-
-impl ModEnvTarget {
-    /// Every target, each at its code.
-    pub const ALL: [Self; 5] = [Self::Off, Self::Filter, Self::Pitch, Self::Fm, Self::Shape];
 
     /// Its code: its place in [`Self::ALL`].
     #[must_use]
@@ -196,8 +172,9 @@ impl MatrixSource {
     }
 }
 
-/// Routes of a patch's modulation matrix.
-pub const MATRIX_SIZE: usize = 8;
+/// Routes of a patch's modulation matrix: room for the eight lines of an
+/// older preset, the targets of its two LFOs and its modulation envelope's.
+pub const MATRIX_SIZE: usize = 11;
 
 /// One line of the matrix: `source`, times `amount`, times what one unit is
 /// worth on `target`, is added to the target's value, every sample.
@@ -209,14 +186,13 @@ pub struct MatrixRoute {
     pub amount: f64,
 }
 
-/// One LFO of a patch.
+/// One LFO of a patch: a source of the matrix ([`MatrixSource::Lfo1`],
+/// [`MatrixSource::Lfo2`]), which says where it lands and how far.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct SynthLfo {
-    pub target: LfoTarget,
     pub wave: Wave,
     /// Hz; 0 or less is off.
     pub freq: f64,
-    pub depth: f64,
 }
 
 /// An ADSR, seconds and level.
@@ -296,9 +272,8 @@ pub struct SynthPatch {
     /// an LFO sweeps it ([`LfoTarget::FmAlgorithm`]), and it is rounded to
     /// the nearest routing sample by sample.
     pub fm_algorithm: f64,
+    /// The modulation envelope: a source of the matrix ([`MatrixSource::ModEnvelope`]).
     pub mod_envelope: Adsr,
-    pub mod_env_target: ModEnvTarget,
-    pub mod_env_depth: f64,
     pub bypass: SynthBypass,
     /// Layers each oscillator sounds as, 1 (none) to [`super::MAX_UNISON`].
     pub unison_count: usize,
@@ -306,7 +281,7 @@ pub struct SynthPatch {
     pub unison_detune: f64,
     /// How far the layers spread over the stereo field, 0–1.
     pub unison_spread: f64,
-    /// The modulation matrix, on top of the LFOs' own targets.
+    /// The modulation matrix: where the LFOs and the other sources land.
     pub matrix: [MatrixRoute; MATRIX_SIZE],
     /// The note's velocity before the patch's levels, 0–1: [`MatrixSource::Velocity`].
     pub note_velocity: f64,
@@ -316,7 +291,7 @@ pub struct SynthPatch {
 
 impl Default for SynthPatch {
     fn default() -> Self {
-        let lfo = SynthLfo { target: LfoTarget::Off, wave: Wave::Sine, freq: 1.0, depth: 0.0 };
+        let lfo = SynthLfo { wave: Wave::Sine, freq: 1.0 };
         Self {
             osc_freq: [440.0; 3],
             osc_gain: [0.5; 3],
@@ -349,8 +324,6 @@ impl Default for SynthPatch {
             fm_amount: 0.0,
             fm_algorithm: 0.0,
             mod_envelope: Adsr { attack: 0.01, decay: 0.1, sustain: 0.0, release: 0.1 },
-            mod_env_target: ModEnvTarget::Off,
-            mod_env_depth: 0.0,
             bypass: SynthBypass::default(),
             unison_count: 1,
             unison_detune: 0.0,
@@ -373,9 +346,6 @@ mod tests {
         }
         for (code, source) in MatrixSource::ALL.iter().enumerate() {
             assert_eq!(usize::from(source.code()), code);
-        }
-        for (code, target) in ModEnvTarget::ALL.iter().enumerate() {
-            assert_eq!(usize::from(target.code()), code);
         }
         for (code, mode) in NoiseMode::ALL.iter().enumerate() {
             assert_eq!(usize::from(mode.code()), code);
