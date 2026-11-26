@@ -462,7 +462,7 @@ impl Session {
             Id::View(i) => self.show_view(i),
             Id::Mode(i) => self.show_mode(if i == 1 { PlayMode::Song } else { PlayMode::Pattern }),
             Id::Master(_) | Id::MixerName(_) | Id::MixerToggle(..) => self.mixer_activate(id),
-            Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthIcon(..) | Id::SynthField(_) => {
+            Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthField(_) => {
                 self.synth_activate(id);
             }
             Id::GeneratePattern => self.run(Command::GeneratePattern),

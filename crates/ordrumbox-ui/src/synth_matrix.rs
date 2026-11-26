@@ -10,9 +10,10 @@ use crate::control::{Format, Spec};
 use crate::panel::{Id, Item, Kind, Rect};
 use crate::scale::Scale;
 
-/// Widths of a line's source and target lists, scale units; the amount takes the rest.
+/// Widths of a line's source and target lists and of its amount, scale units.
 const SOURCE_W: i32 = 62;
 const TARGET_W: i32 = 120;
+const AMOUNT_W: i32 = 96;
 const GAP: i32 = 4;
 /// A line's height, with the space under it.
 const LINE_H: i32 = 16;
@@ -28,29 +29,27 @@ fn spin(draft: &Object, path: &str, options: &[&str]) -> Kind {
     )
 }
 
-/// Push the lines of the matrix, from `inner`'s left at height `y`; the height under them.
+/// Push the lines of the matrix from `(x, y)`; the x right of them and the y under them.
 /// `fields` is [`super::synth_view::all_fields`], where a field's place is its id.
 pub(super) fn push_lines(
     items: &mut Vec<Item>,
     draft: &Object,
     fields: &[String],
-    inner: Rect,
-    y: i32,
+    (x, y): (i32, i32),
     s: Scale,
-) -> i32 {
+) -> (i32, i32) {
     let targets = model::lfo_targets();
     let field_id = |name: &str, n: usize| {
         let path = format!("matrix.{name}{n}");
         fields.iter().position(|f| *f == path).map(|fi| Id::SynthField(fi as u16))
     };
-    let amount_x = inner.x + (SOURCE_W + TARGET_W + 2 * GAP) * s;
-    let amount_w = (inner.w - (SOURCE_W + TARGET_W + 2 * GAP) * s).max(1);
+    let amount_x = x + (SOURCE_W + TARGET_W + 2 * GAP) * s;
     let spec = Spec::slider(-1.0, 1.0, 0.01, 0.0);
     for n in 1..=MATRIX_SIZE {
         let top = y + (n as i32 - 1) * (LINE_H + 2) * s;
-        let source = Rect::new(inner.x, top, SOURCE_W * s, 13 * s);
-        let target = Rect::new(inner.x + (SOURCE_W + GAP) * s, top, TARGET_W * s, 13 * s);
-        let amount = Rect::new(amount_x, top, amount_w, 13 * s);
+        let source = Rect::new(x, top, SOURCE_W * s, 13 * s);
+        let target = Rect::new(x + (SOURCE_W + GAP) * s, top, TARGET_W * s, 13 * s);
+        let amount = Rect::new(amount_x, top, AMOUNT_W * s, 13 * s);
         items.push(Item::new(
             field_id("source", n),
             source,
@@ -65,5 +64,5 @@ pub(super) fn push_lines(
             Kind::Value { spec, value, label: None, text, lfo: false },
         ));
     }
-    y + MATRIX_SIZE as i32 * (LINE_H + 2) * s
+    (amount_x + AMOUNT_W * s, y + MATRIX_SIZE as i32 * (LINE_H + 2) * s)
 }

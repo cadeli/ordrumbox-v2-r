@@ -415,7 +415,12 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         filter_slope: finite(get(filter, "slope"), 12.0),
         drive: finite(get(filter, "drive"), 0.0),
         pitch_punch: finite(at("pitchPunch"), 0.0),
-        pitch_env: pitch_env(at("pitchEnv")),
+        // Bypassed, the pitch envelope moves nothing.
+        pitch_env: if at("bypassPitchEnv").is_some_and(Value::is_true) {
+            PitchEnv { amount: 0.0, ..pitch_env(at("pitchEnv")) }
+        } else {
+            pitch_env(at("pitchEnv"))
+        },
         sub_gain: level(at("subGain"), 0.0),
         envelope: adsr(env, 0.7),
         volume: 1.0,
@@ -510,6 +515,10 @@ mod tests {
         let plain = synth_patch(&json::parse(r#"{"vco2":{"sync":"nope"}}"#).unwrap(), note);
         assert_eq!(plain.pitch_env, PitchEnv { amount: 0.0, decay: PITCH_ENV_DECAY_DEFAULT });
         assert_eq!((plain.ring, plain.is_osc2_synced), (0.0, false));
+        // Bypassed: no swing, the decay kept for when it is switched back on.
+        let preset = r#"{"pitchEnv":{"amount":12,"decay":0.2},"bypassPitchEnv":true}"#;
+        let bypassed = synth_patch(&json::parse(preset).unwrap(), note);
+        assert_eq!(bypassed.pitch_env, PitchEnv { amount: 0.0, decay: 0.2 });
     }
 
     #[test]

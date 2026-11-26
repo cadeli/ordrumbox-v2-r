@@ -227,6 +227,14 @@ file and the data bytes with no running status, which are skipped (they used to 
 nothing played). `midi_rust.txt` rewrote one line, the message of `truncated.mid`; its events and patterns are
 unchanged.
 
+The synth editor's cards are laid out alike (`synth_cells.rs`): the power LED on the left, then the title, then
+the controls in one row, each over its label. A card is as small as what it holds, and the cards follow each other
+left to right (an oscillator strip on a row of its own). The filter types (both filters) and the FM algorithm,
+which were buttons in a card's title, are spins; a card's spins are four characters wide (the noise modes and
+the filter slopes have labels that fit: `Wht`, `Long`, `Shrt`, `12dB`, `24dB`). The matrix keeps its wider lists.
+The pitch envelope's card has a power LED: a preset's `bypassPitchEnv` (new, read only when true) plays it with no
+swing, its decay kept. A preset without it plays as before. No snapshot changed.
+
 A double-click on a track's name in the grid opens the piano roll on that track (`press_track_name`,
 `session_grid.rs`); a single press still selects the track and may drag it. No snapshot changed.
 

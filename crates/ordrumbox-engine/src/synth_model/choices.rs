@@ -6,9 +6,9 @@ use ordrumbox_core::json::Value;
 use super::{FILTER_TYPES, MATRIX_SIZE, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES, lfo_targets};
 
 /// The labels of the noise's modes, in the order of [`NOISE_MODES`].
-pub const NOISE_MODE_LABELS: [&str; 3] = ["White", "Long", "Short"];
+pub const NOISE_MODE_LABELS: [&str; 3] = ["Wht", "Long", "Shrt"];
 /// Filter slopes, dB per octave, and their labels.
-pub const FILTER_SLOPES: [(&str, &str); 2] = [("12", "12 dB"), ("24", "24 dB")];
+pub const FILTER_SLOPES: [(&str, &str); 2] = [("12", "12dB"), ("24", "24dB")];
 pub const LFO_SYNCS: [(&str, &str); 8] = [
     ("off", "free"),
     ("1/1", "1/1"),
@@ -82,9 +82,9 @@ pub fn choices(path: &str) -> Option<Vec<&'static str>> {
 }
 
 /// Value `value` of list control `path` as a preset holds it: the slope
-/// list holds numbers.
+/// and the FM algorithm (a number, which the editor offers on a list) hold numbers.
 pub fn choice_value(path: &str, value: &str) -> Value {
-    if path == "filter.slope" {
+    if matches!(path, "filter.slope" | "fm.algo") {
         Value::from(value).to_number().map_or_else(|| Value::from(value), Value::from)
     } else {
         Value::from(value)

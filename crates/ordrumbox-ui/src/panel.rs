@@ -5,7 +5,7 @@
 //! finding what is under the mouse both use it. The open drop-down list and the number entry
 //! are drawn over everything.
 
-use crate::canvas::{Canvas, Direction, Rgb, fit, text_width};
+use crate::canvas::{Canvas, Direction, Rgb, char_width, fit, text_width};
 use crate::control::{Spec, Style};
 use crate::sample_overlay::Overlay;
 use crate::scale::Scale;
@@ -83,6 +83,12 @@ impl Rect {
 
     pub fn contains(&self, x: i32, y: i32) -> bool {
         (self.x..self.x + self.w).contains(&x) && (self.y..self.y + self.h).contains(&y)
+    }
+
+    /// The same rectangle, `dx` to the right and `dy` down.
+    #[must_use]
+    pub const fn moved(self, dx: i32, dy: i32) -> Self {
+        Self::new(self.x + dx, self.y + dy, self.w, self.h)
     }
 }
 
@@ -272,10 +278,9 @@ pub enum Id {
     SynthTags,
     SynthButton(&'static str),
     SynthTab(SynthTab),
-    /// A card's power button, its icon choices: by the card's index in
+    /// A card's power button: by the card's index in
     /// `ordrumbox_engine::synth_model::groups`.
     SynthPower(u8),
-    SynthIcon(u8, u8),
     /// A control, by its index in `synth_view::all_fields`.
     SynthField(u16),
     // Piano roll.
@@ -542,6 +547,13 @@ pub fn stepper_parts(rect: Rect, labelled: bool, scale: Scale) -> [Rect; 3] {
 pub const SPIN_SCREEN_H: i32 = 20;
 /// The width of a spin's ▲ and ▼ (at scale 1).
 const SPIN_ARROW_W: i32 = 12;
+
+/// The width of a [`Kind::Spin`] whose screen holds `chars` characters,
+/// its ▲ and ▼ included.
+#[must_use]
+pub fn spin_width(chars: i32, scale: Scale) -> i32 {
+    chars * char_width(scale) + 8 * scale + SPIN_ARROW_W * scale
+}
 
 /// The parts of a [`Kind::Spin`]: its ▼, its screen, its ▲. The screen at
 /// the left of `rect` (at most [`SPIN_SCREEN_H`] high), the ▲ over the ▼

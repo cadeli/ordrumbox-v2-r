@@ -218,7 +218,7 @@ pub fn lfo_scale(target: &str) -> f64 {
 }
 
 /// The cards' bypass flags (`CARD_BYPASS_FLAGS`).
-pub const BYPASS_FLAGS: [(&str, &str); 8] = [
+pub const BYPASS_FLAGS: [(&str, &str); 9] = [
     ("noise", "bypassNoise"),
     ("filter", "bypassFilter"),
     ("filterEnv", "bypassFilterEnv"),
@@ -227,6 +227,7 @@ pub const BYPASS_FLAGS: [(&str, &str); 8] = [
     ("lfo2", "bypassLfo2"),
     ("fm", "bypassFm"),
     ("modEnvelope", "bypassModEnv"),
+    ("pitchEnv", "bypassPitchEnv"),
 ];
 
 /// The cards in order (`SYNTH_GROUP_ORDER`), and the master card's controls.
@@ -554,7 +555,7 @@ pub fn modules(draft: &Object) -> Vec<(&'static str, bool)> {
         ("Mod", !flag("bypassModEnv") && is_routed(draft, MOD_ENV_SOURCE)),
         ("Noise", !flag("bypassNoise") && n("noise.mix") > 0.001),
         ("Filter Env", !flag("bypassFilterEnv") && env_amount > 0.001),
-        ("Pitch Env", n("pitchEnv.amount") != 0.0),
+        ("Pitch Env", !flag("bypassPitchEnv") && n("pitchEnv.amount") != 0.0),
     ]
 }
 

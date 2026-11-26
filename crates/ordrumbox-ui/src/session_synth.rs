@@ -13,7 +13,6 @@ use std::time::Instant;
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
-use ordrumbox_engine::synth_preset::FILTER_TYPES;
 
 use super::session_files::NO_SYNTHS;
 use super::session_types::Workspace;
@@ -388,7 +387,7 @@ impl Session {
         }
     }
 
-    /// A tab, a power button, a choice, a switch or a preset button pressed.
+    /// A tab, a power button, a switch or a preset button pressed.
     pub(super) fn synth_activate(&mut self, id: Id) {
         match id {
             Id::SynthTab(tab) => self.synth_editor.tab = tab,
@@ -398,19 +397,6 @@ impl Session {
                 let Some(group) = model::groups(&edit.draft).into_iter().nth(usize::from(gi)) else { return };
                 model::toggle_card(&mut edit.draft, &group);
                 self.commit_synth();
-            }
-            Id::SynthIcon(gi, oi) => {
-                let Some(edit) = &self.synth_editor.edit else { return };
-                let Some(group) = model::groups(&edit.draft).into_iter().nth(usize::from(gi)) else { return };
-                let (path, value) = if group == "filter" || group == "noise" {
-                    let key = if group == "filter" { "type" } else { "filterType" };
-                    (format!("{group}.{key}"), FILTER_TYPES.get(usize::from(oi)).map(|t| Value::from(*t)))
-                } else {
-                    ("fm.algo".to_owned(), Some(Value::from(f64::from(oi))))
-                };
-                if let Some(value) = value {
-                    self.edit_synth(&path, value);
-                }
             }
             Id::SynthField(fi) => {
                 let Some(path) = self.synth_field(fi) else { return };

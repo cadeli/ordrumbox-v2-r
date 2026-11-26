@@ -1,11 +1,11 @@
 //! The synth editor, in the place of
 //! the grid: the preset bar (the preset list, delete, new, duplicate,
 //! revert, tags, export, import), the tabs (OSC, FLT, MOD, ENV), and the cards of
-//! the tab — each with its title, its filter type or algorithm choices,
-//! its power button, its knobs, lists, waves and switches — with the scope
-//! (four cycles of the oscillators), the filter curve and the envelope, and
-//! the module pills under them. The oscillators are strips across the
-//! editor (`synth_strip.rs`).
+//! the tab, each as small as what it holds, side by side — its power LED
+//! and title, then its knobs, spins and switches in a row
+//! (`synth_cells.rs`) — with the scope (four cycles of the oscillators),
+//! the filter curve and the envelope, and the module pills under them. The
+//! oscillators are strips, each on a row of its own (`synth_strip.rs`).
 //!
 //! [`SynthLayout`] and [`build`] place everything as panel items (the ids
 //! name groups and fields by their index in [`model::groups`] and
@@ -20,7 +20,8 @@ use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
 use crate::editors::FILTER_ICONS;
 use crate::frame;
-use crate::panel::{Id, Item, Kind, Rect, SPIN_SCREEN_H, SynthTab};
+use crate::panel::{Id, Item, Kind, Rect, SynthTab};
+use crate::synth_cells::{Cell, KNOB_H, push_head, push_row};
 use crate::synth_strip;
 use crate::theme;
 
@@ -35,10 +36,15 @@ pub const BUTTONS: [(&str, &str, i32); 7] = [
     ("import", "Import", 56),
 ];
 
-const CARD_WIDTH: i32 = 330;
-pub(crate) const KNOB_W: i32 = 64;
-pub(crate) const KNOB_H: i32 = 56;
-const ROW_H: i32 = 16;
+/// The space inside a card around what it holds, across and down (at scale 1).
+const PAD_X: i32 = 6;
+const PAD_Y: i32 = 4;
+/// The space between two cards (at scale 1).
+const CARD_GAP: i32 = 10;
+/// The height of a card's head, the space under it included (at scale 1).
+const HEAD_H: i32 = 18;
+/// The narrowest a plot is (at scale 1): four knobs.
+const PLOT_MIN_W: i32 = 280;
 
 fn card_color() -> Rgb {
     theme::panel()
@@ -70,8 +76,7 @@ pub fn all_fields(draft: &Object) -> Vec<String> {
 
 /// What a field shows as: a knob, a list (values and labels, on a spin), a
 /// list on a stepped knob (the LFOs' sync), a wave (on a spin that draws
-/// it), a switch, a LED (oscillator 2's sync), or
-/// nothing (an icon row in the card's title, an object).
+/// it), a switch, a LED (oscillator 2's sync), or nothing (an object).
 enum Field {
     Knob,
     List(Vec<(String, String)>),
@@ -88,9 +93,6 @@ fn knob_spec(meta: &model::Meta) -> Spec {
     if meta.log { spec.log_full_travel() } else { spec }
 }
 
-/// The width of a spin in a card, its arrows included (at scale 1).
-const SPIN_W: i32 = 96;
-
 /// The values, labels and selected index of list field `path` with `options`.
 fn list_choice(draft: &Object, path: &str, options: Vec<(String, String)>) -> (Vec<String>, Vec<String>, usize) {
     let current = model::get(draft, path).and_then(Value::to_text).unwrap_or_default();
@@ -106,8 +108,13 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     if key == "wave" {
         return Field::Wave;
     }
-    if path == "filter.type" || path == "noise.filterType" || path == "fm.algo" {
-        return Field::None;
+    if path == "filter.type" || path == "noise.filterType" {
+        return Field::List(
+            FILTER_TYPES.iter().zip(FILTER_ICONS).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect(),
+        );
+    }
+    if path == "fm.algo" {
+        return Field::List((0..FM_ALGORITHMS).map(|i| (i.to_string(), (i + 1).to_string())).collect());
     }
     if path == "filter.slope" {
         return Field::List(FILTER_SLOPES.iter().map(|(v, l)| ((*v).to_owned(), (*l).to_owned())).collect());
@@ -132,23 +139,8 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     }
 }
 
-/// The choices in a card's title: the field and its options (value, label).
-fn icon_choices(group: &str) -> Option<(String, Vec<(Value, &'static str)>)> {
-    if group == "filter" || group == "noise" {
-        let key = if group == "filter" { "type" } else { "filterType" };
-        Some((
-            format!("{group}.{key}"),
-            FILTER_TYPES.iter().zip(FILTER_ICONS).map(|(t, l)| (Value::from(*t), l)).collect(),
-        ))
-    } else if group == "fm" {
-        Some((
-            "fm.algo".into(),
-            (0..5).map(|i| (Value::from(f64::from(i)), ["1", "2", "3", "4", "5"][i as usize])).collect(),
-        ))
-    } else {
-        None
-    }
-}
+/// The FM algorithms, offered on a spin as 1 to 5 (a preset holds 0 to 4).
+const FM_ALGORITHMS: usize = 5;
 
 /// A plot of a card.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -229,53 +221,98 @@ pub fn build(
 
     let groups = model::groups(draft);
     let fields = all_fields(draft);
-    let card_w = (CARD_WIDTH * s).min(layout.area.w.max(1));
-    let columns = ((layout.area.w + 10 * s) / (card_w + 10 * s)).max(1);
-    let (mut column, mut row_top, mut row_h) = (0, layout.area.y, 0);
+    let mut flow = Flow::new(layout.area, s);
     for (gi, group) in groups.iter().enumerate() {
         if SynthTab::ALL.get(model::group_tab(group)) != Some(&tab) {
             continue;
         }
-        // A strip takes a row of its own.
+        // Built from (0, 0), then moved to its place.
+        let mut items = Vec::new();
+        let origin = (PAD_X * s, PAD_Y * s);
         let is_strip = synth_strip::is_strip(group);
-        if column == columns || (is_strip && column > 0) {
-            column = 0;
-            row_top += row_h + 10 * s;
-            row_h = 0;
-        }
-        let x = layout.area.x + column * (card_w + 10 * s);
-        let w = if is_strip { layout.area.w } else { card_w };
-        let inner = Rect::new(x + 6 * s, row_top + 4 * s, w - 12 * s, 0);
-        let items = &mut built.items;
-        let mut y = inner.y;
-        let mut plot = None;
-        if is_strip {
-            y = synth_strip::push_strip(items, draft, (group, gi), &fields, inner, s, lfo);
+        let (right, bottom, plot) = if is_strip {
+            let right = synth_strip::push_strip(&mut items, draft, (group, gi), &fields, origin, s, lfo);
+            (right, origin.1 + KNOB_H * s, None)
         } else {
-            push_card_title(items, draft, group, gi, inner, y, s);
-            y += 18 * s;
-            plot = card_plot(group).map(|(plot, h)| {
-                let rect = Rect::new(inner.x, y, inner.w, h * s);
-                y += (h + 6) * s;
-                (plot, rect)
-            });
-            if group == "matrix" {
-                y = crate::synth_matrix::push_lines(items, draft, &fields, inner, y, s);
-            } else {
-                y = push_fields(items, draft, group, &fields, Rect::new(inner.x, y, inner.w, 0), s, lfo);
-            }
-        }
-        let height = y - row_top + 4 * s;
-        row_h = row_h.max(height);
+            push_card(&mut items, draft, (group, gi), &fields, origin, s, lfo)
+        };
+        let (w, h) = (right + PAD_X * s, bottom + PAD_Y * s);
+        let (x, y) = flow.place(w, h, is_strip);
+        built.items.extend(items.into_iter().map(|item| Item { rect: item.rect.moved(x, y), ..item }));
         built.cards.push(Card {
             group: group.clone(),
-            rect: Rect::new(x, row_top, w, height),
+            rect: Rect::new(x, y, w, h),
             bypassed: model::has_power(group) && model::bypassed(draft, group),
-            plot,
+            plot: plot.map(|(plot, rect): (Plot, Rect)| (plot, rect.moved(x, y))),
         });
-        column = if is_strip { columns } else { column + 1 };
     }
     built
+}
+
+/// Where the next card goes: left to right, then on the next row.
+struct Flow {
+    area: Rect,
+    gap: i32,
+    x: i32,
+    top: i32,
+    row_h: i32,
+}
+
+impl Flow {
+    fn new(area: Rect, s: Scale) -> Self {
+        Self { area, gap: CARD_GAP * s, x: area.x, top: area.y, row_h: 0 }
+    }
+
+    /// The place of a `w` × `h` card; `alone`: on a row of its own.
+    fn place(&mut self, w: i32, h: i32, alone: bool) -> (i32, i32) {
+        if self.x > self.area.x && (alone || self.x + w > self.area.x + self.area.w) {
+            self.next_row();
+        }
+        let at = (self.x, self.top);
+        self.row_h = self.row_h.max(h);
+        self.x += w + self.gap;
+        if alone {
+            self.next_row();
+        }
+        at
+    }
+
+    fn next_row(&mut self) {
+        self.top += self.row_h + self.gap;
+        self.x = self.area.x;
+        self.row_h = 0;
+    }
+}
+
+/// Card `group` (index `gi` of the groups) from `(x, y)`: its head, its
+/// plot, its controls in a row (the matrix: its lines). The x right of what
+/// it holds, the y under it, and its plot.
+fn push_card(
+    items: &mut Vec<Item>,
+    draft: &Object,
+    (group, gi): (&str, usize),
+    fields: &[String],
+    (x, y): (i32, i32),
+    s: Scale,
+    lfo: &dyn Fn(&str) -> Option<f64>,
+) -> (i32, i32, Option<(Plot, Rect)>) {
+    let head_right = push_head(items, draft, (group, gi), (x, y), s);
+    let plot_top = y + HEAD_H * s;
+    let plot_h = card_plot(group).map_or(0, |(_, h)| (h + 6) * s);
+    let top = plot_top + plot_h;
+    let (right, bottom) = if group == "matrix" {
+        crate::synth_matrix::push_lines(items, draft, fields, (x, top), s)
+    } else {
+        let cells = field_cells(draft, group, fields, lfo);
+        let bottom = if cells.is_empty() { top } else { top + KNOB_H * s };
+        (push_row(items, cells, x, top, s), bottom)
+    };
+    let plot = card_plot(group).map(|(plot, h)| {
+        let w = (right - x).max(PLOT_MIN_W * s);
+        (plot, Rect::new(x, plot_top, w, h * s))
+    });
+    let right = plot.map_or(right, |(_, r)| right.max(r.x + r.w)).max(head_right);
+    (right, bottom.max(plot_top), plot)
 }
 
 /// The preset's select, the buttons and the tabs, above the cards.
@@ -295,27 +332,6 @@ fn push_header(items: &mut Vec<Item>, presets: &[String], current: &str, tab: Sy
     }
 }
 
-/// A card's title row at `y`: the label, the choices, the power button.
-fn push_card_title(items: &mut Vec<Item>, draft: &Object, group: &str, gi: usize, inner: Rect, y: i32, s: Scale) {
-    items.push(Item::text(inner.x, y + 3 * s, model::group_label(group), theme::text(), s));
-    if let Some((path, options)) = icon_choices(group) {
-        let current = model::get(draft, &path);
-        for (k, (value, label)) in options.iter().enumerate() {
-            let rect = Rect::new(inner.x + 64 * s + k as i32 * 30 * s, y, 28 * s, 13 * s);
-            let on = current.is_some_and(|c| c == value);
-            items.push(Item::new(
-                Some(Id::SynthIcon(gi as u8, k as u8)),
-                rect,
-                Kind::Button { label: (*label).into(), on },
-            ));
-        }
-    }
-    if model::has_power(group) {
-        let rect = Rect::new(inner.x + inner.w - 14 * s, y, 14 * s, 13 * s);
-        items.push(Item::new(Some(Id::SynthPower(gi as u8)), rect, Kind::Led { on: !model::bypassed(draft, group) }));
-    }
-}
-
 /// The plot a card shows under its title, and its height (unscaled).
 fn card_plot(group: &str) -> Option<(Plot, i32)> {
     match group {
@@ -326,9 +342,9 @@ fn card_plot(group: &str) -> Option<(Plot, i32)> {
     }
 }
 
-/// The knob of numeric field `path` (index `fi` of [`all_fields`]) in
-/// `rect`, at the value an LFO gives it now if one moves it.
-pub(crate) fn knob_item(draft: &Object, path: &str, fi: usize, rect: Rect, lfo: &dyn Fn(&str) -> Option<f64>) -> Item {
+/// The knob of numeric field `path`, at the value an LFO gives it now if
+/// one moves it.
+pub(crate) fn knob_kind(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option<f64>) -> Kind {
     let meta = model::find_meta(path);
     let key = path.rsplit('.').next().unwrap_or(path);
     let label = meta.and_then(|m| m.label).unwrap_or(key).to_owned();
@@ -337,88 +353,41 @@ pub(crate) fn knob_item(draft: &Object, path: &str, fi: usize, rect: Rect, lfo: 
     let value = lfo(path).map_or(base, |m| m.clamp(spec.min, spec.max));
     let text = crate::control::Format::Fmt.value(value, meta.map_or("", |m| m.unit));
     let lfo_on = model::lfo_targeted(draft, path);
-    Item::new(Some(Id::SynthField(fi as u16)), rect, Kind::Value { spec, value, label: Some(label), text, lfo: lfo_on })
+    Kind::Value { spec, value, label: Some(label), text, lfo: lfo_on }
 }
 
-/// List field `path` (index `fi`) on a knob in `rect`, under `label`: a
-/// notch per option of `options` (value, label), the option's label as its value.
-fn steps_item(
-    draft: &Object,
-    path: &str,
-    fi: usize,
-    rect: Rect,
-    (label, options): (String, Vec<(String, String)>),
-) -> Item {
+/// List field `path` on a knob: a notch per option of `options` (value,
+/// label), the option's label as its value.
+fn steps_kind(draft: &Object, path: &str, options: Vec<(String, String)>) -> Kind {
     let (_, labels, selected) = list_choice(draft, path, options);
     let last = labels.len().saturating_sub(1).max(1);
     let spec = Spec::knob(0.0, last as f64, 1.0, 0.0);
     let text = labels.get(selected).cloned().unwrap_or_default();
-    let kind = Kind::Value { spec, value: selected as f64, label: Some(label), text, lfo: false };
-    Item::new(Some(Id::SynthField(fi as u16)), rect, kind)
+    Kind::Value { spec, value: selected as f64, label: None, text, lfo: false }
 }
 
-/// The controls of `group` from the top of `area`: knobs in rows, then lists
-/// and switches one per line; the y under them.
-fn push_fields(
-    items: &mut Vec<Item>,
-    draft: &Object,
-    group: &str,
-    fields: &[String],
-    area: Rect,
-    s: Scale,
-    lfo: &dyn Fn(&str) -> Option<f64>,
-) -> i32 {
-    let (inner, mut y) = (area, area.y);
-    let per_row = (inner.w / (KNOB_W * s)).max(1);
-    let mut knobs = 0;
-    let mut rows = Vec::new();
-    let top = y;
-    let knob_rect = |k: i32| {
-        Rect::new(inner.x + (k % per_row) * KNOB_W * s, top + (k / per_row) * (KNOB_H + 4) * s, KNOB_W * s, KNOB_H * s)
-    };
+/// The controls of `group`, in its fields' order, as cells of a row.
+fn field_cells(draft: &Object, group: &str, fields: &[String], lfo: &dyn Fn(&str) -> Option<f64>) -> Vec<Cell> {
+    let mut cells = Vec::new();
     for path in model::fields(draft, group) {
         let Some(fi) = fields.iter().position(|f| *f == path) else { continue };
-        let id = Some(Id::SynthField(fi as u16));
         let key = path.rsplit('.').next().unwrap_or(&path);
-        let meta = model::find_meta(&path);
-        let label = meta.and_then(|m| m.label).unwrap_or(key).to_owned();
-        match field_kind(&path, model::get(draft, &path)) {
-            Field::Knob => {
-                items.push(knob_item(draft, &path, fi, knob_rect(knobs), lfo));
-                knobs += 1;
-            }
-            Field::Wave => rows.push((id, label, synth_strip::wave_spin(draft, &path))),
-            Field::Steps(options) => {
-                items.push(steps_item(draft, &path, fi, knob_rect(knobs), (label, options)));
-                knobs += 1;
-            }
+        let label = model::find_meta(&path).and_then(|m| m.label).unwrap_or(key).to_owned();
+        let kind = match field_kind(&path, model::get(draft, &path)) {
+            Field::Knob => knob_kind(draft, &path, lfo),
+            Field::Wave => synth_strip::wave_spin(draft, &path),
+            Field::Steps(options) => steps_kind(draft, &path, options),
             Field::List(options) => {
                 let (values, labels, selected) = list_choice(draft, &path, options);
-                rows.push((id, label, Kind::spin(values, labels, selected)));
+                Kind::spin(values, labels, selected)
             }
-            Field::Switch => {
-                let on = model::get(draft, &path).and_then(Value::as_bool).unwrap_or(false);
-                rows.push((id, label, Kind::Toggle { on }));
-            }
-            Field::Led => rows.push((id, label, Kind::Led { on: model::is_osc2_synced(draft) })),
-            Field::None => {}
-        }
-    }
-    if knobs > 0 {
-        y += ((knobs + per_row - 1) / per_row) * (KNOB_H + 4) * s;
-    }
-    for (id, label, kind) in rows {
-        // A LED is as wide as a card's power LED.
-        let (w, h) = match kind {
-            Kind::Led { .. } => (14 * s, 13 * s),
-            Kind::Spin { .. } => ((inner.w - 80 * s).min(SPIN_W * s), SPIN_SCREEN_H * s),
-            _ => ((inner.w - 80 * s).min(200 * s), 13 * s),
+            Field::Switch => Kind::Toggle { on: model::get(draft, &path).and_then(Value::as_bool).unwrap_or(false) },
+            Field::Led => Kind::Led { on: model::is_osc2_synced(draft) },
+            Field::None => continue,
         };
-        items.push(Item::text(inner.x, y + (h - 8 * s) / 2, label, theme::muted(), s));
-        items.push(Item::new(id, Rect::new(inner.x + 80 * s, y, w, h), kind));
-        y += h.max(ROW_H * s) + 2 * s;
+        cells.push(Cell { id: Id::SynthField(fi as u16), kind, label });
     }
-    y
+    cells
 }
 
 /// Paint the cards (under their items), their plots and the module pills.
@@ -545,7 +514,7 @@ mod tests {
             }
             assert!(!built.cards.is_empty());
         }
-        // Every numeric control but the algorithm (an icon row) is a knob.
+        // Every numeric control but the algorithm (a spin) is a knob.
         assert_eq!(knobs, model::metas().count() - 1);
         let built = build(&d, &["a".into(), "b".into()], "b", SynthTab::Oscillators, &layout, &|_| None);
         assert!(matches!(built.items[0].kind, Kind::Select { selected: 1, .. }));
