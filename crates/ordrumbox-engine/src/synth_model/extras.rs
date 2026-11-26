@@ -187,4 +187,14 @@ mod tests {
         assert_eq!(implicit_enable(&mut d, "filter2.freq"), ["filter2.type", "filter2.freq", "filter2.Q"]);
         assert_eq!(d.get("bypassFilter2"), Some(&Value::Bool(false)));
     }
+
+    #[test]
+    fn a_set_extra_group_shows_each_control_once() {
+        let mut d = defaults();
+        hydrate(&mut d);
+        implicit_enable(&mut d, "filter2.freq");
+        assert!(set(&mut d, "voice.glide", Value::from(0.1)));
+        assert_eq!(fields(&d, "filter2"), ["filter2.type", "filter2.freq", "filter2.Q"]);
+        assert_eq!(fields(&d, "voice"), ["voice.mode", "voice.glide", "voice.accent"]);
+    }
 }

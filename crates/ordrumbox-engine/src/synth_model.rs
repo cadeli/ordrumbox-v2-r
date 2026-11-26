@@ -378,7 +378,8 @@ pub fn fields(draft: &Object, group: &str) -> Vec<String> {
             .iter()
             .filter(|(key, _)| match defaults.get(group) {
                 Some(Value::Object(known)) => known.get(key).is_some(),
-                _ => true,
+                // A group of extra fields alone (`filter2`, `voice`): they come last, from `extras`.
+                _ => !EXTRA_FIELDS.contains(&(group, *key)),
             })
             .map(|(key, _)| format!("{group}.{key}"))
             .filter(|path| borrowing_card(path).is_none())
