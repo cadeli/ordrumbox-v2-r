@@ -710,3 +710,11 @@ advanced view. The filter envelope's stages, the second filter, the LFOs' delay 
 legato, glide, accent) are extra fields, written once set: a preset without them plays as before, and no audio
 snapshot changed. This rewrote the card lines of `synth_editor_rust.txt` (engine), which list the three new cards, and
 its `lfo targets` line, which gains `filter2.freq`.
+
+The shipped synth presets (`assets/data/synth_presets.json`) each have a profile: percussion for the drums and
+percussions, bass for the basses, melodic for the rest. 28 of them use the new controls, which changes how they sound:
+the basses play mono (legato with a glide for BASS_ACID, BASS_WOBBLE; a glide for BASS_ANALOG, BASS_SUB, TRAP_BASS;
+an accent for BASS_ANALOG, BASS_PLUCK, BASS_ACID), the leads glide in legato and their vibrato comes in after a delay
+(SYNTHLEAD_SAW gains one), the pads' filter swells with its own envelope and a second filter clears their lows, and
+BRASS_SYNTH, PIANO_EPIANO and PIANO_CLAV hold their filter envelope. The drums and percussions sound as before.
+`ordrumbox-probe preset` measures them all without a clip; no snapshot renders them.

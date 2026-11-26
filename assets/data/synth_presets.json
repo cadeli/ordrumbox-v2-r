@@ -2,6 +2,7 @@
   "BASS_ANALOG": {
     "instrument": "BASS",
     "style": "funk",
+    "profile": "bass",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -31,7 +32,11 @@
       "slope": 24
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.08
+      "filterEnvelopeAmount": 0.08,
+      "attack": 0.003,
+      "decay": 0.3,
+      "sustain": 0.15,
+      "release": 0.08
     },
     "fm": {
       "amount": 0,
@@ -64,11 +69,17 @@
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.04,
+      "accent": 0.3
     }
   },
   "BASS_SQUARE": {
     "instrument": "BASS",
     "style": "electro",
+    "profile": "bass",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.8,
@@ -131,11 +142,17 @@
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.0,
+      "accent": 0.0
     }
   },
   "BASS_SUB": {
     "instrument": "BASS",
     "style": "hiphop",
+    "profile": "bass",
     "masterVolume": 0.85,
     "vco1": {
       "gain": 0.85,
@@ -198,11 +215,17 @@
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.03,
+      "accent": 0.0
     }
   },
   "BASS_PLUCK": {
     "instrument": "BASS",
     "style": "house",
+    "profile": "bass",
     "masterVolume": 0.95,
     "vco1": {
       "gain": 0.7,
@@ -232,7 +255,11 @@
       "slope": 24
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.12
+      "filterEnvelopeAmount": 0.12,
+      "attack": 0.002,
+      "decay": 0.15,
+      "sustain": 0.0,
+      "release": 0.06
     },
     "fm": {
       "amount": 0,
@@ -265,11 +292,17 @@
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.0,
+      "accent": 0.4
     }
   },
   "BASS_ACID": {
     "instrument": "BASS",
     "style": "acid",
+    "profile": "bass",
     "masterVolume": 0.6,
     "vco1": {
       "gain": 0.9,
@@ -299,7 +332,11 @@
       "slope": 12
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.12
+      "filterEnvelopeAmount": 0.12,
+      "attack": 0.002,
+      "decay": 0.18,
+      "sustain": 0.0,
+      "release": 0.05
     },
     "fm": {
       "amount": 0,
@@ -332,11 +369,17 @@
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "voice": {
+      "mode": "legato",
+      "glide": 0.06,
+      "accent": 0.7
     }
   },
   "BASS_FM": {
     "instrument": "BASS",
     "style": "pop",
+    "profile": "bass",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.9,
@@ -404,11 +447,17 @@
       "source1": "modEnv",
       "target1": "fm.boost",
       "amount1": 1.0
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.0,
+      "accent": 0.0
     }
   },
   "SYNTHLEAD_SAW": {
     "instrument": "SYNTHLEAD",
     "style": "electro",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -438,7 +487,11 @@
       "slope": 24
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.25
+      "filterEnvelopeAmount": 0.25,
+      "attack": 0.005,
+      "decay": 0.35,
+      "sustain": 0.3,
+      "release": 0.15
     },
     "fm": {
       "amount": 0.0,
@@ -463,19 +516,31 @@
     },
     "lfo2": {
       "wave": "sine",
-      "freq": 0,
-      "sync": "off"
+      "freq": 5.5,
+      "sync": "off",
+      "delay": 0.4
     },
     "modEnvelope": {
       "attack": 0.005,
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "voice": {
+      "mode": "legato",
+      "glide": 0.05,
+      "accent": 0.0
+    },
+    "matrix": {
+      "source1": "lfo2",
+      "target1": "pitch",
+      "amount1": 0.008
     }
   },
   "SYNTHLEAD_SQUARE": {
     "instrument": "SYNTHLEAD",
     "style": "pop",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -526,12 +591,14 @@
     "lfo": {
       "wave": "sine",
       "freq": 5.5,
-      "sync": "off"
+      "sync": "off",
+      "delay": 0.3
     },
     "lfo2": {
       "wave": "sine",
       "freq": 5.5,
-      "sync": "off"
+      "sync": "off",
+      "delay": 0.3
     },
     "modEnvelope": {
       "attack": 0.005,
@@ -546,11 +613,17 @@
       "source2": "lfo2",
       "target2": "vco2.detune",
       "amount2": 0.12
+    },
+    "voice": {
+      "mode": "legato",
+      "glide": 0.04,
+      "accent": 0.0
     }
   },
   "SYNTHLEAD_SUPERSAW": {
     "instrument": "SYNTHLEAD",
     "style": "trance",
+    "profile": "melodic",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 0.8,
@@ -618,11 +691,17 @@
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "filter2": {
+      "type": "highpass",
+      "freq": 120,
+      "Q": 0.7
     }
   },
   "SYNTHPAD_WARM": {
     "instrument": "SYNTHPAD",
     "style": "ambient",
+    "profile": "melodic",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.5,
@@ -652,7 +731,11 @@
       "slope": 12
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.1
+      "filterEnvelopeAmount": 0.1,
+      "attack": 0.9,
+      "decay": 1.2,
+      "sustain": 0.5,
+      "release": 1.2
     },
     "fm": {
       "amount": 0.0,
@@ -685,11 +768,17 @@
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "filter2": {
+      "type": "highpass",
+      "freq": 120,
+      "Q": 0.7
     }
   },
   "SYNTHPAD_SWEEP": {
     "instrument": "SYNTHPAD",
     "style": "trance",
+    "profile": "melodic",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.5,
@@ -719,7 +808,11 @@
       "slope": 24
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.15
+      "filterEnvelopeAmount": 0.15,
+      "attack": 1.5,
+      "decay": 1.5,
+      "sustain": 0.4,
+      "release": 1.5
     },
     "fm": {
       "amount": 0.0,
@@ -762,6 +855,7 @@
   "PIANO_EPIANO": {
     "instrument": "PIANO",
     "style": "soul",
+    "profile": "melodic",
     "masterVolume": 0.85,
     "vco1": {
       "gain": 0.7,
@@ -791,7 +885,11 @@
       "slope": 12
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.1
+      "filterEnvelopeAmount": 0.1,
+      "attack": 0.003,
+      "decay": 0.9,
+      "sustain": 0.25,
+      "release": 0.4
     },
     "fm": {
       "amount": 0.25,
@@ -829,6 +927,7 @@
   "PIANO_CLAV": {
     "instrument": "PIANO",
     "style": "funk",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -858,7 +957,11 @@
       "slope": 24
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.4
+      "filterEnvelopeAmount": 0.4,
+      "attack": 0.001,
+      "decay": 0.15,
+      "sustain": 0.1,
+      "release": 0.08
     },
     "fm": {
       "amount": 0.0,
@@ -891,11 +994,17 @@
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "voice": {
+      "mode": "poly",
+      "glide": 0.0,
+      "accent": 0.3
     }
   },
   "ORGAN_DRAWBAR": {
     "instrument": "ORGAN",
     "style": "jazz",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -963,6 +1072,7 @@
   "ORGAN_PERC": {
     "instrument": "ORGAN",
     "style": "house",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -1030,6 +1140,7 @@
   "BRASS_SYNTH": {
     "instrument": "BRASS",
     "style": "pop",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -1059,7 +1170,11 @@
       "slope": 24
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.5
+      "filterEnvelopeAmount": 0.35,
+      "attack": 0.06,
+      "decay": 0.5,
+      "sustain": 0.45,
+      "release": 0.25
     },
     "fm": {
       "amount": 0.0,
@@ -1097,6 +1212,7 @@
   "BRASS_STAB": {
     "instrument": "BRASS",
     "style": "funk",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -1164,6 +1280,7 @@
   "STRINGS_ENSEMBLE": {
     "instrument": "STRINGS",
     "style": "disco",
+    "profile": "melodic",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.5,
@@ -1214,7 +1331,8 @@
     "lfo": {
       "wave": "sine",
       "freq": 4.5,
-      "sync": "off"
+      "sync": "off",
+      "delay": 0.5
     },
     "lfo2": {
       "wave": "sine",
@@ -1231,11 +1349,17 @@
       "source1": "lfo1",
       "target1": "vco1.detune",
       "amount1": 0.06
+    },
+    "filter2": {
+      "type": "highpass",
+      "freq": 150,
+      "Q": 0.7
     }
   },
   "STRINGS_PIZZ": {
     "instrument": "STRINGS",
     "style": "pop",
+    "profile": "melodic",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.9,
@@ -1303,6 +1427,7 @@
   "CROMAPERC_BELL": {
     "instrument": "CROMAPERC",
     "style": "ambient",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.8,
@@ -1370,6 +1495,7 @@
   "CROMAPERC_MARIMBA": {
     "instrument": "CROMAPERC",
     "style": "pop",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.8,
@@ -1437,6 +1563,7 @@
   "CHH_SYNTH": {
     "instrument": "CHH",
     "style": "electro",
+    "profile": "percussion",
     "masterVolume": 1,
     "vco1": {
       "gain": 0.2,
@@ -1503,6 +1630,7 @@
   "OHH_SYNTH": {
     "instrument": "OHH",
     "style": "electro",
+    "profile": "percussion",
     "masterVolume": 1,
     "vco1": {
       "gain": 0.2,
@@ -1569,6 +1697,7 @@
   "KICK_SYNTH": {
     "instrument": "KICK",
     "style": "electro",
+    "profile": "percussion",
     "masterVolume": 1,
     "vco1": {
       "gain": 1,
@@ -1644,6 +1773,7 @@
   "SNARE_SYNTH": {
     "instrument": "SNARE",
     "style": "electro",
+    "profile": "percussion",
     "masterVolume": 1,
     "vco1": {
       "gain": 1,
@@ -1710,6 +1840,7 @@
   "TOM_SYNTH": {
     "instrument": "TOM",
     "style": "electro",
+    "profile": "percussion",
     "masterVolume": 0.85,
     "vco1": {
       "gain": 1,
@@ -1776,6 +1907,7 @@
   "CLAP_SYNTH": {
     "instrument": "CLAP",
     "style": "electro",
+    "profile": "percussion",
     "masterVolume": 1,
     "vco1": {
       "gain": 0,
@@ -1847,6 +1979,7 @@
   "COWBELL_SYNTH": {
     "instrument": "COWBELL",
     "style": "electro",
+    "profile": "percussion",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.5,
@@ -1914,6 +2047,7 @@
   "CRASH_SYNTH": {
     "instrument": "CRASH",
     "style": "electro",
+    "profile": "percussion",
     "masterVolume": 1,
     "vco1": {
       "gain": 0.2,
@@ -1980,6 +2114,7 @@
   "BASS_TOUCH": {
     "instrument": "BASS",
     "style": "funk",
+    "profile": "bass",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -2068,11 +2203,17 @@
       "source8": "off",
       "target8": "NOT",
       "amount8": 0
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.0,
+      "accent": 0.0
     }
   },
   "BASS_WOBBLE": {
     "instrument": "BASS",
     "style": "dubstep",
+    "profile": "bass",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -2123,7 +2264,8 @@
     "lfo": {
       "wave": "sine",
       "freq": 2.0,
-      "sync": "off"
+      "sync": "off",
+      "retrigger": true
     },
     "lfo2": {
       "wave": "sine",
@@ -2161,11 +2303,17 @@
       "source8": "off",
       "target8": "NOT",
       "amount8": 0
+    },
+    "voice": {
+      "mode": "legato",
+      "glide": 0.08,
+      "accent": 0.0
     }
   },
   "SYNTHPAD_DRIFT": {
     "instrument": "SYNTHPAD",
     "style": "ambient",
+    "profile": "melodic",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.5,
@@ -2254,11 +2402,17 @@
       "source8": "off",
       "target8": "NOT",
       "amount8": 0
+    },
+    "filter2": {
+      "type": "highpass",
+      "freq": 100,
+      "Q": 0.7
     }
   },
   "PIANO_KEYBELL": {
     "instrument": "PIANO",
     "style": "pop",
+    "profile": "melodic",
     "masterVolume": 0.85,
     "vco1": {
       "gain": 0.7,
@@ -2352,6 +2506,7 @@
   "CHIP_LEAD": {
     "instrument": "SYNTHLEAD",
     "style": "chiptune",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 1,
@@ -2402,7 +2557,8 @@
     "lfo": {
       "wave": "sine",
       "freq": 6,
-      "sync": "off"
+      "sync": "off",
+      "delay": 0.15
     },
     "lfo2": {
       "wave": "sine",
@@ -2420,11 +2576,17 @@
       "source1": "lfo1",
       "target1": "vco1.detune",
       "amount1": 0.08
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.0,
+      "accent": 0.0
     }
   },
   "CHIP_PULSE": {
     "instrument": "SYNTHLEAD",
     "style": "chiptune",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -2476,7 +2638,8 @@
     "lfo": {
       "wave": "sine",
       "freq": 1.5,
-      "sync": "off"
+      "sync": "off",
+      "retrigger": true
     },
     "lfo2": {
       "wave": "sine",
@@ -2494,11 +2657,17 @@
       "source1": "lfo1",
       "target1": "vco1.width",
       "amount1": 0.3
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.0,
+      "accent": 0.0
     }
   },
   "CHIP_BASS": {
     "instrument": "BASS",
     "style": "chiptune",
+    "profile": "bass",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 1,
@@ -2562,11 +2731,17 @@
       "sustain": 0,
       "release": 0.1
     },
-    "bypassFilter": true
+    "bypassFilter": true,
+    "voice": {
+      "mode": "mono",
+      "glide": 0.0,
+      "accent": 0.0
+    }
   },
   "CHIP_KICK": {
     "instrument": "KICK",
     "style": "chiptune",
+    "profile": "percussion",
     "masterVolume": 1,
     "vco1": {
       "gain": 1,
@@ -2644,6 +2819,7 @@
   "CHIP_SNARE": {
     "instrument": "SNARE",
     "style": "chiptune",
+    "profile": "percussion",
     "masterVolume": 0.75,
     "vco1": {
       "gain": 0.5,
@@ -2714,6 +2890,7 @@
   "CHIP_TOM": {
     "instrument": "TOM",
     "style": "chiptune",
+    "profile": "percussion",
     "masterVolume": 1,
     "vco1": {
       "gain": 1,
@@ -2790,6 +2967,7 @@
   "CHIP_HAT": {
     "instrument": "CHH",
     "style": "chiptune",
+    "profile": "percussion",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 0,
@@ -2859,6 +3037,7 @@
   "DUB_SIREN": {
     "instrument": "SYNTHEFFECT",
     "style": "dub",
+    "profile": "melodic",
     "masterVolume": 0.55,
     "vco1": {
       "gain": 0.7,
@@ -2910,12 +3089,14 @@
     "lfo": {
       "wave": "sawtooth",
       "freq": 1.8,
-      "sync": "off"
+      "sync": "off",
+      "retrigger": true
     },
     "lfo2": {
       "wave": "sawtooth",
       "freq": 1.8,
-      "sync": "off"
+      "sync": "off",
+      "retrigger": true
     },
     "modEnvelope": {
       "attack": 0.005,
@@ -2930,11 +3111,17 @@
       "source2": "lfo2",
       "target2": "vco2.octave",
       "amount2": 0.5833333333333334
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.12,
+      "accent": 0.0
     }
   },
   "DUB_MELODICA": {
     "instrument": "REED",
     "style": "dub",
+    "profile": "melodic",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 0.55,
@@ -2986,12 +3173,14 @@
     "lfo": {
       "wave": "sine",
       "freq": 5.2,
-      "sync": "off"
+      "sync": "off",
+      "delay": 0.35
     },
     "lfo2": {
       "wave": "sine",
       "freq": 5.2,
-      "sync": "off"
+      "sync": "off",
+      "delay": 0.35
     },
     "modEnvelope": {
       "attack": 0.005,
@@ -3011,6 +3200,7 @@
   "DUB_SKANK": {
     "instrument": "ORGAN",
     "style": "dub",
+    "profile": "melodic",
     "masterVolume": 0.75,
     "vco1": {
       "gain": 0.6,
@@ -3079,6 +3269,7 @@
   "TR808_KICK": {
     "instrument": "KICK",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -3154,6 +3345,7 @@
   "TR808_SNARE": {
     "instrument": "SNARE",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.8,
@@ -3220,6 +3412,7 @@
   "TR808_CLAP": {
     "instrument": "CLAP",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -3286,6 +3479,7 @@
   "TR808_RIMSHOT": {
     "instrument": "RIMSHOT",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.7,
@@ -3352,6 +3546,7 @@
   "TR808_CHH": {
     "instrument": "CHH",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.3,
@@ -3418,6 +3613,7 @@
   "TR808_OHH": {
     "instrument": "OHH",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.3,
@@ -3484,6 +3680,7 @@
   "TR808_CRASH": {
     "instrument": "CRASH",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.3,
@@ -3550,6 +3747,7 @@
   "TR808_RIDE": {
     "instrument": "RIDE",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.3,
@@ -3616,6 +3814,7 @@
   "TR808_LO_TOM": {
     "instrument": "LO_TOM",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -3691,6 +3890,7 @@
   "TR808_TOM": {
     "instrument": "TOM",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -3766,6 +3966,7 @@
   "TR808_HI_TOM": {
     "instrument": "HI_TOM",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -3841,6 +4042,7 @@
   "TR808_LO_CONGAS": {
     "instrument": "LO_CONGAS",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -3907,6 +4109,7 @@
   "TR808_CONGAS": {
     "instrument": "CONGAS",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -3973,6 +4176,7 @@
   "TR808_HI_CONGAS": {
     "instrument": "HI_CONGAS",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -4039,6 +4243,7 @@
   "TR808_CLAVES": {
     "instrument": "CLAVES",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -4105,6 +4310,7 @@
   "TR808_MARACAS": {
     "instrument": "MARACAS",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -4171,6 +4377,7 @@
   "TR808_COWBELL": {
     "instrument": "COWBELL",
     "style": "808",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.5,
@@ -4237,6 +4444,7 @@
   "TR909_KICK": {
     "instrument": "KICK",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -4312,6 +4520,7 @@
   "TR909_SNARE": {
     "instrument": "SNARE",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.7,
@@ -4378,6 +4587,7 @@
   "TR909_CLAP": {
     "instrument": "CLAP",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -4444,6 +4654,7 @@
   "TR909_RIMSHOT": {
     "instrument": "RIMSHOT",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.6,
@@ -4510,6 +4721,7 @@
   "TR909_CHH": {
     "instrument": "CHH",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.12,
@@ -4576,6 +4788,7 @@
   "TR909_OHH": {
     "instrument": "OHH",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.12,
@@ -4642,6 +4855,7 @@
   "TR909_CRASH": {
     "instrument": "CRASH",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.12,
@@ -4708,6 +4922,7 @@
   "TR909_RIDE": {
     "instrument": "RIDE",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.25,
@@ -4774,6 +4989,7 @@
   "TR909_LO_TOM": {
     "instrument": "LO_TOM",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -4849,6 +5065,7 @@
   "TR909_TOM": {
     "instrument": "TOM",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -4924,6 +5141,7 @@
   "TR909_HI_TOM": {
     "instrument": "HI_TOM",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -4999,6 +5217,7 @@
   "TR909_CONGAS": {
     "instrument": "CONGAS",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -5065,6 +5284,7 @@
   "TR909_SHAKER": {
     "instrument": "SHAKER",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -5131,6 +5351,7 @@
   "TR909_TAMBOURINE": {
     "instrument": "TAMBOURINE",
     "style": "909",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.2,
@@ -5197,6 +5418,7 @@
   "LAT_HI_BONGOS": {
     "instrument": "HI_BONGOS",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -5263,6 +5485,7 @@
   "LAT_LO_BONGOS": {
     "instrument": "LO_BONGOS",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -5329,6 +5552,7 @@
   "LAT_OHI_CONGAS": {
     "instrument": "OHI_CONGAS",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -5395,6 +5619,7 @@
   "LAT_HI_CONGAS": {
     "instrument": "HI_CONGAS",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -5461,6 +5686,7 @@
   "LAT_LO_CONGAS": {
     "instrument": "LO_CONGAS",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -5527,6 +5753,7 @@
   "LAT_HI_TIMBAL": {
     "instrument": "HI_TIMBAL",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.7,
@@ -5593,6 +5820,7 @@
   "LAT_LO_TIMBAL": {
     "instrument": "LO_TIMBAL",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.7,
@@ -5659,6 +5887,7 @@
   "LAT_HI_WOODBLOCK": {
     "instrument": "HI_WOODBLOCK",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 0.3,
     "vco1": {
       "gain": 1.0,
@@ -5725,6 +5954,7 @@
   "LAT_LO_WOODBLOCK": {
     "instrument": "LO_WOODBLOCK",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 0.3,
     "vco1": {
       "gain": 1.0,
@@ -5791,6 +6021,7 @@
   "LAT_CLAVES": {
     "instrument": "CLAVES",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 0.25,
     "vco1": {
       "gain": 1.0,
@@ -5857,6 +6088,7 @@
   "LAT_COWBELL": {
     "instrument": "COWBELL",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.6,
@@ -5924,6 +6156,7 @@
   "LAT_TRIANGLE": {
     "instrument": "TRIANGLE",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.5,
@@ -5990,6 +6223,7 @@
   "LAT_MARACAS": {
     "instrument": "MARACAS",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -6056,6 +6290,7 @@
   "LAT_CABA": {
     "instrument": "CABA",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -6122,6 +6357,7 @@
   "LAT_GUIRO": {
     "instrument": "GUIRO",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 0.5,
     "vco1": {
       "gain": 0,
@@ -6193,6 +6429,7 @@
   "LAT_CASTENET": {
     "instrument": "CASTENET",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.5,
@@ -6259,6 +6496,7 @@
   "LAT_CUICA": {
     "instrument": "CUICA",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -6330,6 +6568,7 @@
   "LAT_WHISTLE": {
     "instrument": "WHISTLE",
     "style": "latin",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -6401,6 +6640,7 @@
   "TR606_KICK": {
     "instrument": "KICK",
     "style": "606",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -6476,6 +6716,7 @@
   "TR606_SNARE": {
     "instrument": "SNARE",
     "style": "606",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.6,
@@ -6542,6 +6783,7 @@
   "TR606_CHH": {
     "instrument": "CHH",
     "style": "606",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.15,
@@ -6608,6 +6850,7 @@
   "TR606_OHH": {
     "instrument": "OHH",
     "style": "606",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.15,
@@ -6674,6 +6917,7 @@
   "TR606_CRASH": {
     "instrument": "CRASH",
     "style": "606",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.2,
@@ -6740,6 +6984,7 @@
   "TR606_LO_TOM": {
     "instrument": "LO_TOM",
     "style": "606",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -6815,6 +7060,7 @@
   "TR606_HI_TOM": {
     "instrument": "HI_TOM",
     "style": "606",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -6890,6 +7136,7 @@
   "CR78_KICK": {
     "instrument": "KICK",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -6956,6 +7203,7 @@
   "CR78_SNARE": {
     "instrument": "SNARE",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.7,
@@ -7022,6 +7270,7 @@
   "CR78_RIMSHOT": {
     "instrument": "RIMSHOT",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 0.5,
     "vco1": {
       "gain": 0.8,
@@ -7088,6 +7337,7 @@
   "CR78_CHH": {
     "instrument": "CHH",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.08,
@@ -7154,6 +7404,7 @@
   "CR78_OHH": {
     "instrument": "OHH",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.08,
@@ -7220,6 +7471,7 @@
   "CR78_TAMBOURINE": {
     "instrument": "TAMBOURINE",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.15,
@@ -7286,6 +7538,7 @@
   "CR78_GUIRO": {
     "instrument": "GUIRO",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 0.5,
     "vco1": {
       "gain": 0,
@@ -7357,6 +7610,7 @@
   "CR78_MARACAS": {
     "instrument": "MARACAS",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -7423,6 +7677,7 @@
   "CR78_CLAVES": {
     "instrument": "CLAVES",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -7489,6 +7744,7 @@
   "CR78_COWBELL": {
     "instrument": "COWBELL",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.5,
@@ -7555,6 +7811,7 @@
   "CR78_HI_BONGOS": {
     "instrument": "HI_BONGOS",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -7621,6 +7878,7 @@
   "CR78_LO_BONGOS": {
     "instrument": "LO_BONGOS",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -7687,6 +7945,7 @@
   "CR78_CONGAS": {
     "instrument": "CONGAS",
     "style": "cr78",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -7753,6 +8012,7 @@
   "SDS_KICK": {
     "instrument": "KICK",
     "style": "simmons",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -7828,6 +8088,7 @@
   "SDS_SNARE": {
     "instrument": "SNARE",
     "style": "simmons",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.5,
@@ -7898,6 +8159,7 @@
   "SDS_LO_TOM": {
     "instrument": "LO_TOM",
     "style": "simmons",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -7973,6 +8235,7 @@
   "SDS_MTOM": {
     "instrument": "MTOM",
     "style": "simmons",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -8048,6 +8311,7 @@
   "SDS_TOM": {
     "instrument": "TOM",
     "style": "simmons",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -8123,6 +8387,7 @@
   "SDS_HI_TOM": {
     "instrument": "HI_TOM",
     "style": "simmons",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -8198,6 +8463,7 @@
   "TRAP_KICK": {
     "instrument": "KICK",
     "style": "trap",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -8273,6 +8539,7 @@
   "TRAP_BASS": {
     "instrument": "BASS",
     "style": "trap",
+    "profile": "bass",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -8338,11 +8605,17 @@
     "pitchEnv": {
       "amount": 12,
       "decay": 0.041
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.07,
+      "accent": 0.0
     }
   },
   "TRAP_SNARE": {
     "instrument": "SNARE",
     "style": "trap",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.5,
@@ -8409,6 +8682,7 @@
   "TRAP_CLAP": {
     "instrument": "CLAP",
     "style": "trap",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -8475,6 +8749,7 @@
   "TRAP_CHH": {
     "instrument": "CHH",
     "style": "trap",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.1,
@@ -8541,6 +8816,7 @@
   "TRAP_OHH": {
     "instrument": "OHH",
     "style": "trap",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.1,
@@ -8607,6 +8883,7 @@
   "TRAP_RIMSHOT": {
     "instrument": "RIMSHOT",
     "style": "trap",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.6,
@@ -8673,6 +8950,7 @@
   "MIN_KICK": {
     "instrument": "KICK",
     "style": "minimal",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -8748,6 +9026,7 @@
   "MIN_RIMSHOT": {
     "instrument": "RIMSHOT",
     "style": "minimal",
+    "profile": "percussion",
     "masterVolume": 0.35,
     "vco1": {
       "gain": 1.0,
@@ -8814,6 +9093,7 @@
   "MIN_CHH": {
     "instrument": "CHH",
     "style": "minimal",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -8880,6 +9160,7 @@
   "MIN_OHH": {
     "instrument": "OHH",
     "style": "minimal",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -8946,6 +9227,7 @@
   "MIN_CLAP": {
     "instrument": "CLAP",
     "style": "minimal",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -9012,6 +9294,7 @@
   "MIN_SNARE": {
     "instrument": "SNARE",
     "style": "minimal",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.3,
@@ -9078,6 +9361,7 @@
   "MIN_PERC": {
     "instrument": "PERC",
     "style": "minimal",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -9144,6 +9428,7 @@
   "MIN_HIT": {
     "instrument": "HIT",
     "style": "minimal",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -9214,6 +9499,7 @@
   "MIN_SHAKER": {
     "instrument": "SHAKER",
     "style": "minimal",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -9280,6 +9566,7 @@
   "SR601_KICK": {
     "instrument": "KICK",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -9346,6 +9633,7 @@
   "SR601_SNARE": {
     "instrument": "SNARE",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.35,
@@ -9412,6 +9700,7 @@
   "SR601_BRUSH": {
     "instrument": "SNARE",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.0,
@@ -9478,6 +9767,7 @@
   "SR601_CYMBAL": {
     "instrument": "RIDE",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.6,
     "vco1": {
       "gain": 0.05,
@@ -9544,6 +9834,7 @@
   "SR601_CHH": {
     "instrument": "CHH",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.6,
     "vco1": {
       "gain": 0.04,
@@ -9610,6 +9901,7 @@
   "SR601_HI_BONGOS": {
     "instrument": "HI_BONGOS",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 1.0,
@@ -9676,6 +9968,7 @@
   "SR601_LO_BONGOS": {
     "instrument": "LO_BONGOS",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 1.0,
@@ -9742,6 +10035,7 @@
   "SR601_CONGAS": {
     "instrument": "CONGAS",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.75,
     "vco1": {
       "gain": 1.0,
@@ -9808,6 +10102,7 @@
   "SR601_CLAVES": {
     "instrument": "CLAVES",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 1.0,
@@ -9874,6 +10169,7 @@
   "SR601_WOODBLOCK": {
     "instrument": "HI_WOODBLOCK",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.35,
     "vco1": {
       "gain": 1.0,
@@ -9940,6 +10236,7 @@
   "SR601_MARACAS": {
     "instrument": "MARACAS",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.0,
@@ -10006,6 +10303,7 @@
   "SR601_COWBELL": {
     "instrument": "COWBELL",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.6,
     "vco1": {
       "gain": 0.5,
@@ -10072,6 +10370,7 @@
   "SR601_OHH": {
     "instrument": "OHH",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.6,
     "vco1": {
       "gain": 0.04,
@@ -10138,6 +10437,7 @@
   "SR601_CLAP": {
     "instrument": "CLAP",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.0,
@@ -10204,6 +10504,7 @@
   "SR601_RIMSHOT": {
     "instrument": "RIMSHOT",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.5,
     "vco1": {
       "gain": 0.8,
@@ -10270,6 +10571,7 @@
   "SR601_LO_TOM": {
     "instrument": "LO_TOM",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 1.0,
@@ -10336,6 +10638,7 @@
   "SR601_TOM": {
     "instrument": "TOM",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 1.0,
@@ -10402,6 +10705,7 @@
   "SR601_HI_TOM": {
     "instrument": "HI_TOM",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 1.0,
@@ -10468,6 +10772,7 @@
   "SR601_CRASH": {
     "instrument": "CRASH",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.6,
     "vco1": {
       "gain": 0.05,
@@ -10534,6 +10839,7 @@
   "SR601_TAMBOURINE": {
     "instrument": "TAMBOURINE",
     "style": "60s",
+    "profile": "percussion",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 0.12,
@@ -10600,6 +10906,7 @@
   "SR601_BASS": {
     "instrument": "BASS",
     "style": "60s",
+    "profile": "bass",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.8,
@@ -10661,11 +10968,17 @@
       "decay": 0.12,
       "sustain": 0,
       "release": 0.1
+    },
+    "voice": {
+      "mode": "mono",
+      "glide": 0.0,
+      "accent": 0.0
     }
   },
   "SR601_LEAD": {
     "instrument": "SYNTHLEAD",
     "style": "60s",
+    "profile": "melodic",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 0.6,
@@ -10715,12 +11028,14 @@
     "lfo": {
       "wave": "sine",
       "freq": 6.0,
-      "sync": "off"
+      "sync": "off",
+      "delay": 0.25
     },
     "lfo2": {
       "wave": "sine",
       "freq": 6.0,
-      "sync": "off"
+      "sync": "off",
+      "delay": 0.25
     },
     "modEnvelope": {
       "attack": 0.005,
@@ -10740,6 +11055,7 @@
   "SR601_PAD": {
     "instrument": "SYNTHPAD",
     "style": "60s",
+    "profile": "melodic",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.5,
@@ -10809,11 +11125,17 @@
       "source2": "lfo2",
       "target2": "filter.freq",
       "amount2": 0.3
+    },
+    "filter2": {
+      "type": "highpass",
+      "freq": 100,
+      "Q": 0.7
     }
   },
   "PUNCH_KICK": {
     "instrument": "KICK",
     "style": "punchy",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -10889,6 +11211,7 @@
   "PUNCH_SNARE": {
     "instrument": "SNARE",
     "style": "punchy",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.5,
@@ -10959,6 +11282,7 @@
   "PUNCH_TOM": {
     "instrument": "TOM",
     "style": "punchy",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -11025,6 +11349,7 @@
   "PUNCH_CLAP": {
     "instrument": "CLAP",
     "style": "punchy",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0,
@@ -11091,6 +11416,7 @@
   "PUNCH_HIT": {
     "instrument": "HIT",
     "style": "punchy",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 1.0,
@@ -11157,6 +11483,7 @@
   "PUNCH_CHH": {
     "instrument": "CHH",
     "style": "punchy",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.1,
@@ -11223,6 +11550,7 @@
   "PUNCH_OHH": {
     "instrument": "OHH",
     "style": "punchy",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.1,
@@ -11289,6 +11617,7 @@
   "PUNCH_CRASH": {
     "instrument": "CRASH",
     "style": "punchy",
+    "profile": "percussion",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.15,
@@ -11355,6 +11684,7 @@
   "SYNTHLEAD_SYNC": {
     "instrument": "SYNTHLEAD",
     "style": "electro",
+    "profile": "melodic",
     "masterVolume": 0.75,
     "vco1": {
       "gain": 0.25,
@@ -11429,6 +11759,11 @@
       "source3": "lfo1",
       "target3": "vco2.octave",
       "amount3": 0.08
+    },
+    "voice": {
+      "mode": "legato",
+      "glide": 0.04,
+      "accent": 0.0
     }
   }
 }
