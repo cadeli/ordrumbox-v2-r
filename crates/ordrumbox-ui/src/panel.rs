@@ -277,6 +277,8 @@ pub enum Id {
     /// The preset edited's tags (their entry).
     SynthTags,
     SynthButton(&'static str),
+    /// The preset edited's profile: which cards the editor shows first.
+    SynthProfile,
     /// A card's power button: by the card's index in
     /// `ordrumbox_engine::synth_model::groups`.
     SynthPower(u8),

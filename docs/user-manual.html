@@ -948,17 +948,30 @@ A built-in preset you have not changed plays as the assets hold it.</p>
 <tr><td><strong>Revert</strong></td><td>Back to the preset as it was when opened.</td></tr>
 <tr><td><strong>Export</strong></td><td>Write <code>ordrumbox-synth-sounds.json</code> to a folder you pick.</td></tr>
 <tr><td><strong>Import</strong></td><td>Read presets from a file.</td></tr>
+<tr><td><strong>Advanced</strong></td><td>Show the cards the preset's profile leaves out (lit), and back.</td></tr>
+<tr><td>Profile list</td><td><strong>All</strong>, <strong>Perc</strong>, <strong>Melodic</strong> or <strong>Bass</strong>: which cards come first, below. Kept in the preset; it changes nothing in the sound.</td></tr>
 <tr><td><strong>USE ON &lt;track&gt;</strong></td><td>Shown when the track editor's track plays something else (a sample, another preset): puts the preset shown on it. Beside it, what the track plays.</td></tr>
 </table>
 <p>The built-in presets include one per base sound of the kits: <code>KICK_SYNTH</code>, <code>SNARE_SYNTH</code>,
 <code>TOM_SYNTH</code>, <code>CLAP_SYNTH</code>, <code>COWBELL_SYNTH</code>, <code>CHH_SYNTH</code>, <code>OHH_SYNTH</code>,
 <code>CRASH_SYNTH</code>. Auto-assign plays them on a track whose instrument the kit lacks.</p>
 
+<h3>Profiles</h3>
+<p>A preset's profile shows the controls that matter for its kind of sound first; the other cards wait in the
+<strong>Advanced</strong> view, with every setting they hold still playing.</p>
+<table>
+<tr><th>Profile</th><th>Cards shown first</th></tr>
+<tr><td><strong>All</strong> (no profile)</td><td>Every card but the Voice, Filter Env and Filter 2 cards, which are in the advanced view.</td></tr>
+<tr><td><strong>Perc</strong></td><td>Oscillators, FM, noise, filter, envelope (a short decay), pitch envelope, master.</td></tr>
+<tr><td><strong>Melodic</strong></td><td>Oscillators, unison, filter and its envelope, envelope (ADSR), LFOs (with their delay), matrix, master.</td></tr>
+<tr><td><strong>Bass</strong></td><td>Oscillators (VCO1's sub), voice (mono, glide, accent), filter (its drive) and its envelope, envelope, master.</td></tr>
+</table>
+
 <h3>Cards</h3>
-<p>Every card on one screen: first what makes the sound (oscillators, noise, filter, envelopes), then what moves it (LFOs, mod envelope, matrix), then the master. Each card has a power button; touching a control of a card that is off switches it on
-(an oscillator to 0.5, also when its ring or sync is touched, FM to 0.3, the noise to 0.15, an LFO onto the filter on a free line of the matrix, the mod envelope opening the filter on a free line).
+<p>Every card of the view on one screen: first what makes the sound (oscillators, noise, filter, envelopes), then what moves it (LFOs, mod envelope, matrix), then the master. Each card has a power button; touching a control of a card that is off switches it on
+(an oscillator to 0.5, also when its ring or sync is touched, FM to 0.3, the noise to 0.15, an LFO onto the filter on a free line of the matrix, the mod envelope opening the filter on a free line, the filter envelope's stages giving it an amount of 0.5, a control of Filter 2 turning it on).
 An oscillator also shows off when it is silent (gain 0) and modulates nothing, and an LFO at 0 Hz: turning it on gives it a gain, or a rate of 1 Hz. An oscillator switched off is not heard and modulates nothing either (FM, VCO2's ring, VCO1's sub-oscillator). A knob that does nothing as the sound stands (a pulse width under another wave than the square, the noise's rate in White) is greyed out, in its place.
-A knob an LFO moves is purple and follows it. VCO1 to VCO3 share one card, a strip each, the scope's curve right of VCO1's knobs: the octave and the semitones are spins, and the other knobs of a strip show their value in their tooltip; the filter and the envelope draw their curve left of their knobs. The attack, decay, sustain and release of the envelope and of the mod envelope are faders marked A, D, S, R, and the filter's frequency, resonance and drive are faders marked F, Q, D, its slope under its type: their value shows in their tooltip.</p>
+A knob an LFO moves is purple and follows it. VCO1 to VCO3 share one card, a strip each, the scope's curve right of VCO1's knobs: the octave and the semitones are spins, and the other knobs of a strip show their value in their tooltip; the filter and the envelope draw their curve left of their knobs. The attack, decay, sustain and release of the envelope, of the filter envelope and of the mod envelope are faders marked A, D, S, R, and the filters' frequency, resonance and drive are faders marked F, Q, D, the slope under the type: their value shows in their tooltip.</p>
 
 <h4>Sound cards</h4>
 <table>
@@ -1001,8 +1014,16 @@ A knob an LFO moves is purple and follows it. VCO1 to VCO3 share one card, a str
 <tr><td>Q</td><td>0.1–24</td><td>Resonance.</td></tr>
 <tr><td>drive</td><td>0–1</td><td>Saturation into the filter.</td></tr>
 <tr><td>slope</td><td>12 dB, 24 dB</td><td>Per octave.</td></tr>
-<tr><td>Env</td><td>0–1</td><td>How far the filter opens at the start of the note, towards the top, with the attack and the decay of the envelope.</td></tr>
+<tr><td>Env</td><td>0–1</td><td>How far the filter envelope moves the cutoff: towards the top, or towards the bottom when inverted.</td></tr>
+<tr><td rowspan="2"><strong>Filter Env</strong></td><td>A, D, S, R</td><td>0–2 s, 0–4 s, 0–1, 0–4 s</td><td>The filter envelope's own ADSR. Until one is set, it rises over the envelope's attack and falls to nothing over its decay, as in the presets before it (the faders show those values); touching one gives it all four, and an amount of 0.5 when it had none.</td></tr>
+<tr><td>invert</td><td>on, off</td><td>On: the envelope closes the filter (towards 20 Hz) instead of opening it.</td></tr>
+<tr><td rowspan="3"><strong>Filter 2</strong></td><td>type</td><td>LP, HP, BP, NT (default HP)</td><td>A second filter after the first, 12 dB per octave, off until turned on: a highpass at 100 Hz to clear a bass's mud, a lowpass to soften a lead, a band-pass with the first for a vowel.</td></tr>
+<tr><td>freq</td><td>20 Hz – 20 kHz (default 100)</td><td>Its cutoff; a matrix target (filter2.freq).</td></tr>
+<tr><td>Q</td><td>0.1–24 (default 0.7)</td><td>Its resonance.</td></tr>
 <tr><td><strong>Env</strong></td><td>attack, decay, sustain, release</td><td>0–2 s, 0–4 s, 0–1, 0–4 s</td><td>The amplitude envelope, drawn with its shape. The times are on logarithmic knobs, as fine for a click as for a pad.</td></tr>
+<tr><td rowspan="3"><strong>Voice</strong></td><td>mode</td><td>Poly, Mono, Leg</td><td>Poly: each note a voice of its own. Mono: one voice per track; each note starts the envelopes again from where they stand and glides from the pitch of the note before. Leg (legato): a note that comes while the one before is held glides to its pitch and the envelopes go on; a note after a release starts again without gliding.</td></tr>
+<tr><td>Glide</td><td>0–2 s</td><td>How long the slide takes (0: none). Mono and legato only.</td></tr>
+<tr><td>Accent</td><td>0–1</td><td>How much the velocity opens the filter envelope further and raises the level: at 1, a note at full velocity opens the envelope all the way and plays half again louder.</td></tr>
 <tr><td rowspan="2"><strong>Pitch Env</strong></td><td>Amount</td><td>−48 to +48 semitones (default 0: off)</td><td>Where the note's pitch starts: above it (kicks, toms, zaps) or below it. It then falls back to the note exponentially, as an analog drum does. All three oscillators and the sub follow it.</td></tr>
 <tr><td>Decay</td><td>5 ms – 1 s (default 50 ms)</td><td>How long the offset takes to fall to a hundredth of itself. Short for a kick's click, longer for a tom's sweep. Both controls are matrix targets: velocity on Amount hits harder notes higher. A preset of an older version with a pitch punch plays it here: as an Amount of up to 24 semitones over 140 ms, when the envelope had no Amount of its own.</td></tr>
 </table>
@@ -1010,9 +1031,11 @@ A knob an LFO moves is purple and follows it. VCO1 to VCO3 share one card, a str
 <h4>Modulation cards</h4>
 <table>
 <tr><th>Card</th><th>Control</th><th>Range</th><th>What it does</th></tr>
-<tr><td rowspan="3"><strong>LFO1</strong>, <strong>LFO2</strong></td><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform. The triangle stays between the LFO's ends, starting at the lower one, like the sine.</td></tr>
+<tr><td rowspan="5"><strong>LFO1</strong>, <strong>LFO2</strong></td><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform. The triangle stays between the LFO's ends, starting at the lower one, like the sine.</td></tr>
 <tr><td>freq</td><td>0.01–100 Hz</td><td>Rate (when not synced): slow sweeps, vibrato and tremolo, up to the buzz of an audio-rate modulation.</td></tr>
 <tr><td>sync</td><td>free, 1/1, 1/2, 1/4, 1/8, 1/16, 1/8T, 1/16T</td><td>Lock the rate to the tempo (T = triplet). What an LFO moves, and how far, is set in the matrix: a line with the source lfo1 or lfo2.</td></tr>
+<tr><td>Delay</td><td>0–4 s</td><td>The LFO fades in over this time from each note's start: a vibrato that comes in once the note is held.</td></tr>
+<tr><td>retrigger</td><td>on, off</td><td>On: the LFO starts its cycle with each note, so every note sweeps the same way. Off: it runs on the song's clock.</td></tr>
 <tr><td><strong>ModEnv</strong></td><td>attack, decay, sustain, release</td><td>0–2 s, 0–4 s, 0–1, 0–4 s</td><td>A second envelope. What it moves, and how far, is set in the matrix: a line with the source modEnv.</td></tr>
 <tr><td rowspan="3"><strong>Matrix</strong></td><td>source</td><td>off, lfo1, lfo2, env, modEnv, velocity, key, random</td><td>What drives the line: an LFO, the amplitude or the modulation envelope, the note's velocity (which sets the note's level anyway: a line makes it move something more, the filter or the pitch), its key (pitch), or a random value per note. Eleven lines: the card lists those in use (a source or a target set) and one free line to start a new one, six at a time; the others scroll with the wheel or the bar beside them.</td></tr>
 <tr><td>target</td><td>off, any synth control, filter.open, pitch, fm.boost, shape</td><td>What the line moves. The last four act on several controls: <strong>filter.open</strong> opens the filter towards its top (all the way at 1), <strong>pitch</strong> moves the three oscillators (an octave at 1), <strong>fm.boost</strong> adds FM (twice the FM amount at 1), <strong>shape</strong> raises the oscillators' gains towards full.</td></tr>

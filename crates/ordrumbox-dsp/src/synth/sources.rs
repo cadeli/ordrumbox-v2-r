@@ -6,7 +6,7 @@ use super::*;
 
 impl SynthVoice {
     /// The frequencies of the three oscillators for this sample, Hz: detune,
-    /// the pitch envelope's ratio, FM and what the `late` values
+    /// the ratio of the pitch envelope and the glide (`pitch_env`), FM and what the `late` values
     /// of the matrix add (pitch, more FM), which also raise `gains` (shape).
     #[inline]
     pub(super) fn frequencies(
@@ -21,7 +21,7 @@ impl SynthVoice {
         for (n, frequency) in detuned.iter_mut().enumerate() {
             *frequency = p.osc_freq[n] * cents_ratio(modulated(mods, p.osc_detune[n], DETUNE_SLOTS[n]));
         }
-        if b.has_pitch_env {
+        if pitch_env != 1.0 {
             detuned = detuned.map(|frequency| frequency * pitch_env);
         }
 

@@ -11,7 +11,8 @@ use ordrumbox_dsp::SynthPatch;
 use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;
 use ordrumbox_dsp::synth::patch::{
-    Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, NoiseMode, PitchEnv, SynthBypass, SynthLfo,
+    Adsr, Filter2, FilterEnv, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, NoiseMode, PitchEnv, SynthBypass,
+    SynthLfo, VoiceMode,
 };
 use ordrumbox_dsp::synth::{MAX_PITCH_ENV_SEMITONES, MAX_UNISON};
 
@@ -46,6 +47,20 @@ pub const DECAY_MAX: f64 = 4.0;
 pub const RELEASE_MAX: f64 = 4.0;
 /// The fastest LFO, Hz.
 pub const LFO_FREQ_MAX: f64 = 100.0;
+/// The longest an LFO takes to fade in, seconds.
+pub const LFO_DELAY_MAX: f64 = 4.0;
+/// How a track's notes share a voice (`voice.mode`), by code.
+pub const VOICE_MODES: [&str; 3] = ["poly", "mono", "legato"];
+/// The longest glide, seconds.
+pub const GLIDE_MAX: f64 = 2.0;
+/// How much louder a note at full velocity plays at full accent: half again.
+const ACCENT_LEVEL: f64 = 0.5;
+/// The second filter a preset turns on without saying more: a highpass at 100 Hz.
+pub const FILTER2_TYPE_DEFAULT: &str = "highpass";
+pub const FILTER2_FREQ_DEFAULT: f64 = 100.0;
+pub const FILTER2_Q_DEFAULT: f64 = 0.7;
+/// The stages of the filter envelope's own ADSR (`filterEnv.<stage>`).
+pub const FILTER_ENV_STAGES: [&str; 4] = ["attack", "decay", "sustain", "release"];
 /// The semitones an oscillator is tuned by, on top of its octave.
 pub const SEMITONE_RANGE: (f64, f64) = (-12.0, 12.0);
 /// The decay of a preset's pitch envelope when it gives none, seconds.
@@ -54,7 +69,7 @@ pub const PITCH_ENV_DECAY_DEFAULT: f64 = 0.05;
 pub const MATRIX_SOURCES: [&str; 8] = ["off", "lfo1", "lfo2", "env", "modEnv", "velocity", "key", "random"];
 /// The LFO targets by their name in a preset (two names for the filter envelope amount;
 /// older names: [`legacy_modulation`]).
-const LFO_TARGETS: [(&str, LfoTarget); 41] = [
+const LFO_TARGETS: [(&str, LfoTarget); 42] = [
     ("NOT", LfoTarget::Off),
     ("masterVolume", LfoTarget::Volume),
     ("vco1.gain", LfoTarget::Osc1Gain),
@@ -96,6 +111,7 @@ const LFO_TARGETS: [(&str, LfoTarget); 41] = [
     ("pitch", LfoTarget::Pitch),
     ("fm.boost", LfoTarget::FmBoost),
     ("shape", LfoTarget::Shape),
+    ("filter2.freq", LfoTarget::Filter2Freq),
 ];
 
 /// The targets that are no control of the editor but an effect on several:
@@ -202,7 +218,7 @@ impl SynthPresets {
 }
 
 /// The keys of a preset that hold a group of settings (an object).
-const PRESET_GROUPS: [&str; 14] = [
+const PRESET_GROUPS: [&str; 16] = [
     "vco1",
     "vco2",
     "vco3",
@@ -217,6 +233,8 @@ const PRESET_GROUPS: [&str; 14] = [
     "lfo",
     "lfo2",
     "matrix",
+    "filter2",
+    "voice",
 ];
 /// The keys of a preset that hold one number (`pitchPunch`: an older one,
 /// read as the pitch envelope).
@@ -309,8 +327,9 @@ fn or_else<'a>(a: Option<&'a Value>, b: Option<&'a Value>) -> Option<&'a Value> 
 
 /// The loudness of a note of `velocity` on a preset whose oscillators have
 /// `gains`: normalised by what the voice mixes, then the master volume,
-/// accented above half, and trimmed to the level of the kit samples.
-fn peak_velocity(preset: &Value, gains: [f64; 3], velocity: f64) -> f64 {
+/// accented above half, raised by the voice's accent (`voice_accent`, 0–1),
+/// and trimmed to the level of the kit samples.
+fn peak_velocity(preset: &Value, gains: [f64; 3], velocity: f64, voice_accent: f64) -> f64 {
     let at = |key: &str| get(Some(preset), key);
     let total_gain = gains[0] + gains[1] + gains[2];
     // The voice mixes oscillators and noise by `noise.mix`: both count, or a
@@ -322,7 +341,9 @@ fn peak_velocity(preset: &Value, gains: [f64; 3], velocity: f64) -> f64 {
     let note_velo = velocity * mix_norm;
     let accent = if note_velo > 0.5 { 1.0 + 0.5 * 0.5 } else { 1.0 };
     let master_volume = level(at("masterVolume"), 0.8);
-    note_velo * master_volume * accent * SYNTH_TRIM
+    // The voice's accent, on top: louder as the velocity rises.
+    let voice_accent = 1.0 + ACCENT_LEVEL * voice_accent * velocity;
+    note_velo * master_volume * accent * voice_accent * SYNTH_TRIM
 }
 
 /// The frequency of each oscillator at `note_ratio` (1 is C3), its octave
@@ -340,13 +361,54 @@ fn osc_frequencies(vcos: [Option<&Value>; 3], note_ratio: f64) -> [f64; 3] {
 
 /// An envelope from `env`'s attack, decay, sustain (`sustain` when absent)
 /// and release.
-fn adsr(env: Option<&Value>, sustain: f64) -> Adsr {
+pub(crate) fn adsr(env: Option<&Value>, sustain: f64) -> Adsr {
     Adsr {
         attack: clamp(finite(get(env, "attack"), 0.01), 0.003, ATTACK_MAX),
         decay: finite(get(env, "decay"), 0.1).min(DECAY_MAX),
         sustain: finite(get(env, "sustain"), sustain),
         release: clamp(finite(get(env, "release"), 0.1), 0.008, RELEASE_MAX),
     }
+}
+
+/// The amplitude envelope of a preset's `envelope` group.
+pub(crate) fn amp_adsr(env: Option<&Value>) -> Adsr {
+    adsr(env, 0.7)
+}
+
+/// What a stage of the filter envelope's ADSR that a preset does not set
+/// plays with: the amplitude envelope's attack, decay and release
+/// (`envelope`), no sustain, as the filter envelope of the presets before.
+#[must_use]
+pub fn filter_adsr_default(envelope: Adsr) -> Adsr {
+    Adsr { sustain: 0.0, ..envelope }
+}
+
+/// The filter envelope's own ADSR (`filterEnv`), when the preset sets one
+/// of its stages; the others then take [`filter_adsr_default`].
+fn filter_adsr(filter_env: Option<&Value>, envelope: Adsr) -> Option<Adsr> {
+    if !FILTER_ENV_STAGES.iter().any(|stage| get(filter_env, stage).is_some()) {
+        return None;
+    }
+    let base = filter_adsr_default(envelope);
+    Some(Adsr {
+        attack: clamp(finite(get(filter_env, "attack"), base.attack), 0.0, ATTACK_MAX),
+        decay: clamp(finite(get(filter_env, "decay"), base.decay), 0.0, DECAY_MAX),
+        sustain: clamp(finite(get(filter_env, "sustain"), base.sustain), 0.0, 1.0),
+        release: clamp(finite(get(filter_env, "release"), base.release), 0.0, RELEASE_MAX),
+    })
+}
+
+/// The second filter of a `filter2` group: off without one, or when bypassed.
+fn filter2(group: Option<&Value>, is_bypassed: bool) -> Option<Filter2> {
+    if is_bypassed || !group.is_some_and(|g| g.as_object().is_some()) {
+        return None;
+    }
+    let mode = get(group, "type").and_then(Value::as_str).unwrap_or(FILTER2_TYPE_DEFAULT);
+    Some(Filter2 {
+        mode: choice(Some(&Value::from(mode)), &FILTER_TYPES, &FilterMode::ALL),
+        freq: finite(get(group, "freq"), FILTER2_FREQ_DEFAULT),
+        q: finite(get(group, "Q"), FILTER2_Q_DEFAULT),
+    })
 }
 
 /// The flag that switches each oscillator off.
@@ -373,6 +435,8 @@ fn synth_lfo(lfo: Option<&Value>, bpm: f64) -> SynthLfo {
     SynthLfo {
         wave: choice(get(lfo, "wave"), &WAVES, &Wave::ALL),
         freq: sync_to_hz(get(lfo, "sync"), bpm).unwrap_or_else(|| finite(get(lfo, "freq"), 0.0)),
+        delay_seconds: clamp(finite(get(lfo, "delay"), 0.0), 0.0, LFO_DELAY_MAX),
+        is_retriggered: get(lfo, "retrigger").is_some_and(Value::is_true),
     }
 }
 
@@ -400,7 +464,10 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let bypass = bypass_flags(preset);
     // Switched off, an oscillator counts for nothing in the mix.
     let gains = std::array::from_fn(|n| if bypass.osc[n] { 0.0 } else { level(get(vcos[n], "gain"), 0.0) });
-    let peak = peak_velocity(preset, gains, note.velocity);
+    let voice = at("voice");
+    let accent = level(get(voice, "accent"), 0.0);
+    let velocity = clamp(finite(Some(&Value::Number(note.velocity)), 0.0), 0.0, 1.0);
+    let peak = peak_velocity(preset, gains, note.velocity, accent);
 
     let osc_freq = osc_frequencies(vcos, note_ratio);
 
@@ -412,6 +479,9 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let unison = at("unison");
     // Bypassed, the pitch envelope moves nothing.
     let is_pitch_bypassed = at("bypassPitchEnv").is_some_and(Value::is_true);
+    let envelope = amp_adsr(env);
+    let filter_env = or_else(at("filterEnv"), filter);
+    let filter_env_amount = clamp(finite(get(filter_env, "filterEnvelopeAmount"), 0.0), 0.0, 1.0);
 
     SynthPatch {
         osc_freq,
@@ -438,13 +508,21 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
             pitch_env(at("pitchEnv"))
         },
         sub_gain: level(at("subGain"), 0.0),
-        envelope: adsr(env, 0.7),
+        envelope,
         volume: 1.0,
         pan: finite(Some(&Value::Number(note.pan)), 0.0),
         velocity: peak,
         lfo1: synth_lfo(at("lfo"), note.bpm),
         lfo2: synth_lfo(at("lfo2"), note.bpm),
-        filter_env_amount: clamp(finite(get(or_else(at("filterEnv"), filter), "filterEnvelopeAmount"), 0.0), 0.0, 1.0),
+        // The accent opens it further, the more the louder the note.
+        filter_env_amount: filter_env_amount + (1.0 - filter_env_amount) * accent * velocity,
+        filter_env: FilterEnv {
+            adsr: filter_adsr(at("filterEnv"), envelope),
+            is_inverted: get(at("filterEnv"), "invert").is_some_and(Value::is_true),
+        },
+        filter2: filter2(at("filter2"), at("bypassFilter2").is_some_and(Value::is_true)),
+        voice_mode: choice(get(voice, "mode"), &VOICE_MODES, &VoiceMode::ALL),
+        glide_seconds: clamp(finite(get(voice, "glide"), 0.0), 0.0, GLIDE_MAX),
         fm_amount: clamp(finite(get(fm, "amount"), 0.0), 0.0, 1.0),
         fm_algorithm: clamp(finite(get(fm, "algo"), 0.0).round(), 0.0, 4.0),
         mod_envelope: adsr(mod_env, 0.0),
@@ -452,7 +530,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         unison_detune: clamp(finite(get(unison, "detune"), 0.0), 0.0, 100.0),
         unison_spread: clamp(finite(get(unison, "spread"), 0.0), 0.0, 1.0),
         matrix: matrix(at("matrix")),
-        note_velocity: clamp(finite(Some(&Value::Number(note.velocity)), 0.0), 0.0, 1.0),
+        note_velocity: velocity,
         // Two octaves each way fill the source: ratio 1 is C3.
         note_key: clamp(note_ratio.log2() / 2.0, -1.0, 1.0),
         bypass,
@@ -581,6 +659,38 @@ mod tests {
         routes[0] = MatrixRoute { source: MatrixSource::Lfo1, target: LfoTarget::FilterQ, amount: 0.3 };
         assert_eq!(patch.matrix, routes);
         assert_eq!(note_seconds(120.0, 4), 0.125);
+    }
+
+    #[test]
+    fn the_filter_envelope_filter_2_and_voice_are_read() {
+        let note = SynthNote { ratio: 1.0, velocity: 0.5, pan: 0.0, bpm: 120.0 };
+        let read = |text: &str| synth_patch(&json::parse(text).unwrap(), note);
+        let plain = read(r#"{"envelope":{"attack":0.02,"decay":0.3,"release":0.4}}"#);
+        assert_eq!(plain.filter_env, FilterEnv { adsr: None, is_inverted: false });
+        assert_eq!((plain.filter2, plain.voice_mode, plain.glide_seconds), (None, VoiceMode::Poly, 0.0));
+        // One stage set: the others from the amplitude envelope, no sustain.
+        let own =
+            read(r#"{"envelope":{"attack":0.02,"decay":0.3,"release":0.4},"filterEnv":{"sustain":0.6,"invert":true}}"#);
+        let adsr = Adsr { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.4 };
+        assert_eq!(own.filter_env, FilterEnv { adsr: Some(adsr), is_inverted: true });
+        let second = read(r#"{"filter2":{"freq":2000},"voice":{"mode":"legato","glide":9}}"#);
+        assert_eq!(second.filter2, Some(Filter2 { mode: FilterMode::Highpass, freq: 2000.0, q: FILTER2_Q_DEFAULT }));
+        assert_eq!((second.voice_mode, second.glide_seconds), (VoiceMode::Legato, GLIDE_MAX));
+        assert_eq!(read(r#"{"filter2":{},"bypassFilter2":true}"#).filter2, None);
+        let lfo = read(r#"{"lfo":{"delay":0.5,"retrigger":true}}"#).lfo1;
+        assert_eq!((lfo.delay_seconds, lfo.is_retriggered), (0.5, true));
+    }
+
+    #[test]
+    fn the_accent_opens_the_filter_envelope_and_raises_the_level() {
+        let at = |accent: f64, velocity: f64| {
+            let text = format!(r#"{{"filterEnv":{{"filterEnvelopeAmount":0.2}},"voice":{{"accent":{accent}}}}}"#);
+            synth_patch(&json::parse(&text).unwrap(), SynthNote { ratio: 1.0, velocity, pan: 0.0, bpm: 120.0 })
+        };
+        assert_eq!(at(0.0, 1.0).filter_env_amount, 0.2);
+        assert!((at(1.0, 1.0).filter_env_amount - 1.0).abs() < 1e-12);
+        assert!((at(1.0, 0.5).filter_env_amount - 0.6).abs() < 1e-12);
+        assert!((at(1.0, 1.0).velocity / at(0.0, 1.0).velocity - 1.5).abs() < 1e-12);
     }
 
     #[test]

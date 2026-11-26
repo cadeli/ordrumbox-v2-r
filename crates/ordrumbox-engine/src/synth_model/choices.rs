@@ -3,7 +3,10 @@
 
 use ordrumbox_core::json::Value;
 
-use super::{FILTER_TYPES, MATRIX_SIZE, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES, lfo_targets};
+use super::{
+    FILTER_TYPES, MATRIX_SIZE, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, PROFILE_KEY, PROFILES, WAVES, lfo_targets,
+};
+use crate::synth_preset::VOICE_MODES;
 
 /// The labels of the noise's modes, in the order of [`NOISE_MODES`].
 pub const NOISE_MODE_LABELS: [&str; 3] = ["Wht", "Long", "Shrt"];
@@ -20,8 +23,11 @@ pub const LFO_SYNCS: [(&str, &str); 8] = [
     ("1/16T", "1/16T"),
 ];
 
-/// The controls set from a list (`filter.slope` holds numbers).
-pub const CHOICE_PATHS: [&str; 12 + 2 * MATRIX_SIZE] = [
+/// The labels of the voice's modes, in the order of [`VOICE_MODES`].
+pub const VOICE_MODE_LABELS: [&str; 3] = ["Poly", "Mono", "Leg"];
+
+/// The controls set from a list (`filter.slope` holds numbers), and the profile.
+pub const CHOICE_PATHS: [&str; 15 + 2 * MATRIX_SIZE] = [
     "vco1.wave",
     "vco2.wave",
     "vco3.wave",
@@ -34,6 +40,9 @@ pub const CHOICE_PATHS: [&str; 12 + 2 * MATRIX_SIZE] = [
     "noise.mode",
     "lfo.sync",
     "lfo2.sync",
+    "filter2.type",
+    "voice.mode",
+    PROFILE_KEY,
     "matrix.source1",
     "matrix.target1",
     "matrix.source2",
@@ -70,7 +79,9 @@ pub fn choices(path: &str) -> Option<Vec<&'static str>> {
     let values = |list: &[(&'static str, &'static str)]| list.iter().map(|(value, _)| *value).collect();
     Some(match path {
         "vco1.wave" | "vco2.wave" | "vco3.wave" | "lfo.wave" | "lfo2.wave" => WAVES.to_vec(),
-        "filter.type" | "noise.filterType" => FILTER_TYPES.to_vec(),
+        "filter.type" | "noise.filterType" | "filter2.type" => FILTER_TYPES.to_vec(),
+        "voice.mode" => VOICE_MODES.to_vec(),
+        PROFILE_KEY => PROFILES.iter().map(|(profile, _)| *profile).collect(),
         "filter.slope" => values(&FILTER_SLOPES),
         "noise.mode" => NOISE_MODES.to_vec(),
         "vco2.sync" => OSC2_SYNCS.to_vec(),

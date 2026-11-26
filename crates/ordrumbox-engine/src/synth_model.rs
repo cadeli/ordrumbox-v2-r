@@ -1,7 +1,8 @@
 //! What the synth editor edits: a preset as JSON, filled
 //! with the group defaults; its cards, their bypassed state and what turning
 //! one on or off does; the groups a control quietly switches on; the LFO
-//! modulation; and what the scope, the envelope and the filter curve plot.
+//! modulation; the profile that sorts the cards into two views; and what
+//! the scope, the envelope and the filter curve plot.
 
 use ordrumbox_core::json::{self, Object, Value};
 
@@ -23,6 +24,11 @@ mod preview;
 pub use preview::*;
 mod power;
 pub use power::*;
+mod extras;
+use extras::{EXTRA_FIELDS, EXTRA_GROUPS, implicit_enable_extra, is_extra};
+pub use extras::{EXTRA_METAS, SWITCHES, extra_default, extra_value};
+mod profile;
+pub use profile::*;
 /// A group's defaults (`SYNTH_GROUP_DEFAULTS`), in order.
 const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,
     "vco1":{"gain":1,"octave":0,"detune":0,"wave":"sine"},
@@ -38,23 +44,6 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,
     "envelope":{"attack":0,"decay":0.12,"sustain":1,"release":0.05},
     "modEnvelope":{"attack":0,"decay":0.12,"sustain":0,"release":0.1},
     "pitchEnv":{"amount":0,"decay":0.05}}"#;
-
-/// Fields added since the first presets, shown last in their card and written
-/// only once set (absent, the engine's default applies): kept out of
-/// [`DEFAULTS`] so a hydrated preset keeps the keys it was written with.
-const EXTRA_FIELDS: [(&str, &str); 11] = [
-    ("filter", "slope"),
-    ("vco1", "semitone"),
-    ("vco2", "semitone"),
-    ("vco3", "semitone"),
-    ("vco1", "width"),
-    ("vco2", "width"),
-    ("vco2", "ring"),
-    ("vco2", "sync"),
-    ("vco3", "width"),
-    ("noise", "mode"),
-    ("noise", "rate"),
-];
 
 #[expect(clippy::expect_used, reason = "a constant, read by the tests")]
 pub fn defaults() -> Object {
@@ -137,7 +126,7 @@ const MOD_RELEASE: Meta = time("modEnvelope.release", RELEASE_MAX);
 const LFO_FREQ_MIN: f64 = 0.01;
 /// The shortest time of an envelope a knob sets, seconds: its knob spans
 /// milliseconds to seconds, the shortest stage as fine as the longest.
-const TIME_MIN: f64 = 0.001;
+pub(crate) const TIME_MIN: f64 = 0.001;
 
 /// An envelope's time at `path`, up to `max` seconds, on a logarithmic knob.
 const fn time(path: &'static str, max: f64) -> Meta {
@@ -174,52 +163,26 @@ pub const PITCH_ENV_METAS: [Meta; 2] = [
     },
 ];
 
-/// The controls of [`EXTRA_FIELDS`] that are knobs: the pulse width of each
-/// oscillator, how far oscillator 1 ring-modulates oscillator 2, and the
-/// clock of the console noise.
-pub const EXTRA_METAS: [Meta; 5] = [
-    Meta { default: 0.5, label: Some("Width"), ..meta("vco1.width", 0.02, 0.98, 0.01, "") },
-    Meta { default: 0.5, label: Some("Width"), ..meta("vco2.width", 0.02, 0.98, 0.01, "") },
-    Meta { default: 0.5, label: Some("Width"), ..meta("vco3.width", 0.02, 0.98, 0.01, "") },
-    Meta { label: Some("Ring"), ..meta("vco2.ring", 0.0, 1.0, 0.01, "") },
-    Meta {
-        log: true,
-        default: ordrumbox_dsp::synth::patch::NOISE_RATE_DEFAULT,
-        label: Some("Rate"),
-        ..meta(
-            "noise.rate",
-            crate::synth_preset::NOISE_RATE_RANGE.0,
-            crate::synth_preset::NOISE_RATE_RANGE.1,
-            1.0,
-            "Hz",
-        )
-    },
-];
-
 pub fn metas() -> impl Iterator<Item = &'static Meta> {
     METAS.iter().chain(std::iter::once(&MOD_RELEASE)).chain(&MATRIX_AMOUNTS).chain(&EXTRA_METAS).chain(&PITCH_ENV_METAS)
-}
-
-/// The value of an extra control `draft` has not set, if `path` is one.
-pub fn extra_default(path: &str) -> Option<f64> {
-    EXTRA_METAS.iter().find(|m| m.path == path).map(|m| m.default)
 }
 
 pub fn find_meta(path: &str) -> Option<&'static Meta> {
     metas().find(|m| m.path == path)
 }
 
-/// What a line of the matrix can modulate (`SYNTH_LFO_TARGETS`): off, every control but the
-/// LFOs', the unison's and the matrix's, then the effects on several ([`crate::synth_preset::EFFECT_TARGETS`]).
+/// What a line of the matrix can modulate (`SYNTH_LFO_TARGETS`): off, every control that is
+/// a target (not the LFOs', the unison's, the matrix's, the voice's nor the filter envelope's
+/// stages), each with the others of its card (an oscillator's width and ring with its gain),
+/// then the effects on several ([`crate::synth_preset::EFFECT_TARGETS`]).
 pub fn lfo_targets() -> Vec<&'static str> {
-    std::iter::once("NOT")
-        .chain(
-            metas()
-                .map(|m| m.path)
-                .filter(|p| !["lfo.", "lfo2.", "unison.", "matrix."].iter().any(|group| p.starts_with(group))),
-        )
-        .chain(crate::synth_preset::EFFECT_TARGETS)
-        .collect()
+    let mut controls: Vec<&'static str> =
+        metas().map(|m| m.path).filter(|p| crate::synth_preset::lfo_target_named(p) != LfoTarget::Off).collect();
+    let group = |path: &str| path.split_once('.').map_or(path, |(group, _)| group).to_owned();
+    let groups: Vec<String> = controls.iter().map(|p| group(p)).collect();
+    // A stable sort: the cards in the order they first come, their controls in theirs.
+    controls.sort_by_key(|p| groups.iter().position(|g| *g == group(p)));
+    std::iter::once("NOT").chain(controls).chain(crate::synth_preset::EFFECT_TARGETS).collect()
 }
 
 /// What one unit of a matrix source is worth on a target, in the draft's
@@ -236,15 +199,18 @@ pub fn lfo_scale(target: &str) -> f64 {
 }
 
 /// The cards in order (`SYNTH_GROUP_ORDER`), and the master card's controls.
-pub const GROUP_ORDER: [&str; 15] = [
+pub const GROUP_ORDER: [&str; 18] = [
     "scope",
     "vco1",
     "vco2",
     "vco3",
+    "voice",
     "unison",
     "fm",
     "noise",
     "filter",
+    "filterEnv",
+    "filter2",
     "envelope",
     "pitchEnv",
     "lfo",
@@ -261,12 +227,9 @@ const NUMBER_KEYS: [&str; 2] = ["masterVolume", "subGain"];
 
 /// The fields shown last in another card than their group's: the card, the
 /// field. The sub-oscillator, an octave under VCO1, in VCO1's strip; the
-/// filter envelope's amount (its times are the envelope's attack and decay)
-/// in the filter's card.
+/// filter envelope's amount in the filter's card, its stages in a card of
+/// their own.
 pub const BORROWED_FIELDS: [(&str, &str); 2] = [("vco1", "subGain"), ("filter", "filterEnv.filterEnvelopeAmount")];
-
-/// The groups whose fields are all shown in another card: no card of their own.
-const FOLDED_GROUPS: [&str; 1] = ["filterEnv"];
 
 /// The fields of [`BORROWED_FIELDS`] that card `group` shows.
 pub fn borrowed_fields(group: &str) -> impl Iterator<Item = &'static str> + '_ {
@@ -286,6 +249,8 @@ pub fn group_label(group: &str) -> String {
         "master" => "Master".into(),
         "filter" => "Filter".into(),
         "filterEnv" => "Filter Env".into(),
+        "filter2" => "Filter 2".into(),
+        "voice" => "Voice".into(),
         "fm" => "FM".into(),
         "unison" => "Unison".into(),
         "lfo" => "LFO1".into(),
@@ -331,7 +296,8 @@ pub fn osc2_sync_value(on: bool) -> Value {
     Value::from(if on { OSC2_SYNCS[1] } else { OSC2_SYNCS[0] })
 }
 
-/// Set the value at a dotted `path` (its group must exist); whether it was set.
+/// Set the value at a dotted `path` (its group must exist, unless `path`
+/// is an extra field: its group is then made); whether it was set.
 pub fn set(draft: &mut Object, path: &str, value: Value) -> bool {
     match path.split_once('.') {
         None => {
@@ -341,6 +307,12 @@ pub fn set(draft: &mut Object, path: &str, value: Value) -> bool {
         Some((group, key)) => match draft.get_mut(group) {
             Some(Value::Object(object)) => {
                 object.insert(key, value);
+                true
+            }
+            None if is_extra(path) => {
+                let mut object = Object::default();
+                object.insert(key, value);
+                draft.insert(group, Value::Object(object));
                 true
             }
             _ => false,
@@ -372,14 +344,12 @@ pub fn hydrate(draft: &mut Object) {
 }
 
 /// The cards of `draft`, in order: the known ones,
-/// then any other group it has (not a bypass flag nor a tag), by name.
+/// then any other group it has (not a bypass flag, a tag nor the profile), by name.
 pub fn groups(draft: &Object) -> Vec<String> {
     let mut groups: Vec<String> = GROUP_ORDER.iter().map(|g| (*g).to_owned()).collect();
     for (key, _) in draft.iter() {
-        let is_card = !NUMBER_KEYS.contains(&key)
-            && !FOLDED_GROUPS.contains(&key)
-            && !TAG_KEYS.contains(&key)
-            && !key.starts_with("bypass");
+        let is_card =
+            !NUMBER_KEYS.contains(&key) && key != PROFILE_KEY && !TAG_KEYS.contains(&key) && !key.starts_with("bypass");
         if is_card && !groups.iter().any(|g| g == key) {
             groups.push(key.to_owned());
         }
@@ -395,11 +365,13 @@ pub fn groups(draft: &Object) -> Vec<String> {
 }
 
 /// A card's fields: the master keys, a group's own
-/// keys known to its defaults (then those it borrows), or the value itself.
+/// keys known to its defaults but those another card shows (then its extra
+/// fields, then those it borrows), or the value itself.
 pub fn fields(draft: &Object, group: &str) -> Vec<String> {
     if group == "master" {
         return MASTER_KEYS.iter().map(|k| (*k).to_owned()).collect();
     }
+    let extras = || EXTRA_FIELDS.iter().filter(move |(g, _)| *g == group).map(|(g, key)| format!("{g}.{key}"));
     let defaults = defaults();
     match draft.get(group) {
         Some(Value::Object(object)) => object
@@ -409,9 +381,11 @@ pub fn fields(draft: &Object, group: &str) -> Vec<String> {
                 _ => true,
             })
             .map(|(key, _)| format!("{group}.{key}"))
-            .chain(EXTRA_FIELDS.iter().filter(|(g, _)| *g == group).map(|(g, key)| format!("{g}.{key}")))
+            .filter(|path| borrowing_card(path).is_none())
+            .chain(extras())
             .chain(borrowed_fields(group).map(str::to_owned))
             .collect(),
+        None if EXTRA_GROUPS.contains(&group) => extras().collect(),
         _ => vec![group.to_owned()],
     }
 }
@@ -422,6 +396,9 @@ pub fn fields(draft: &Object, group: &str) -> Vec<String> {
 /// 1). The paths it changed.
 pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
     let Some((group, key)) = path.split_once('.') else { return Vec::new() };
+    if let Some(changed) = implicit_enable_extra(draft, group, key) {
+        return changed;
+    }
     let mut changed = Vec::new();
     let gain = |d: &Object, g: &str| number(d, &format!("{g}.gain")).unwrap_or(0.0);
     if matches!(group, "vco2" | "vco3")
@@ -449,7 +426,7 @@ pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
         draft.insert("bypassNoise", Value::Bool(false));
         changed.push("noise.mix".into());
     } else if let Some(lfo) = LFOS.iter().find(|lfo| lfo.group == group)
-        && matches!(key, "wave" | "freq" | "sync")
+        && matches!(key, "wave" | "freq" | "sync" | "delay" | "retrigger")
         && !is_routed(draft, lfo.source)
     {
         // An LFO touched with nowhere to go: onto the filter, at half, on the first free line.
@@ -603,10 +580,14 @@ mod tests {
     }
 
     #[test]
-    fn the_sub_and_the_filter_env_show_in_other_cards() {
+    fn the_sub_and_the_filter_env_amount_show_in_other_cards() {
         let d = defaults();
         let groups = groups(&d);
-        assert!(!groups.iter().any(|g| ["filterEnv", "subGain"].contains(&g.as_str())), "{groups:?}");
+        assert!(!groups.iter().any(|g| g == "subGain"), "{groups:?}");
+        // The filter envelope's card has its stages; its amount stays in the filter's.
+        let filter_env = fields(&d, "filterEnv");
+        assert_eq!(filter_env.first().map(String::as_str), Some("filterEnv.attack"), "{filter_env:?}");
+        assert!(!filter_env.iter().any(|f| f == "filterEnv.filterEnvelopeAmount"));
         assert_eq!(fields(&d, "master"), ["masterVolume"]);
         assert_eq!(fields(&d, "vco1").last().map(String::as_str), Some("subGain"));
         assert_eq!(fields(&d, "filter").last().map(String::as_str), Some("filterEnv.filterEnvelopeAmount"));

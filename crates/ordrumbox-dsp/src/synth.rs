@@ -1,12 +1,15 @@
 //! One synth note: three oscillators with FM and unison, a sub-oscillator, filtered
-//! noise, drive, a TPT state-variable filter with its envelope, an ADSR, a
-//! modulation envelope, a pitch envelope, ring modulation and hard sync of
-//! oscillator 2 by oscillator 1, and two LFOs routed to any of their
-//! targets, then equal-power pan.
+//! noise, drive, a TPT state-variable filter with its envelope (an ADSR of
+//! its own, which may close it instead of opening it), a second filter, an
+//! ADSR, a modulation envelope, a pitch envelope, ring modulation and hard
+//! sync of oscillator 2 by oscillator 1, and two LFOs (each with a fade-in
+//! and, if asked, restarted by each note) routed to any of their targets,
+//! then equal-power pan.
 //!
-//! [`SynthVoice::start`] starts a note of a [`SynthPatch`] and
-//! [`SynthVoice::release_at`] releases it. Starting, releasing and rendering
-//! never allocate.
+//! [`SynthVoice::start`] starts a note of a [`SynthPatch`],
+//! [`SynthVoice::retrigger`] plays a note over one still sounding (mono and
+//! legato: it may glide from its pitch) and [`SynthVoice::release_at`]
+//! releases it. Starting, releasing and rendering never allocate.
 //!
 //! The sub-oscillator sounds an octave below oscillator 1, the pitch punch
 //! reaches two octaves, FM follows the note and goes through zero, each note
@@ -25,6 +28,7 @@ mod modulation;
 mod oscillator;
 pub mod patch;
 mod pitch_env;
+mod retrigger;
 mod sources;
 mod unison;
 
@@ -42,9 +46,10 @@ use oscillator::{
     LFSR_SEED, NOISE_SEED, WIDTH_MAX, WIDTH_MIN, WaveTables, fm_frequencies, lfsr_sample, lfsr_step, noise_sample,
     noise_seed, oscillator, phase_step, sin_lookup, sine_table, xorshift32,
 };
-use patch::{Adsr, LfoTarget, MatrixSource, NoiseMode, SynthLfo, SynthPatch};
+use patch::{Adsr, Filter2, LfoTarget, MatrixSource, NoiseMode, SynthLfo, SynthPatch};
 pub use pitch_env::MAX_PITCH_ENV_SEMITONES;
 use pitch_env::{PitchFall, fall_per_sample};
+pub use retrigger::Retrigger;
 pub use unison::MAX_UNISON;
 use unison::{Layer, layers, start_phases, unison_oscillator};
 
@@ -65,6 +70,27 @@ fn cents_ratio(cents: f64) -> f64 {
     if cents == 0.0 { 1.0 } else { (cents * LN2_OVER_1200).exp() }
 }
 
+/// The second filter as a block runs it: its taps, its cutoff and the
+/// coefficient and damping while nothing moves it.
+#[derive(Debug, Clone, Copy)]
+struct Filter2Stage {
+    weights: [f64; 3],
+    freq: f64,
+    g: f64,
+    k: f64,
+}
+
+impl Filter2Stage {
+    fn new(filter: &Filter2, sample_rate: f64) -> Self {
+        Self {
+            weights: tap_weights(filter.mode),
+            freq: filter.freq,
+            g: cutoff_coefficient(filter.freq, sample_rate),
+            k: 1.0 / clamp(filter.q, 0.1, 20.0),
+        }
+    }
+}
+
 /// What a block of a note is rendered with: everything of the patch that no
 /// sample changes, worked out once.
 #[derive(Debug)]
@@ -73,6 +99,12 @@ struct Block<'a> {
     sample_rate: f64,
     /// Phase step of the two LFOs, cycles per sample.
     lfo_steps: [f64; 2],
+    /// Seconds each LFO takes to fade in from the note's start (0: none), and whether one does.
+    lfo_delays: [f64; 2],
+    has_lfo_delay: bool,
+    /// The share of a glide's offset a sample keeps.
+    glide_fall: f64,
+    filter2: Option<Filter2Stage>,
     /// Whether the modulation envelope runs: the matrix reads it, and it is not bypassed.
     runs_mod_env: bool,
     /// Whether a route of the matrix moves a late value ([`modulation::Late`]).
@@ -126,10 +158,15 @@ impl<'a> Block<'a> {
             lfo_wave(&p.lfo1, p.bypass.lfo1, MatrixSource::Lfo1),
             lfo_wave(&p.lfo2, p.bypass.lfo2, MatrixSource::Lfo2),
         ];
+        let lfo_delays = [p.lfo1.delay_seconds.max(0.0), p.lfo2.delay_seconds.max(0.0)];
         Self {
             tables: WaveTables { sine: sine_table(), source },
             sample_rate,
             lfo_steps: [p.lfo1.freq / sample_rate, p.lfo2.freq / sample_rate],
+            lfo_delays,
+            has_lfo_delay: lfo_delays.iter().any(|delay| *delay > 0.0),
+            glide_fall: fall_per_sample(p.glide_seconds, sample_rate),
+            filter2: p.filter2.map(|filter| Filter2Stage::new(&filter, sample_rate)),
             runs_mod_env: matrix.reads(MatrixSource::ModEnvelope) && !p.bypass.mod_env,
             has_late: matrix.has_late(),
             matrix,
@@ -169,6 +206,12 @@ pub struct SynthVoice {
     /// Trigger and release times, seconds on the engine clock (-1: none).
     start_time: f64,
     release_time: f64,
+    /// When the note playing started, seconds on the engine clock: the
+    /// voice's start, or a later note played over it (mono).
+    note_start: f64,
+    /// The glide from the pitch of the note before: what is left of it, and its offset at the start, semitones.
+    glide: PitchFall,
+    glide_semitones: f64,
     /// Phase and cycle count of each layer of each oscillator; layer 0 is on the pitch.
     phase: [[f64; MAX_UNISON]; 3],
     osc_cycle: [[f64; MAX_UNISON]; 3],
@@ -195,6 +238,11 @@ pub struct SynthVoice {
     noise_filter: Svf,
     env: Envelope,
     filter_env: FilterEnvelope,
+    /// The filter envelope when it has an ADSR of its own.
+    filter_adsr: Envelope,
+    /// The second filter, left and right.
+    filter2: Svf,
+    filter2_right: Svf,
     mod_env: Envelope,
 }
 
@@ -208,6 +256,9 @@ impl Default for SynthVoice {
             patch: SynthPatch::default(),
             start_time: -1.0,
             release_time: -1.0,
+            note_start: -1.0,
+            glide: PitchFall::START,
+            glide_semitones: 0.0,
             phase: [[0.0; MAX_UNISON]; 3],
             osc_cycle: [[0.0; MAX_UNISON]; 3],
             rng: NOISE_SEED,
@@ -226,6 +277,9 @@ impl Default for SynthVoice {
             noise_filter: Svf::default(),
             env: Envelope::new(Segment::Idle),
             filter_env: FilterEnvelope::new(Segment::Idle),
+            filter_adsr: Envelope::new(Segment::Idle),
+            filter2: Svf::default(),
+            filter2_right: Svf::default(),
             mod_env: Envelope::new(Segment::Idle),
         }
     }
@@ -253,6 +307,7 @@ impl SynthVoice {
             serial,
             patch: *patch,
             start_time,
+            note_start: start_time,
             rng: noise_seed(serial),
             sources: SourceValues {
                 velocity: clamp(patch.note_velocity, 0.0, 1.0),
@@ -262,6 +317,7 @@ impl SynthVoice {
             },
             env: Envelope::new(Segment::Attack),
             filter_env: FilterEnvelope::new(Segment::Attack),
+            filter_adsr: Envelope::new(Segment::Attack),
             mod_env: Envelope::new(Segment::Attack),
             ..Self::default()
         };
@@ -314,20 +370,37 @@ impl SynthVoice {
         }
     }
 
-    /// Move the LFOs on by a sample and set the values the matrix reads of them.
+    /// Move the LFOs on by a sample and set the values the matrix reads of
+    /// them, faded in over their delay.
     #[inline]
     fn step_lfos(&mut self, p: &SynthPatch, b: &Block, time: f64) {
         if self.lfo_seeded {
             self.lfo_phase[0] += b.lfo_steps[0];
             self.lfo_phase[1] += b.lfo_steps[1];
         } else {
-            // LFOs run on the engine clock, not from the note's start.
-            self.lfo_phase = [time * p.lfo1.freq, time * p.lfo2.freq];
+            // On the engine clock, unless the LFO starts with each note.
+            let since_note = time - self.note_start;
+            let seed = |lfo: &SynthLfo| if lfo.is_retriggered { since_note * lfo.freq } else { time * lfo.freq };
+            self.lfo_phase = [seed(&p.lfo1), seed(&p.lfo2)];
             self.lfo_seeded = true;
         }
         for ((wave, phase), value) in b.matrix_lfo_waves.iter().zip(self.lfo_phase).zip(&mut self.sources.lfo) {
             *value = wave.map_or(0.0, |wave| lfo::wave(phase, wave));
         }
+        if b.has_lfo_delay {
+            let since_note = time - self.note_start;
+            for (value, delay) in self.sources.lfo.iter_mut().zip(b.lfo_delays) {
+                if delay > 0.0 {
+                    *value *= clamp(since_note / delay, 0.0, 1.0);
+                }
+            }
+        }
+    }
+
+    /// Whether the voice plays a note not yet released at `time` (seconds on the engine clock).
+    #[must_use]
+    pub fn is_held(&self, time: f64) -> bool {
+        self.active && !self.is_released(time)
     }
 
     /// Whether the note's release has come at `time`.
@@ -345,15 +418,21 @@ impl SynthVoice {
         let late = if b.has_late { b.matrix.late(&self.sources) } else { LateMods::default() };
         let filter_open = late[Late::FilterOpen];
         let filter_env_amount = modulated(mods, p.filter_env_amount, Slot::FilterEnvAmount).max(0.0);
-        let cutoff = self.cutoff(p, mods, &env, filter_env_amount, filter_open, t);
+        let cutoff = self.cutoff(p, mods, &env, (filter_env_amount, filter_open), (time, t));
 
         let mut gains = [0.0; 3];
         for ((gain, base), slot) in gains.iter_mut().zip(p.osc_gain).zip(GAIN_SLOTS) {
             *gain = clamp(modulated(mods, base, slot), 0.0, 1.0);
         }
         self.width = pulse_widths(b, mods, p.osc_width);
-        let pitch_env = if b.has_pitch_env { self.pitch_env_ratio(p, b, mods) } else { 1.0 };
-        let frequencies = self.frequencies(p, b, mods, &mut gains, (&late, pitch_env));
+        let mut bend = if b.has_pitch_env { self.pitch_env_ratio(p, b, mods) } else { 1.0 };
+        if self.glide_semitones != 0.0 {
+            bend *= self.glide.step(self.glide_semitones, b.glide_fall);
+            if self.glide.left() == 0.0 {
+                self.glide_semitones = 0.0;
+            }
+        }
+        let frequencies = self.frequencies(p, b, mods, &mut gains, (&late, bend));
         // After the matrix and the shape, which may raise a gain: off stays silent.
         for (gain, is_off) in gains.iter_mut().zip(p.bypass.osc) {
             if is_off {
@@ -374,8 +453,12 @@ impl SynthVoice {
             dry[1] = if b.is_stereo { saturate(dry[1]) } else { dry[0] };
         }
 
-        let is_swept = (filter_env_amount > SILENT && !self.filter_env.is_idle()) || filter_open.abs() > SILENT;
+        let is_swept = (filter_env_amount > SILENT && self.is_filter_env_running(p)) || filter_open.abs() > SILENT;
         let filtered = if p.bypass.filter { dry } else { self.filter(b, mods, dry, cutoff, is_swept) };
+        let filtered = match &b.filter2 {
+            Some(stage) => self.filter_2nd(b, mods, stage, filtered),
+            None => filtered,
+        };
 
         if self.is_released(time) {
             self.env.release(t);
@@ -405,26 +488,69 @@ impl SynthVoice {
     }
 
     /// The filter cutoff of this sample, Hz: the patch's, moved by the matrix,
-    /// opened by the filter envelope and by `filter_open` (a share of the way to the top).
+    /// opened (or closed, inverted) by the filter envelope at `filter_env_amount`,
+    /// and opened by `filter_open` (a share of the way to the top); `time` on
+    /// the engine clock, `t` from the note's start.
     #[inline]
     fn cutoff(
         &mut self,
         p: &SynthPatch,
         mods: &Mods,
         env: &Adsr,
-        filter_env_amount: f64,
-        filter_open: f64,
-        t: f64,
+        (filter_env_amount, filter_open): (f64, f64),
+        (time, t): (f64, f64),
     ) -> f64 {
         let mut cutoff = modulated(mods, p.filter_freq, Slot::Filter);
-        if !p.bypass.filter_env && filter_env_amount > SILENT && !self.filter_env.is_idle() {
-            let level = self.filter_env.step(t, env.attack, env.decay);
-            cutoff += (crate::MAX_FILTER_FREQ - cutoff) * filter_env_amount * level;
+        if !p.bypass.filter_env
+            && filter_env_amount > SILENT
+            && let Some(level) = self.filter_env_level(p, env, time, t)
+        {
+            let depth = filter_env_amount * level;
+            if p.filter_env.is_inverted {
+                cutoff -= (cutoff - crate::MIN_FILTER_FREQ).max(0.0) * depth;
+            } else {
+                cutoff += (crate::MAX_FILTER_FREQ - cutoff) * depth;
+            }
         }
         if filter_open.abs() > SILENT {
             cutoff += (crate::MAX_FILTER_FREQ - cutoff) * filter_open;
         }
         cutoff
+    }
+
+    /// The filter envelope's level (0–1) at `t`, moved on by a sample; `None` once it is over.
+    #[inline]
+    fn filter_env_level(&mut self, p: &SynthPatch, env: &Adsr, time: f64, t: f64) -> Option<f64> {
+        match p.filter_env.adsr {
+            None => (!self.filter_env.is_idle()).then(|| self.filter_env.step(t, env.attack, env.decay)),
+            Some(adsr) => {
+                if self.is_released(time) {
+                    self.filter_adsr.release(t);
+                }
+                (!self.filter_adsr.is_idle()).then(|| self.filter_adsr.step(t, adsr, 1.0, |norm| norm))
+            }
+        }
+    }
+
+    /// Whether the filter envelope still moves the cutoff.
+    #[inline]
+    fn is_filter_env_running(&self, p: &SynthPatch) -> bool {
+        if p.filter_env.adsr.is_some() { !self.filter_adsr.is_idle() } else { !self.filter_env.is_idle() }
+    }
+
+    /// `x` (left, right) through the second filter: at the block's
+    /// coefficient unless the matrix moves its cutoff.
+    #[inline]
+    fn filter_2nd(&mut self, b: &Block, mods: &Mods, stage: &Filter2Stage, x: [f64; 2]) -> [f64; 2] {
+        let g = if is_moved(mods, Slot::Filter2) {
+            cutoff_coefficient(modulated(mods, stage.freq, Slot::Filter2), b.sample_rate)
+        } else {
+            stage.g
+        };
+        let coefficients = coefficients(g, stage.k);
+        let left = tap(self.filter2.step(x[0], &coefficients), stage.weights);
+        let right = if b.is_stereo { tap(self.filter2_right.step(x[1], &coefficients), stage.weights) } else { left };
+        [left, right]
     }
 
     /// `x` (left, right) through the main filter at `cutoff` Hz. The
@@ -737,7 +863,7 @@ mod tests {
 
     #[test]
     fn an_lfo_sweeps_the_pulse_width_and_the_noise_clock() {
-        let lfo = SynthLfo { wave: Wave::Square, freq: 2.0 };
+        let lfo = SynthLfo::free(Wave::Square, 2.0);
         let route = MatrixRoute { source: MatrixSource::Lfo1, target: LfoTarget::Osc1Width, amount: 1.0 };
         let held = |patch: SynthPatch| {
             let mut voice = SynthVoice::default();
@@ -761,6 +887,126 @@ mod tests {
         assert!(high(&swept[..5000]) < 0.05, "{}", high(&swept[..5000]));
         assert!(high(&swept[8000..16_000]) > 0.9, "{}", high(&swept[8000..16_000]));
         assert!((high(&held(base)) - 0.5).abs() < 0.02);
+    }
+
+    /// A sawtooth at 100 Hz through a lowpass at 200 Hz, opened all the way
+    /// by its envelope at `filter_env`, held for 0.5 s then released: the
+    /// level of its 2 kHz partial every 50 ms.
+    fn swept(filter_env: super::patch::FilterEnv, filter_freq: f64) -> Vec<f64> {
+        let mut voice = SynthVoice::default();
+        let patch = SynthPatch {
+            osc_freq: [100.0; 3],
+            osc_gain: [1.0, 0.0, 0.0],
+            osc_wave: [Wave::Sawtooth; 3],
+            filter_freq,
+            filter_env_amount: 1.0,
+            filter_env,
+            volume: 1.0,
+            bypass: SynthBypass { env: true, ..SynthBypass::default() },
+            ..SynthPatch::default()
+        };
+        voice.start(&patch, 0, 0.0, 1);
+        voice.release_at(0.5);
+        let out = render(&mut voice, 48_000);
+        out.as_chunks::<2_400>().0.iter().map(|chunk| tone_level(chunk, 2_000.0)).collect()
+    }
+
+    #[test]
+    fn a_filter_adsr_holds_its_sustain_until_the_release() {
+        use super::patch::FilterEnv;
+        let adsr = Adsr { attack: 0.001, decay: 0.1, sustain: 0.5, release: 0.1 };
+        let held = swept(FilterEnv { adsr: Some(adsr), is_inverted: false }, 200.0);
+        let legacy = swept(FilterEnv { adsr: None, is_inverted: false }, 200.0);
+        // Half open from 0.1 s to the release at 0.5 s; the older one is shut by then.
+        assert!(held[5] > 10.0 * legacy[5], "{held:?} {legacy:?}");
+        assert!((held[4] - held[8]).abs() < 0.1 * held[4], "{held:?}");
+        assert!(held[14] < 0.1 * held[8], "closed after its release: {held:?}");
+    }
+
+    #[test]
+    fn an_inverted_filter_envelope_closes_the_filter() {
+        use super::patch::FilterEnv;
+        let adsr = Adsr { attack: 0.001, decay: 0.1, sustain: 1.0, release: 0.1 };
+        let closed = swept(FilterEnv { adsr: Some(adsr), is_inverted: true }, 8_000.0);
+        // Shut while held, open again once released.
+        assert!(closed[5] < 0.05 * closed[14], "{closed:?}");
+    }
+
+    #[test]
+    fn the_second_filter_follows_the_first() {
+        let saw = |filter2| {
+            let patch = SynthPatch {
+                osc_gain: [1.0, 0.0, 0.0],
+                osc_wave: [Wave::Sawtooth; 3],
+                filter2,
+                ..SynthPatch::default()
+            };
+            let out = held(patch, 24_000);
+            [200.0, 3_000.0].map(|f| tone_level(&out[12_000..], f))
+        };
+        let open = saw(None);
+        let cut = saw(Some(Filter2 { mode: crate::slope::FilterMode::Lowpass, freq: 500.0, q: 0.7 }));
+        assert!((cut[0] - open[0]).abs() < 0.2 * open[0], "{open:?} {cut:?}");
+        assert!(cut[1] < 0.05 * open[1], "{open:?} {cut:?}");
+    }
+
+    #[test]
+    fn a_delayed_lfo_fades_in_and_a_retriggered_one_starts_with_the_note() {
+        let route = MatrixRoute { source: MatrixSource::Lfo1, target: LfoTarget::Volume, amount: -1.0 };
+        let base = routed(route);
+        let delayed = SynthLfo { delay_seconds: 0.5, ..SynthLfo::free(Wave::Square, 4.0) };
+        let out = held(SynthPatch { lfo1: delayed, ..base }, 48_000);
+        // How far the level of each 10 ms moves: barely over the first tenth
+        // of a second, all the way over the last half.
+        let swing = |out: &[f32]| {
+            let levels = out.as_chunks::<480>().0.iter().map(|chunk| peak(chunk));
+            levels.clone().fold(0.0, f32::max) - levels.fold(f32::MAX, f32::min)
+        };
+        let (first, last) = (swing(&out[..4_800]), swing(&out[24_000..]));
+        assert!(first < 0.25 * last, "{first} {last}");
+        // A note starting later hears the same start of the cycle when it restarts.
+        let note = |is_retriggered, start: f64| {
+            let lfo1 = SynthLfo { is_retriggered, ..SynthLfo::free(Wave::Sine, 3.0) };
+            let mut voice = SynthVoice::default();
+            let bypass = SynthBypass { filter: true, env: true, ..SynthBypass::default() };
+            voice.start(&SynthPatch { osc_freq: [100.0; 3], volume: 1.0, bypass, lfo1, ..base }, 0, start, 1);
+            let start_frame = (start * 48_000.0) as usize;
+            let out = render(&mut voice, start_frame + 4_800);
+            out[start_frame..].to_vec()
+        };
+        assert_eq!(note(true, 0.0), note(true, 0.25));
+        assert_ne!(note(false, 0.0), note(false, 0.25));
+    }
+
+    #[test]
+    fn a_note_played_over_glides_from_the_pitch_before() {
+        let play = |how: Retrigger, glide_seconds: f64| {
+            let mut voice = SynthVoice::default();
+            let bypass = SynthBypass { filter: true, env: true, ..SynthBypass::default() };
+            let low = SynthPatch {
+                osc_freq: [100.0; 3],
+                osc_gain: [1.0, 0.0, 0.0],
+                volume: 1.0,
+                bypass,
+                glide_seconds,
+                ..SynthPatch::default()
+            };
+            voice.start(&low, 0, 0.0, 1);
+            let (mut l, mut r) = (vec![0.0; 4_800], vec![0.0; 4_800]);
+            voice.render(48_000.0, 0, &[], &mut l, &mut r);
+            voice.retrigger(&SynthPatch { osc_freq: [400.0; 3], ..low }, 0.1, 2, how);
+            let (mut l, mut r) = (vec![0.0; 9_600], vec![0.0; 9_600]);
+            voice.render(48_000.0, 4_800, &[], &mut l, &mut r);
+            // Cycles in the first and the last 20 ms after the new note.
+            (cycles(&l[..960]), cycles(&l[8_640..]))
+        };
+        let (start, end) = play(Retrigger::Glide, 0.1);
+        assert!(start < 5 && end == 8, "glides up to 400 Hz: {start} {end}");
+        assert_eq!(play(Retrigger::Legato, 0.1).1, 8);
+        let (start, _) = play(Retrigger::Restart, 0.1);
+        assert!(start >= 7, "no glide: {start}");
+        let (start, _) = play(Retrigger::Glide, 0.0);
+        assert!(start >= 7, "no glide time, no glide: {start}");
     }
 
     #[test]

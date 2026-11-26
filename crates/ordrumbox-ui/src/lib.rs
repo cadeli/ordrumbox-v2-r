@@ -47,6 +47,7 @@ mod song_view;
 mod spectrum;
 mod startup_error;
 mod store;
+mod synth_bar;
 mod synth_cells;
 mod synth_faders;
 mod synth_matrix;

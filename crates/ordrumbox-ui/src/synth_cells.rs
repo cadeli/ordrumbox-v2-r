@@ -163,7 +163,8 @@ fn push_cell(
 #[must_use]
 pub(crate) fn value_tip(draft: &Object, (group, path): (&str, &str), name: &str) -> Option<[String; 2]> {
     let meta = model::find_meta(path);
-    let value = model::number(draft, path).or_else(|| meta.map(|m| m.default))?;
+    let value =
+        model::number(draft, path).or_else(|| model::extra_value(draft, path)).or_else(|| meta.map(|m| m.default))?;
     let unit = meta.map_or("", |m| m.unit);
     Some([format!("{} {name}", model::group_label(group)), Format::Fmt.value(value, unit)])
 }

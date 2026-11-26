@@ -8,7 +8,7 @@ use ordrumbox_core::json::{Object, Value};
 use super::{LFOS, NOISE_MODES, OSC_BYPASS_FLAGS, WAVES, number, set, text};
 
 /// The cards' bypass flags (`CARD_BYPASS_FLAGS`).
-pub const BYPASS_FLAGS: [(&str, &str); 12] = [
+pub const BYPASS_FLAGS: [(&str, &str); 13] = [
     ("vco1", OSC_BYPASS_FLAGS[0]),
     ("vco2", OSC_BYPASS_FLAGS[1]),
     ("vco3", OSC_BYPASS_FLAGS[2]),
@@ -21,11 +21,16 @@ pub const BYPASS_FLAGS: [(&str, &str); 12] = [
     ("fm", "bypassFm"),
     ("modEnvelope", "bypassModEnv"),
     ("pitchEnv", "bypassPitchEnv"),
+    ("filter2", "bypassFilter2"),
 ];
 
 /// Which cards show bypassed: a card whose bypass flag is set, an
-/// oscillator at gain 0 that modulates nothing either, an LFO at 0 Hz.
+/// oscillator at gain 0 that modulates nothing either, an LFO at 0 Hz, the
+/// second filter while the preset has none.
 pub fn bypassed(draft: &Object, group: &str) -> bool {
+    if group == "filter2" && draft.get(group).is_none() {
+        return true;
+    }
     let is_flagged = BYPASS_FLAGS
         .iter()
         .find(|(g, _)| *g == group)
@@ -60,6 +65,9 @@ pub fn toggle_card(draft: &mut Object, group: &str) {
     draft.insert(*flag, Value::Bool(off));
     if group == "envelope" && !off {
         draft.insert("_resetEnv", Value::Bool(true));
+    }
+    if group == "filter2" && draft.get(group).is_none() {
+        draft.insert(group, super::extras::filter2_defaults());
     }
     if !off && is_still_lfo(draft, group) {
         set(draft, &format!("{group}.freq"), Value::from(LFO_ON_HZ));

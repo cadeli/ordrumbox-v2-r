@@ -699,3 +699,14 @@ noise, the filter and its envelope, the envelope, the pitch envelope, the master
 the mod envelope, the matrix), 8 px apart (was 10) so that they fit the smallest window. The line of the track
 edited is under the preset bar, where the tabs were. The cards follow that order in `synth_model::GROUP_ORDER`, and the scope sits in VCO1's strip, right of its controls (it
 was VCO3's). This rewrote the card lines of `synth_editor_rust.txt` (engine), only their order; no sound changed.
+
+The Matrix card's target list keeps each card's controls together: an oscillator's width (and VCO2's ring) follows its
+detune, the noise's clock its filter, where they used to come after the envelopes, out of sight of their oscillator.
+This rewrote the `lfo targets` line of `synth_editor_rust.txt` (engine), only its order; no sound changed.
+
+The synth editor shows the cards of a profile (`profile` of a preset: percussion, melodic, bass) and keeps the others
+in an advanced view; without a profile, the cards of before, the new ones (Voice, Filter Env, Filter 2) in the
+advanced view. The filter envelope's stages, the second filter, the LFOs' delay and retrigger and the voice (mono,
+legato, glide, accent) are extra fields, written once set: a preset without them plays as before, and no audio
+snapshot changed. This rewrote the card lines of `synth_editor_rust.txt` (engine), which list the three new cards, and
+its `lfo targets` line, which gains `filter2.freq`.

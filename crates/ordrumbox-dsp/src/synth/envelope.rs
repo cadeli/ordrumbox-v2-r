@@ -24,12 +24,22 @@ pub(super) struct Envelope {
     /// When the segment started, seconds from the note's start.
     segment_start: f64,
     release_start_level: f64,
+    /// The level the attack rises from: 0, or where a note played over (mono) left it.
+    attack_floor: f64,
 }
 
 impl Envelope {
     /// An envelope in `segment`, at level 0.
     pub(super) const fn new(segment: Segment) -> Self {
-        Self { level: 0.0, segment, segment_start: 0.0, release_start_level: 0.0 }
+        Self { level: 0.0, segment, segment_start: 0.0, release_start_level: 0.0, attack_floor: 0.0 }
+    }
+
+    /// Start the attack again at `t` (seconds from the note's start), rising
+    /// from the level reached rather than from 0, so a note played over does not click.
+    pub(super) fn restart(&mut self, t: f64) {
+        self.attack_floor = self.level;
+        self.segment = Segment::Attack;
+        self.segment_start = t;
     }
 
     pub(super) fn is_idle(&self) -> bool {
@@ -62,7 +72,13 @@ impl Envelope {
                 self.segment = Segment::Decay;
                 self.segment_start = t;
             } else {
-                self.level = attack_level((dt / attack).max(0.0));
+                let rise = attack_level((dt / attack).max(0.0));
+                self.level = if self.attack_floor > 0.0 && peak > 0.0 {
+                    // From the floor to the peak, along the same curve.
+                    self.attack_floor + (1.0 - self.attack_floor / peak) * rise
+                } else {
+                    rise
+                };
             }
         }
         if self.segment == Segment::Decay {
@@ -99,11 +115,19 @@ impl Envelope {
 pub(super) struct FilterEnvelope {
     level: f64,
     segment: Segment,
+    /// When it started, seconds from the note's start: 0, or when a note played over (mono) restarted it.
+    start: f64,
 }
 
 impl FilterEnvelope {
     pub(super) const fn new(segment: Segment) -> Self {
-        Self { level: 0.0, segment }
+        Self { level: 0.0, segment, start: 0.0 }
+    }
+
+    /// Start it again at `t` (seconds from the note's start).
+    pub(super) fn restart(&mut self, t: f64) {
+        self.segment = Segment::Attack;
+        self.start = t;
     }
 
     pub(super) fn is_idle(&self) -> bool {
@@ -113,6 +137,7 @@ impl FilterEnvelope {
     /// The level (0–1) at `t` seconds from the note's start.
     #[inline]
     pub(super) fn step(&mut self, t: f64, attack: f64, decay: f64) -> f64 {
+        let t = t - self.start;
         if self.segment == Segment::Attack {
             if attack > INSTANT && t < attack {
                 self.level = t / attack;
@@ -154,6 +179,19 @@ mod tests {
         // Over, it stays over.
         envelope.release(0.6);
         assert_eq!(at(&mut envelope, 0.6), 0.0);
+    }
+
+    #[test]
+    fn a_restarted_attack_rises_from_where_the_level_stood() {
+        let mut envelope = Envelope::new(Segment::Attack);
+        let at = |envelope: &mut Envelope, t: f64| envelope.step(t, ADSR, 1.0, |norm| norm);
+        // In its sustain at 0.5, restarted at 0.3: half way up the attack, at 0.75.
+        at(&mut envelope, 0.1);
+        at(&mut envelope, 0.2);
+        assert_eq!(at(&mut envelope, 0.3), 0.5);
+        envelope.restart(0.3);
+        assert!((at(&mut envelope, 0.35) - 0.75).abs() < 1e-12);
+        assert_eq!(at(&mut envelope, 0.4), 1.0);
     }
 
     #[test]

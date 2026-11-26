@@ -1,6 +1,7 @@
 //! The synth editor's controls that are faders standing up, each named by
 //! its letter under it: the attack, decay, sustain and release of the
-//! envelopes, the filter's frequency, resonance and drive. Their values are
+//! envelopes (the filter's included), the filters' frequency and resonance,
+//! the first one's drive. Their values are
 //! said in their tooltip, not on the card.
 
 use ordrumbox_core::json::Object;
@@ -11,7 +12,7 @@ use crate::synth_cells::value_tip;
 use crate::synth_view::knob_kind;
 
 /// Each fader: its card, its key, its letter, its name.
-const FADERS: [(&str, &str, &str, &str); 11] = [
+const FADERS: [(&str, &str, &str, &str); 17] = [
     ("envelope", "attack", "A", "Attack"),
     ("envelope", "decay", "D", "Decay"),
     ("envelope", "sustain", "S", "Sustain"),
@@ -23,6 +24,12 @@ const FADERS: [(&str, &str, &str, &str); 11] = [
     ("filter", "freq", "F", "Frequency"),
     ("filter", "Q", "Q", "Resonance"),
     ("filter", "drive", "D", "Drive"),
+    ("filterEnv", "attack", "A", "Attack"),
+    ("filterEnv", "decay", "D", "Decay"),
+    ("filterEnv", "sustain", "S", "Sustain"),
+    ("filterEnv", "release", "R", "Release"),
+    ("filter2", "freq", "F", "Frequency"),
+    ("filter2", "Q", "Q", "Resonance"),
 ];
 
 /// The fader field `path` is, if it is one: its letter and its name.

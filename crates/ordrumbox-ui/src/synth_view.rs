@@ -1,7 +1,7 @@
 //! The synth editor, in the place of
-//! the grid: the preset bar (the preset list, delete, new, duplicate,
-//! revert, tags, export, import), the line of the track it is for, and
-//! every card on one screen — what makes the sound (the sources, the
+//! the grid: the preset bar (`synth_bar.rs`), the line of the track it is
+//! for, and the cards of the view shown (those of the preset's profile, or
+//! the others: [`model::card_view`]) on one screen — what makes the sound (the sources, the
 //! filter, the envelopes), then what moves it (the LFOs, the modulation
 //! envelope, the matrix), then the master — each as small as what it holds, side by side — its power LED
 //! and title, then its plot (the filter curve, the envelope) left of its
@@ -16,30 +16,20 @@
 
 use crate::scale::Scale;
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS};
-use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES};
+use ordrumbox_engine::synth_model::{self as model, CardView, FILTER_SLOPES, LFO_SYNCS, VOICE_MODE_LABELS};
+use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES, VOICE_MODES};
 
 use crate::canvas::{Canvas, Rgb};
 use crate::control::Spec;
 use crate::editors::FILTER_ICONS;
 use crate::frame;
 use crate::panel::{Id, Item, Kind, Rect};
+use crate::synth_bar::{self, Bar};
 use crate::synth_cells::{Cell, KNOB_H, Place, QUIET_H, push_head, push_row};
 use crate::synth_faders;
 use crate::synth_matrix::MatrixList;
 use crate::synth_strip;
 use crate::{scroll_thumb, theme};
-
-/// The preset bar's buttons: id, label, width (scale units).
-pub const BUTTONS: [(&str, &str, i32); 7] = [
-    ("delete", "x", 20),
-    ("new", "+", 20),
-    ("duplicate", "Duplicate", 60),
-    ("revert", "Revert", 56),
-    ("tags", "Tags", 44),
-    ("export", "Export", 56),
-    ("import", "Import", 56),
-];
 
 /// The space inside a card around what it holds, across and down (at scale 1).
 const PAD_X: i32 = 6;
@@ -118,7 +108,14 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     if key == "wave" {
         return Field::Wave;
     }
-    if path == "filter.type" || path == "noise.filterType" {
+    if model::SWITCHES.contains(&path) {
+        return Field::Switch;
+    }
+    if path == "voice.mode" {
+        let modes = VOICE_MODES.iter().zip(VOICE_MODE_LABELS);
+        return Field::List(modes.map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect());
+    }
+    if matches!(path, "filter.type" | "noise.filterType" | "filter2.type") {
         return Field::List(
             FILTER_TYPES.iter().zip(FILTER_ICONS).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect(),
         );
@@ -180,8 +177,7 @@ pub enum Plot {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SynthLayout {
     scale: Scale,
-    pub preset: Rect,
-    pub buttons: [Rect; 7],
+    pub bar: Bar,
     /// The line under the preset bar: what the track edited plays.
     pub track_line: Rect,
     pub area: Rect,
@@ -193,20 +189,12 @@ impl SynthLayout {
         let s = scale;
         let margin = 16 * s;
         let top = frame::body_top(scale);
-        let preset = Rect::new(margin, top, 180 * s, 14 * s);
-        let mut x = preset.x + preset.w + 8 * s;
-        let buttons = BUTTONS.map(|(_, _, w)| {
-            let r = Rect::new(x, top, w * s, 14 * s);
-            x += (w + 4) * s;
-            r
-        });
         let track_line = Rect::new(margin, top + 20 * s, (width - 2 * margin).max(0), 14 * s);
         let area_top = top + 42 * s;
         let bottom = frame::footer_top(height, scale, status_lines) - margin / 2;
         Self {
             scale,
-            preset,
-            buttons,
+            bar: Bar::new(margin, top, s),
             track_line,
             area: Rect::new(margin, area_top, (width - 2 * margin).max(0), (bottom - area_top).max(0)),
         }
@@ -273,23 +261,29 @@ struct Source<'a> {
     matrix_first: usize,
 }
 
-/// The editor for `draft` (preset `current` of `presets`), its matrix scrolled to line `matrix_first` of those listed;
+/// The editor for `draft` (preset `current` of `presets`), the cards of
+/// `view`, its matrix scrolled to line `matrix_first` of those listed;
 /// `lfo`: the value an LFO gives a control now, if it moves it.
 pub fn build(
     draft: &Object,
     (presets, current): (&[String], &str),
-    layout: &SynthLayout,
+    (layout, view): (&SynthLayout, CardView),
     matrix_first: usize,
     lfo: &dyn Fn(&str) -> Option<f64>,
 ) -> Built {
     let s = layout.scale;
     let mut built = Built::default();
-    push_header(&mut built.items, presets, current, layout);
+    synth_bar::push_bar(&mut built.items, (presets, current), draft, &layout.bar, view);
 
     let groups = model::groups(draft);
     let fields = all_fields(draft);
     let source = Source { draft, fields: &fields, s, lfo, matrix_first };
-    let shown: Vec<(usize, &str)> = groups.iter().enumerate().map(|(gi, group)| (gi, group.as_str())).collect();
+    let shown: Vec<(usize, &str)> = groups
+        .iter()
+        .enumerate()
+        .map(|(gi, group)| (gi, group.as_str()))
+        .filter(|(_, group)| model::card_view(draft, group) == view)
+        .collect();
     let strips: Vec<(&str, usize)> =
         shown.iter().filter(|(_, group)| synth_strip::is_strip(group)).map(|&(gi, group)| (group, gi)).collect();
     let scope = shown.iter().any(|(_, group)| *group == "scope");
@@ -439,20 +433,6 @@ fn card_block(source: &Source, (group, gi): (&str, usize)) -> Block {
     Block { items, size: (w, h), cards: vec![card], matrix }
 }
 
-/// The preset's select and the buttons, above the cards.
-fn push_header(items: &mut Vec<Item>, presets: &[String], current: &str, layout: &SynthLayout) {
-    let values = presets.to_vec();
-    let selected = presets.iter().position(|p| p == current).unwrap_or(0);
-    items.push(Item::new(
-        Some(Id::SynthPreset),
-        layout.preset,
-        Kind::Select { values: values.clone(), labels: values, selected },
-    ));
-    for ((id, label, _), rect) in BUTTONS.iter().zip(layout.buttons) {
-        items.push(Item::new(Some(Id::SynthButton(id)), rect, Kind::Button { label: (*label).into(), on: false }));
-    }
-}
-
 /// The plot a card shows left of its controls, as high as a knob (the
 /// scope has a card of its own: [`scope_block`]).
 fn card_plot(group: &str) -> Option<Plot> {
@@ -472,7 +452,7 @@ pub(crate) fn knob_kind(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option
     if model::is_inert(draft, path) {
         return Kind::Disabled { label };
     }
-    let base = model::number(draft, path).or_else(|| model::extra_default(path)).unwrap_or(0.0);
+    let base = model::number(draft, path).or_else(|| model::extra_value(draft, path)).unwrap_or(0.0);
     let spec = meta.map_or_else(|| Spec::knob(0.0, 1.0, 0.01, 0.0), knob_spec);
     let value = lfo(path).map_or(base, |m| m.clamp(spec.min, spec.max));
     let text = crate::control::Format::Fmt.value(value, meta.map_or("", |m| m.unit));
@@ -634,8 +614,9 @@ mod tests {
         let fields = all_fields(&d);
         let names = ["a".to_owned(), "b".to_owned()];
         let mut knobs = 0;
-        let built = build(&d, (&names, "b"), &layout, 0, &|_| None);
-        for item in &built.items {
+        let advanced = build(&d, (&names, "b"), (&layout, CardView::Advanced), 0, &|_| None);
+        let built = build(&d, (&names, "b"), (&layout, CardView::Main), 0, &|_| None);
+        for item in built.items.iter().chain(&advanced.items) {
             if let (Some(Id::SynthField(fi)), Kind::Value { .. }) = (item.id, &item.kind) {
                 let path = &fields[usize::from(fi)];
                 // A knob is a numeric control, or a list on notches (the LFOs' sync).
@@ -652,12 +633,15 @@ mod tests {
         // its free line only.
         let inert = fields.iter().filter(|path| model::is_inert(&d, path)).count();
         assert_eq!(inert, 4);
+        // Both views: their bars' knobs are none.
         assert_eq!(knobs, model::metas().count() - 4 - inert - (ordrumbox_engine::MATRIX_SIZE - 1));
         assert!(matches!(built.items[0].kind, Kind::Select { selected: 1, .. }));
-        // The oscillators' card, its strips (vco2, vco3 off: gain 0) and the
-        // scope, the unison, FM (its flag unset), the noise, the filter, the
-        // envelopes, then the LFOs (off: at 0 Hz), the mod envelope, the
-        // matrix and the master.
+        // Without a profile, the cards of before: the oscillators' card, its
+        // strips (vco2, vco3 off: gain 0) and the scope, the unison, FM (its
+        // flag unset), the noise, the filter, the envelopes, then the LFOs
+        // (off: at 0 Hz), the mod envelope, the matrix and the master; the
+        // advanced view, the voice and the filter envelope and second filter
+        // (off until the preset has one).
         let groups: Vec<_> = built.cards.iter().map(|c| (c.group.as_str(), c.bypassed)).collect();
         assert_eq!(
             groups,
@@ -680,6 +664,8 @@ mod tests {
                 ("master", false)
             ]
         );
+        let later: Vec<_> = advanced.cards.iter().map(|c| (c.group.as_str(), c.bypassed)).collect();
+        assert_eq!(later, [("voice", false), ("filterEnv", false), ("filter2", true)]);
         // The scope, with no title, in VCO1's band right of its controls; the
         // filter's and the envelope's plots left of their controls.
         let [oscillators, vco1, scope] = [&built.cards[0], &built.cards[1], &built.cards[4]].map(|c| c.rect);
@@ -712,7 +698,7 @@ mod tests {
     fn the_filters_slope_is_under_its_type_and_its_knobs_are_faders() {
         let d = draft();
         let layout = SynthLayout::new(740, 680, Scale::ONE, 0);
-        let built = build(&d, (&[], ""), &layout, 0, &|_| None);
+        let built = build(&d, (&[], ""), (&layout, CardView::Main), 0, &|_| None);
         let fields = all_fields(&d);
         let rect = |path: &str| {
             let fi = fields.iter().position(|f| f == path).unwrap() as u16;
@@ -740,7 +726,8 @@ mod tests {
         // As wide as the smallest window leaves the editor: every card on one screen.
         let layout = SynthLayout::new(912, 680, Scale::ONE, 0);
         let names = ["presets".to_owned()];
-        let built = |d: &Object, first: usize| build(d, (&names, "presets"), &layout, first, &|_| None);
+        let built =
+            |d: &Object, first: usize| build(d, (&names, "presets"), (&layout, CardView::Main), first, &|_| None);
         let lines = |d: &Object, built: &Built| {
             let fields = all_fields(d);
             let paths: Vec<_> = built
@@ -791,7 +778,7 @@ mod tests {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
             let layout = SynthLayout::new(w as i32, h as i32, Scale::ONE, 0);
-            let built = build(&d, (&[], ""), &layout, 0, &|_| None);
+            let built = build(&d, (&[], ""), (&layout, CardView::Main), 0, &|_| None);
             draw(&mut canvas, &d, &built, &layout, 0.3, 120.0);
         }
     }

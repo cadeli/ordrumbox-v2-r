@@ -2,6 +2,8 @@
 //! on their frame, the LFOs and the voices' mix into the strips.
 
 use super::*;
+use ordrumbox_dsp::Retrigger;
+use ordrumbox_dsp::synth::patch::VoiceMode;
 
 impl Engine {
     /// Render `left.len()` frames (both slices the same length), replacing their content.
@@ -220,6 +222,11 @@ impl Engine {
             return;
         }
         let now_seconds = self.seconds(now);
+        // Before the cut, which would release the voice a mono note plays over.
+        let mono_voice = match event.sound {
+            Sound::Synth(synth) => patches.get(synth.patch).and_then(|p| self.mono_voice(track, p, now_seconds)),
+            Sound::Sample(_) => None,
+        };
         self.choke_groups[track] = event.choke_group;
         self.release_cut(track, event, now_seconds);
         self.serial += 1;
@@ -234,13 +241,47 @@ impl Engine {
                 let Some(&patch) = patches.get(synth.patch) else { return };
                 let osc_freq = patch.osc_freq.map(|f| f * ratio);
                 let patch = SynthPatch { velocity: patch.velocity * f64::from(velocity), osc_freq, ..patch };
-                let slot = free_or_oldest(&self.synths, SynthVoice::is_active, SynthVoice::serial);
-                let voice = &mut self.synths[slot];
-                voice.start(&patch, track, now_seconds, self.serial);
-                voice.release_at(now_seconds + synth.length);
+                let slot = match mono_voice {
+                    Some((slot, how)) => {
+                        // One voice plays the track: any other ends.
+                        for (i, other) in self.synths.iter_mut().enumerate() {
+                            if i != slot && other.is_active() && other.track() == track {
+                                other.release_at(now_seconds);
+                            }
+                        }
+                        self.synths[slot].retrigger(&patch, now_seconds, self.serial, how);
+                        slot
+                    }
+                    None => {
+                        let slot = free_or_oldest(&self.synths, SynthVoice::is_active, SynthVoice::serial);
+                        self.synths[slot].start(&patch, track, now_seconds, self.serial);
+                        slot
+                    }
+                };
+                self.synths[slot].release_at(now_seconds + synth.length);
                 self.synth_samples[slot] = synth.sample;
             }
         }
+    }
+
+    /// The voice a note of `patch` on `track` plays over at `now` (seconds),
+    /// when the patch is mono or legato: the track's synth voice started last,
+    /// if one still sounds, and how it takes the note on (a legato note
+    /// after a release starts again, without gliding).
+    fn mono_voice(&self, track: usize, patch: &SynthPatch, now: f64) -> Option<(usize, Retrigger)> {
+        let how = match patch.voice_mode {
+            VoiceMode::Poly => return None,
+            VoiceMode::Mono => Retrigger::Glide,
+            VoiceMode::Legato => Retrigger::Legato,
+        };
+        let (slot, voice) = self
+            .synths
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| v.is_active() && v.track() == track)
+            .max_by_key(|(_, v)| v.serial())?;
+        let how = if how == Retrigger::Legato && !voice.is_held(now) { Retrigger::Restart } else { how };
+        Some((slot, how))
     }
 
     fn render_voices(&mut self, from: usize, to: usize) {

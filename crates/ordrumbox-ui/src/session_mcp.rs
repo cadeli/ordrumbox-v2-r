@@ -479,7 +479,7 @@ pub(super) fn synth_settings(args: &Value, required: bool) -> Result<Vec<(String
                 return Err(format!("{at}: {value} is not one of {}", Value::Array(allowed.collect())));
             }
             value.clone()
-        } else if model::BYPASS_FLAGS.iter().any(|(_, flag)| *flag == path) {
+        } else if model::BYPASS_FLAGS.iter().any(|(_, flag)| *flag == path) || model::SWITCHES.contains(&path) {
             Value::Bool(value.as_bool().ok_or_else(|| format!("{at}: not true or false ({value})"))?)
         } else if let Some(facet) = Facet::ALL.into_iter().find(|facet| facet.key() == path) {
             let tag = value.as_str().ok_or_else(|| format!("{at}: not a text ({value})"))?;

@@ -41,9 +41,10 @@ pub(super) enum Slot {
     PitchEnvAmount,
     PitchEnvDecay,
     Ring,
+    Filter2,
 }
 
-const SLOT_COUNT: usize = Slot::Ring as usize + 1;
+const SLOT_COUNT: usize = Slot::Filter2 as usize + 1;
 
 pub(super) const DETUNE_SLOTS: [Slot; 3] = [Slot::Detune1, Slot::Detune2, Slot::Detune3];
 pub(super) const GAIN_SLOTS: [Slot; 3] = [Slot::Gain1, Slot::Gain2, Slot::Gain3];
@@ -297,6 +298,7 @@ fn slot_of(target: LfoTarget) -> Option<(Slot, f64)> {
         T::PitchEnvAmount => (Slot::PitchEnvAmount, 24.0),
         T::PitchEnvDecay => (Slot::PitchEnvDecay, 0.25),
         T::Osc2Ring => (Slot::Ring, 1.0),
+        T::Filter2Freq => (Slot::Filter2, 1000.0),
     })
 }
 

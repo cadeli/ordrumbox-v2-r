@@ -56,11 +56,13 @@ pub enum LfoTarget {
     FmBoost,
     /// Raises the oscillators' gains towards 1: at 1, all at full.
     Shape,
+    /// The second filter's cutoff.
+    Filter2Freq,
 }
 
 impl LfoTarget {
     /// Every target, each at its code.
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 41] = [
         Self::Off,
         Self::Volume,
         Self::Osc1Gain,
@@ -101,6 +103,7 @@ impl LfoTarget {
         Self::Pitch,
         Self::FmBoost,
         Self::Shape,
+        Self::Filter2Freq,
     ];
 
     /// Its code: its place in [`Self::ALL`].
@@ -191,6 +194,18 @@ pub struct SynthLfo {
     pub wave: Wave,
     /// Hz; 0 or less is off.
     pub freq: f64,
+    /// Seconds from the note's start over which the LFO fades in, from nothing (0: at once).
+    pub delay_seconds: f64,
+    /// Whether the LFO starts its cycle with each note, instead of running on the engine clock.
+    pub is_retriggered: bool,
+}
+
+impl SynthLfo {
+    /// An LFO of `wave` at `freq` Hz on the engine clock, at full depth from the note's start.
+    #[must_use]
+    pub const fn free(wave: Wave, freq: f64) -> Self {
+        Self { wave, freq, delay_seconds: 0.0, is_retriggered: false }
+    }
 }
 
 /// An ADSR, seconds and level.
@@ -210,6 +225,42 @@ pub struct PitchEnv {
     pub amount: f64,
     /// Seconds the offset takes to fall to a hundredth of itself.
     pub decay: f64,
+}
+
+/// The filter envelope: its stages, and which way it moves the cutoff.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FilterEnv {
+    /// Its own ADSR; `None`: up over the amplitude envelope's attack, down
+    /// over its decay, then off (the presets written before it had one).
+    pub adsr: Option<Adsr>,
+    /// Whether it closes the filter (towards its lowest cutoff) instead of opening it.
+    pub is_inverted: bool,
+}
+
+/// The second filter, after the first: a 12 dB/oct stage of its own.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Filter2 {
+    pub mode: FilterMode,
+    pub freq: f64,
+    pub q: f64,
+}
+
+/// How a track's notes share a voice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VoiceMode {
+    /// Each note a voice of its own.
+    #[default]
+    Poly,
+    /// One voice: each note restarts the envelopes and glides from the pitch of the one before.
+    Mono,
+    /// One voice: a note that comes while the one before is held glides to
+    /// its pitch and keeps the envelopes going; any other restarts them, without gliding.
+    Legato,
+}
+
+impl VoiceMode {
+    /// Every mode, each at its code.
+    pub const ALL: [Self; 3] = [Self::Poly, Self::Mono, Self::Legato];
 }
 
 /// Stages switched off (`bypass*` of the preset).
@@ -267,6 +318,13 @@ pub struct SynthPatch {
     pub lfo1: SynthLfo,
     pub lfo2: SynthLfo,
     pub filter_env_amount: f64,
+    pub filter_env: FilterEnv,
+    /// The second filter; `None` when off.
+    pub filter2: Option<Filter2>,
+    pub voice_mode: VoiceMode,
+    /// Seconds a glide takes to bring the pitch within a hundredth of the
+    /// interval of the note (0: none). Mono and legato only.
+    pub glide_seconds: f64,
     pub fm_amount: f64,
     /// Which oscillators modulate which, 0 to 4. A number and not an `enum`:
     /// an LFO sweeps it ([`LfoTarget::FmAlgorithm`]), and it is rounded to
@@ -291,7 +349,7 @@ pub struct SynthPatch {
 
 impl Default for SynthPatch {
     fn default() -> Self {
-        let lfo = SynthLfo { wave: Wave::Sine, freq: 1.0 };
+        let lfo = SynthLfo::free(Wave::Sine, 1.0);
         Self {
             osc_freq: [440.0; 3],
             osc_gain: [0.5; 3],
@@ -320,6 +378,10 @@ impl Default for SynthPatch {
             lfo1: lfo,
             lfo2: lfo,
             filter_env_amount: 0.0,
+            filter_env: FilterEnv { adsr: None, is_inverted: false },
+            filter2: None,
+            voice_mode: VoiceMode::Poly,
+            glide_seconds: 0.0,
             fm_amount: 0.0,
             fm_algorithm: 0.0,
             mod_envelope: Adsr { attack: 0.01, decay: 0.1, sustain: 0.0, release: 0.1 },

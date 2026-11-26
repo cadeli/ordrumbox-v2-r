@@ -391,6 +391,43 @@ fn synth_notes_play_for_their_length() {
     assert!(engine.synths.iter().all(|s| !s.is_active()));
 }
 
+/// Active synth voices after two notes of `voice_mode` on one track, the
+/// second at frame 4800, while the first is held.
+fn voices_after_two_notes(voice_mode: ordrumbox_dsp::synth::patch::VoiceMode) -> usize {
+    let mut engine = engine();
+    let patch = SynthPatch { velocity: 0.5, volume: 1.0, voice_mode, glide_seconds: 0.05, ..SynthPatch::default() };
+    let note = |frame| Event {
+        frame,
+        sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 1.0, sample: None }),
+        mono: false,
+        choke_group: None,
+        velocity: 1.0,
+        note: None,
+        note_frames: 0,
+        lock: None,
+    };
+    let pass = Pass {
+        frames: 48_000,
+        ticks: 128,
+        events: vec![note(64), note(4_800)],
+        strips: vec![StripSettings::default()],
+        patches: vec![patch],
+        ..Pass::default()
+    };
+    engine.play(Arc::new(pass));
+    let signal = render(&mut engine, 9_600);
+    assert!(signal[4_800..].iter().any(|s| s.abs() > 0.01), "the second note sounds");
+    engine.synths.iter().filter(|s| s.is_active()).count()
+}
+
+#[test]
+fn a_mono_or_legato_track_plays_one_voice() {
+    use ordrumbox_dsp::synth::patch::VoiceMode;
+    assert_eq!(voices_after_two_notes(VoiceMode::Poly), 2);
+    assert_eq!(voices_after_two_notes(VoiceMode::Mono), 1);
+    assert_eq!(voices_after_two_notes(VoiceMode::Legato), 1);
+}
+
 #[test]
 fn master_bus_limits_the_output() {
     let mut engine = Engine::new(RATE, bank());

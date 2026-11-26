@@ -22,6 +22,11 @@ impl PitchFall {
     /// The envelope at the start of a note: the whole offset.
     pub(super) const START: Self = Self { left: 1.0 };
 
+    /// The share of the offset left, 0–1.
+    pub(super) const fn left(self) -> f64 {
+        self.left
+    }
+
     /// The frequency ratio of this sample for an offset of `semitones`, then
     /// moved on by a sample, each of which keeps `fall` of what is left.
     #[inline]

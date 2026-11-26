@@ -161,7 +161,8 @@ mod tests {
     #[test]
     fn the_strips_stay_put_and_inside_their_card() {
         let layout = SynthLayout::new(740, 680, Scale::ONE, 0);
-        let built = |d: &Object| build(d, (&[], ""), &layout, 0, &|_| None);
+        let built =
+            |d: &Object| build(d, (&[], ""), (&layout, ordrumbox_engine::synth_model::CardView::Main), 0, &|_| None);
         let plain = built(&draft());
         let mut set = draft();
         model::set(&mut set, "vco2.gain", Value::from(0.7));

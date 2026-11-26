@@ -131,6 +131,22 @@ mod tests {
     }
 
     #[test]
+    fn a_target_list_offers_every_oscillator_width() {
+        let s = session();
+        let mut draft = s.synths.presets.get("b").unwrap().as_object().unwrap().clone();
+        ordrumbox_engine::synth_model::hydrate(&mut draft);
+        let fields = crate::synth_view::all_fields(&draft);
+        let fi = fields.iter().position(|f| f == "matrix.target1").unwrap() as u16;
+        let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
+        let spin = crate::panel::find(&layout.items, Id::SynthField(fi)).expect("the first line's target");
+        let crate::panel::Kind::Spin { values, .. } = &spin.kind else { panic!("{:?}", spin.kind) };
+        for vco in ["vco1", "vco2", "vco3"] {
+            let at = |key: &str| values.iter().position(|v| *v == format!("{vco}.{key}"));
+            assert_eq!(at("width"), at("detune").map(|i| i + 1), "{vco}'s width with its card: {values:?}");
+        }
+    }
+
+    #[test]
     fn an_envelope_fader_says_its_value_in_its_tooltip() {
         let mut s = session();
         let mut draft = s.synths.presets.get("b").unwrap().as_object().unwrap().clone();
