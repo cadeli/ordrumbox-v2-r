@@ -51,6 +51,8 @@ mod synth_bar;
 mod synth_cells;
 mod synth_faders;
 mod synth_matrix;
+mod synth_rows;
+mod synth_spread;
 mod synth_strip;
 mod synth_view;
 #[cfg(test)]

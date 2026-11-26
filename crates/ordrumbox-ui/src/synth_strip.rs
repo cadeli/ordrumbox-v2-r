@@ -15,7 +15,7 @@ use crate::synth_cells::{Cell, Place, QUIET_H, push_head, push_row, value_tip};
 use crate::synth_view::knob_kind;
 
 /// The width of the title, left of the controls (at scale 1).
-const TITLE_W: i32 = 48;
+pub(crate) const TITLE_W: i32 = 48;
 /// The space between two strips of the oscillators' card (at scale 1).
 pub const STRIP_GAP: i32 = 4;
 /// The waves' names in the list a spin opens.
@@ -161,8 +161,7 @@ mod tests {
     #[test]
     fn the_strips_stay_put_and_inside_their_card() {
         let layout = SynthLayout::new(740, 680, Scale::ONE, 0);
-        let built =
-            |d: &Object| build(d, (&[], ""), (&layout, ordrumbox_engine::synth_model::CardView::Main), 0, &|_| None);
+        let built = |d: &Object| build(d, (&[], ""), &layout, 0, &|_| None);
         let plain = built(&draft());
         let mut set = draft();
         model::set(&mut set, "vco2.gain", Value::from(0.7));
@@ -182,7 +181,8 @@ mod tests {
         for strip in strips {
             let r = strip.rect;
             assert!(r.x >= card.x && r.x + r.w <= card.x + card.w && r.y >= card.y && r.y + r.h <= card.y + card.h);
-            let inside = plain.items.iter().filter(|i| i.rect.x >= card.x && i.rect.y >= r.y && i.rect.y < r.y + r.h);
+            let in_card = |i: crate::panel::Rect| i.x >= card.x && i.x < card.x + card.w;
+            let inside = plain.items.iter().filter(|i| in_card(i.rect) && i.rect.y >= r.y && i.rect.y < r.y + r.h);
             for item in inside {
                 let i = item.rect;
                 assert!(i.x >= r.x && i.x + i.w <= r.x + r.w && i.y + i.h <= r.y + r.h, "{item:?} in {}", strip.group);

@@ -727,3 +727,9 @@ an accent for BASS_ANALOG, BASS_PLUCK, BASS_ACID), the leads glide in legato and
 (SYNTHLEAD_SAW gains one), the pads' filter swells with its own envelope and a second filter clears their lows, and
 BRASS_SYNTH, PIANO_EPIANO and PIANO_CLAV hold their filter envelope. The drums and percussions sound as before.
 `ordrumbox-probe preset` measures them all without a clip; no snapshot renders them.
+
+The synth editor's cards are in rows filled to the full width, each card as tall as its row and its controls spread
+across it (`synth_rows.rs`, `synth_spread.rs`). Every card is shown, those of the preset's profile first
+(`synth_model::is_shown_first`); the Advanced button and its view are gone. For them to fit, the smallest window is
+89 pixels taller at scale 1: its main editor is `synth_view::MIN_HEIGHT` high when that is more than the track
+editor's. No snapshot changed.

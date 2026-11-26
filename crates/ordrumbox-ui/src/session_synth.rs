@@ -12,7 +12,7 @@ use crate::scale::Scale;
 use std::time::Instant;
 
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_engine::synth_model::{self as model, CardView};
+use ordrumbox_engine::synth_model as model;
 
 use super::session_files::NO_SYNTHS;
 use super::session_synth_matrix::MatrixScroll;
@@ -53,19 +53,17 @@ pub(super) struct Synths {
 }
 
 /// The synth editor: the preset edited, when the session
-/// started (the LFO clock), where the matrix list is scrolled to, and the
-/// view shown (the profile's cards, or the others).
+/// started (the LFO clock), and where the matrix list is scrolled to.
 #[derive(Debug)]
 pub(super) struct SynthEditor {
     edit: Option<SynthEdit>,
     started: Instant,
     pub(super) matrix: MatrixScroll,
-    view: CardView,
 }
 
 impl SynthEditor {
     pub(super) fn new() -> Self {
-        Self { edit: None, started: Instant::now(), matrix: MatrixScroll::default(), view: CardView::Main }
+        Self { edit: None, started: Instant::now(), matrix: MatrixScroll::default() }
     }
 
     /// Preset `key` is the one edited.
@@ -321,8 +319,7 @@ impl Session {
         };
         let keys = self.synth_keys();
         let first = self.synth_editor.matrix.first;
-        let view = self.synth_editor.view;
-        let built = synth_view::build(&edit.draft, (&keys, &edit.key), (&layout, view), first, &lfo);
+        let built = synth_view::build(&edit.draft, (&keys, &edit.key), &layout, first, &lfo);
         Some((built, layout))
     }
 
@@ -454,12 +451,6 @@ impl Session {
     /// The preset bar's buttons.
     pub(super) fn synth_button(&mut self, button: &str) {
         match button {
-            crate::synth_bar::ADVANCED => {
-                self.synth_editor.view = match self.synth_editor.view {
-                    CardView::Main => CardView::Advanced,
-                    CardView::Advanced => CardView::Main,
-                };
-            }
             "delete" => {
                 let Some(key) = self.synth_editor.edit.as_ref().map(|e| e.key.clone()) else { return };
                 let keys = self.synth_keys();
@@ -631,21 +622,22 @@ mod tests {
     }
 
     #[test]
-    fn every_card_fits_the_smallest_window_in_each_profile_and_view() {
+    fn every_card_fits_the_smallest_window_in_each_profile() {
         let mut s = session();
         s.toggle_synth();
-        let scale = Scale::ONE;
-        let (w, h) = crate::view::min_window_size(scale, crate::view::Shown::all());
-        s.set_size((w, h, scale));
-        for profile in std::iter::once("").chain(model::PROFILES.iter().map(|(p, _)| *p)) {
-            s.synth_select(Id::SynthProfile, profile);
-            for _ in 0..2 {
-                s.synth_button(crate::synth_bar::ADVANCED);
+        for quarters in 4..=Scale::MAX.quarters() {
+            let scale = Scale::from_quarters(quarters);
+            let (w, h) = crate::view::min_window_size(scale, crate::view::Shown::all());
+            s.set_size((w, h, scale));
+            for profile in std::iter::once("").chain(model::PROFILES.iter().map(|(p, _)| *p)) {
+                s.synth_select(Id::SynthProfile, profile);
                 let (built, layout) = s.synth_built((w, h, scale)).expect("the editor");
                 let (bottom, right) = (layout.area.y + layout.area.h, layout.area.x + layout.area.w);
+                assert_eq!(built.cards.len(), model::groups(&s.synth_editor.edit.as_ref().unwrap().draft).len() + 1);
                 for card in &built.cards {
                     let (end, side) = (card.rect.y + card.rect.h, card.rect.x + card.rect.w);
-                    assert!(end <= bottom && side <= right, "{profile:?}: {} ends at {end}, {side}", card.group);
+                    let at = format!("scale {scale}, {profile:?}: {} ends at {end}, {side}", card.group);
+                    assert!(end <= bottom && side <= right, "{at}");
                 }
                 let profile_list = crate::panel::find(&built.items, Id::SynthProfile).expect("the profile").rect;
                 assert!(profile_list.x + profile_list.w <= w, "the bar fits");
@@ -660,13 +652,13 @@ mod tests {
         s.synth_select(Id::SynthProfile, "bass");
         let preset = |s: &Session| s.synths.presets.get("b").unwrap().as_object().unwrap().clone();
         assert_eq!(preset(&s).get(model::PROFILE_KEY), Some(&Value::from("bass")));
-        // The voice's card is in the bass view; the LFOs in the advanced one.
+        // The voice's card is among the bass profile's, before the LFOs.
         let shown = |s: &Session| -> Vec<String> {
             s.synth_built(SIZE).expect("the editor").0.cards.into_iter().map(|c| c.group).collect()
         };
-        assert!(shown(&s).iter().any(|g| g == "voice") && !shown(&s).iter().any(|g| g == "lfo"));
-        s.synth_button(crate::synth_bar::ADVANCED);
-        assert!(shown(&s).iter().any(|g| g == "lfo"));
+        let at = |group: &str| shown(&s).iter().position(|g| g == group).expect("every card");
+        assert!(at("voice") < at("lfo"));
+        assert!(at("master") < at("lfo"), "the profile's cards first");
         let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
         let fi = fields.iter().position(|f| f == "lfo.retrigger").unwrap() as u16;
         s.synth_activate(Id::SynthField(fi));

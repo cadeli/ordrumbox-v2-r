@@ -266,8 +266,9 @@ impl Shown {
 
 /// The smallest window, in physical pixels, that the layout fits at `scale`
 /// with what `shown` shows: the header's controls across; down, the header,
-/// the tallest track editor (or, the grid without it, the grid and its note
-/// editor) and a footer of one status line.
+/// the tallest track editor or the synth editor with every card (or, the
+/// grid without the track editor, the grid and its note editor) and a footer
+/// of one status line.
 pub fn min_window_size(scale: Scale, shown: Shown) -> (i32, i32) {
     let views = header_controls(scale).views;
     let width = views[5].x + views[5].w + margin(scale);
@@ -276,7 +277,7 @@ pub fn min_window_size(scale: Scale, shown: Shown) -> (i32, i32) {
     let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, false).main_bottom;
     let main = if shown.track_editor || !shown.grid {
         let rounding = if scale.quarters() % 2 == 1 { TRACK_EDITOR_ROUNDING } else { 0 };
-        TRACK_EDITOR_HEIGHT * scale + rounding
+        (TRACK_EDITOR_HEIGHT * scale + rounding).max(crate::synth_view::MIN_HEIGHT * scale)
     } else {
         let note = if shown.note_editor { editors::note_strip_height(scale) + NOTE_GAP * scale } else { 0 };
         compact_grid_height(scale) + note
