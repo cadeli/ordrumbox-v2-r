@@ -83,6 +83,13 @@ impl Session {
                 self.chrome.widgets.focus = Some(id);
                 self.open_select(id, item.rect, values, labels, selected);
             }
+            Kind::TwoState { values, selected, .. } => {
+                self.chrome.widgets.focus = Some(id);
+                let half = panel::two_state_half_at(item.rect, x);
+                if half != selected {
+                    self.select(id, &values[half]);
+                }
+            }
             _ => self.activate(id),
         }
         true
@@ -463,6 +470,11 @@ impl Session {
                 }
             }
             Kind::Select { values, selected, .. } | Kind::Screen { values, selected, .. } => {
+                if let Some(value) = moved_value(&values, selected, lines) {
+                    self.select(id, value);
+                }
+            }
+            Kind::TwoState { values, selected, .. } => {
                 if let Some(value) = moved_value(&values, selected, lines) {
                     self.select(id, value);
                 }

@@ -13,7 +13,7 @@
 use crate::scale::Scale;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS, TABS};
-use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES, OSC2_SYNCS, WAVES};
+use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES, WAVES};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
@@ -68,12 +68,15 @@ pub fn all_fields(draft: &Object) -> Vec<String> {
     model::groups(draft).iter().flat_map(|g| model::fields(draft, g)).collect()
 }
 
-/// What a field shows as: a knob, a list (values and labels), a switch, or
+/// What a field shows as: a knob, a list (values and labels), a two-state
+/// button (the filter's slope), a switch, a LED (oscillator 2's sync), or
 /// nothing (an icon row in the card's title, an object).
 enum Field {
     Knob,
     List(Vec<(String, String)>),
+    TwoState(Vec<(String, String)>),
     Switch,
+    Led,
     None,
 }
 
@@ -81,6 +84,17 @@ enum Field {
 fn knob_spec(meta: &model::Meta) -> Spec {
     let spec = Spec::knob(meta.min, meta.max, meta.step, meta.default);
     if meta.log { spec.log_full_travel() } else { spec }
+}
+
+/// The width of a two-state button in a card (at scale 1).
+const TWO_STATE_W: i32 = 96;
+
+/// The values, labels and selected index of list field `path` with `options`.
+fn list_choice(draft: &Object, path: &str, options: Vec<(String, String)>) -> (Vec<String>, Vec<String>, usize) {
+    let current = model::get(draft, path).and_then(Value::to_text).unwrap_or_default();
+    let selected = options.iter().position(|(v, _)| *v == current).unwrap_or(0);
+    let (values, labels) = options.into_iter().unzip();
+    (values, labels, selected)
 }
 
 fn field_kind(path: &str, value: Option<&Value>) -> Field {
@@ -93,15 +107,14 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
         return Field::None;
     }
     if path == "filter.slope" {
-        return list(&FILTER_SLOPES);
+        return Field::TwoState(FILTER_SLOPES.iter().map(|(v, l)| ((*v).to_owned(), (*l).to_owned())).collect());
     }
     if path == "noise.mode" {
         let labels = model::NOISE_MODE_LABELS;
         return Field::List(NOISE_MODES.iter().zip(labels).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect());
     }
     if path == "vco2.sync" {
-        let labels = model::OSC2_SYNC_LABELS;
-        return Field::List(OSC2_SYNCS.iter().zip(labels).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect());
+        return Field::Led;
     }
     if model::extra_default(path).is_some() {
         return Field::Knob;
@@ -344,27 +357,34 @@ fn push_fields(
                 items.push(Item::new(id, rect, Kind::Value { spec, value, label: Some(label), text, lfo: lfo_on }));
                 knobs += 1;
             }
-            Field::List(options) => rows.push((id, label, Some(options), path)),
-            Field::Switch => rows.push((id, label, None, path)),
+            Field::List(options) => {
+                let (values, labels, selected) = list_choice(draft, &path, options);
+                rows.push((id, label, Kind::Select { values, labels, selected }));
+            }
+            Field::TwoState(options) => {
+                let (values, labels, selected) = list_choice(draft, &path, options);
+                rows.push((id, label, Kind::two_state(values, labels, selected)));
+            }
+            Field::Switch => {
+                let on = model::get(draft, &path).and_then(Value::as_bool).unwrap_or(false);
+                rows.push((id, label, Kind::Toggle { on }));
+            }
+            Field::Led => rows.push((id, label, Kind::Led { on: model::is_osc2_synced(draft) })),
             Field::None => {}
         }
     }
     if knobs > 0 {
         y += ((knobs + per_row - 1) / per_row) * (KNOB_H + 4) * s;
     }
-    for (id, label, options, path) in rows {
+    for (id, label, kind) in rows {
         items.push(Item::text(inner.x, y + 3 * s, label, theme::muted(), s));
-        let rect = Rect::new(inner.x + 80 * s, y, (inner.w - 80 * s).min(200 * s), 13 * s);
-        let kind = match options {
-            Some(options) => {
-                let current = model::get(draft, &path).and_then(Value::to_text).unwrap_or_default();
-                let selected = options.iter().position(|(v, _)| *v == current).unwrap_or(0);
-                let (values, labels) = options.into_iter().unzip();
-                Kind::Select { values, labels, selected }
-            }
-            None => Kind::Toggle { on: model::get(draft, &path).and_then(Value::as_bool).unwrap_or(false) },
+        // A LED is as wide as a card's power LED, a two-state button as two labels.
+        let w = match kind {
+            Kind::Led { .. } => 14 * s,
+            Kind::TwoState { .. } => (inner.w - 80 * s).min(TWO_STATE_W * s),
+            _ => (inner.w - 80 * s).min(200 * s),
         };
-        items.push(Item::new(id, rect, kind));
+        items.push(Item::new(id, Rect::new(inner.x + 80 * s, y, w, 13 * s), kind));
         y += (ROW_H + 2) * s;
     }
     y

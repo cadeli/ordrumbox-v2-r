@@ -6,7 +6,7 @@ use ordrumbox_core::lfo;
 use ordrumbox_core::num::gain_to_db;
 use ordrumbox_dsp::synth::ring;
 
-use super::{EXTRA_METAS, FM_DEVIATION, LFOS, OSC2_SYNCS, WAVES, lfo_scale, number, routes_of, slope, text};
+use super::{EXTRA_METAS, FM_DEVIATION, LFOS, WAVES, is_osc2_synced, lfo_scale, number, routes_of, slope, text};
 
 /// The LFOs playing (not bypassed), each with the matrix source it is.
 fn playing_lfos(draft: &Object) -> impl Iterator<Item = (&Object, &'static str)> {
@@ -141,7 +141,7 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
         .map(|n| (vco(n, "gain", if n == 1 { 1.0 } else { 0.0 }) + modded(&format!("vco{n}.gain"))).clamp(0.0, 1.0))
         .collect();
     let ring_amount = (number(draft, "vco2.ring").unwrap_or(0.0) + modded("vco2.ring")).clamp(0.0, 1.0);
-    let is_synced = text(draft, "vco2.sync") == Some(OSC2_SYNCS[1]);
+    let is_synced = is_osc2_synced(draft);
     let fm_amount = number(draft, "fm.amount").unwrap_or(0.0);
     let fm_algo = number(draft, "fm.algo").unwrap_or(0.0);
     let sub_gain = number(draft, "subGain").unwrap_or(0.0);

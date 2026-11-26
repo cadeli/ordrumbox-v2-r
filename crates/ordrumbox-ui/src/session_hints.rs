@@ -64,6 +64,7 @@ const fn control_hint(kind: &Kind) -> Option<&'static str> {
             "drag or wheel: change (Shift: finely)   double-click: default   right-click: type a value, copy, paste",
         ),
         Kind::Select { .. } | Kind::Screen { .. } => Some("click: open the list   wheel or arrows: the next one"),
+        Kind::TwoState { .. } => Some("click: pick a side   wheel, arrows or Space: the other one"),
         _ => None,
     }
 }

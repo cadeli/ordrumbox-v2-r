@@ -91,8 +91,12 @@ fn fx_knob_row(rows: &mut Rows, view: &TrackView, state: &EditorState, fx: &FxDe
     for &key in choices {
         let rect = rows.slot(slot, FX_SLOTS);
         slot += 1;
-        let choice = if key == "sidechainSource" { view.sidechains.clone() } else { fx_choice(view, state, key) };
-        rows.slot_choice(rect, fx_label(key), Some(key), Some(Id::TrackSelect(key)), choice.kind());
+        let kind = match key {
+            "sidechainSource" => view.sidechains.kind(),
+            "filterSlope" => fx_choice(view, state, key).two_state(),
+            _ => fx_choice(view, state, key).kind(),
+        };
+        rows.slot_choice(rect, fx_label(key), Some(key), Some(Id::TrackSelect(key)), kind);
     }
 }
 

@@ -370,6 +370,9 @@ fn the_fx_tab_shows_every_effect_and_moves_nothing_when_one_goes_on() {
                 assert!(items.iter().any(|item| item.id == Some(Id::TrackSelectStep(key, step))), "{key} {step:?}");
             }
         }
+        // The filter's slope: a two-state button, 12 dB lit.
+        let slope = items.iter().find(|item| item.id == Some(Id::TrackSelect("filterSlope"))).map(|item| &item.kind);
+        assert!(matches!(slope, Some(Kind::TwoState { selected: 0, .. })), "{slope:?}");
         // Every effect value is a knob of the knob bar's size, under the tab.
         let knobs = items.iter().filter(|item| matches!(item.id, Some(Id::Fx(_))));
         for item in knobs {

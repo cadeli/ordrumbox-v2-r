@@ -32,6 +32,11 @@ impl Choice {
         Kind::Select { values: self.values.clone(), labels: self.shown_labels(), selected: self.selected }
     }
 
+    /// The same choice as a two-state button (a select unless it has two options).
+    pub fn two_state(&self) -> Kind {
+        Kind::two_state(self.values.clone(), self.shown_labels(), self.selected)
+    }
+
     /// The same choice on a one-line screen, lit or dimmed.
     pub fn screen(&self, lit: bool) -> Kind {
         Kind::Screen { values: self.values.clone(), labels: self.shown_labels(), selected: self.selected, lit }

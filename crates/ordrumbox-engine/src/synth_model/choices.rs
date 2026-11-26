@@ -5,9 +5,6 @@ use ordrumbox_core::json::Value;
 
 use super::{FILTER_TYPES, MATRIX_SIZE, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES, lfo_targets};
 
-/// The LFO syncs (value, label).
-/// The labels of what oscillator 2 syncs to, in the order of [`OSC2_SYNCS`].
-pub const OSC2_SYNC_LABELS: [&str; 2] = ["Off", "VCO1"];
 /// The labels of the noise's modes, in the order of [`NOISE_MODES`].
 pub const NOISE_MODE_LABELS: [&str; 3] = ["White", "Long", "Short"];
 /// Filter slopes, dB per octave, and their labels.

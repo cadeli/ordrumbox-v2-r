@@ -301,6 +301,18 @@ fn text<'a>(draft: &'a Object, path: &str) -> Option<&'a str> {
     get(draft, path).and_then(Value::as_str)
 }
 
+/// Whether oscillator 2 is synced to oscillator 1 (`vco2.sync`).
+#[must_use]
+pub fn is_osc2_synced(draft: &Object) -> bool {
+    text(draft, "vco2.sync") == Some(OSC2_SYNCS[1])
+}
+
+/// The `vco2.sync` value that syncs oscillator 2 (`on`) or frees it.
+#[must_use]
+pub fn osc2_sync_value(on: bool) -> Value {
+    Value::from(if on { OSC2_SYNCS[1] } else { OSC2_SYNCS[0] })
+}
+
 /// Set the value at a dotted `path` (its group must exist); whether it was set.
 pub fn set(draft: &mut Object, path: &str, value: Value) -> bool {
     match path.split_once('.') {

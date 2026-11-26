@@ -77,6 +77,13 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
             draw_value_item(canvas, r, (spec, *value, *lfo), (label.as_deref(), text), scale);
         }
         Kind::Select { labels, selected, .. } => draw_select_item(canvas, r, labels, *selected, scale),
+        Kind::TwoState { labels, selected, .. } => {
+            for (i, (half, label)) in two_state_halves(r).into_iter().zip(labels).enumerate() {
+                let (fill, color) = if i == *selected { (ACTIVE, background_color()) } else { (field_color(), dim()) };
+                canvas.fill_rect(half.x, half.y, half.w, half.h, fill);
+                centered_label(canvas, half, label, scale, color);
+            }
+        }
         Kind::Screen { labels, selected, lit, .. } => draw_screen(canvas, r, labels, *selected, *lit, scale),
         Kind::Toggle { on } => {
             canvas.fill_rect(r.x, r.y, r.w, r.h, if *on { ON } else { field_color() });

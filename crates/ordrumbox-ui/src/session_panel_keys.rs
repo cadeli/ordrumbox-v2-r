@@ -124,6 +124,18 @@ impl Session {
                 }
                 true
             }
+            Kind::TwoState { values, selected, .. } => {
+                let to = match key {
+                    PanelKey::Up | PanelKey::Left | PanelKey::Minus => 0,
+                    PanelKey::Down | PanelKey::Right | PanelKey::Plus => 1,
+                    PanelKey::Enter | PanelKey::Space => 1 - selected.min(1),
+                    _ => return false,
+                };
+                if to != selected {
+                    self.select(id, &values[to]);
+                }
+                true
+            }
             _ => {
                 if matches!(key, PanelKey::Enter | PanelKey::Space) {
                     self.activate(id);

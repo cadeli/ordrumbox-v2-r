@@ -407,10 +407,14 @@ impl Session {
             }
             Id::SynthField(fi) => {
                 let Some(path) = self.synth_field(fi) else { return };
-                let on =
-                    self.synth_editor.edit.as_ref().and_then(|e| model::get(&e.draft, &path)).and_then(Value::as_bool);
-                if let Some(on) = on {
-                    self.edit_synth(&path, Value::Bool(!on));
+                let Some(edit) = &self.synth_editor.edit else { return };
+                let value = if path == "vco2.sync" {
+                    Some(model::osc2_sync_value(!model::is_osc2_synced(&edit.draft)))
+                } else {
+                    model::get(&edit.draft, &path).and_then(Value::as_bool).map(|on| Value::Bool(!on))
+                };
+                if let Some(value) = value {
+                    self.edit_synth(&path, value);
                 }
             }
             _ => {}
@@ -597,6 +601,25 @@ mod tests {
         s.synth_button("revert");
         assert_eq!(s.synths.presets.get("b").unwrap().to_json(), r#"{"vco1":{"gain":0.5}}"#);
         assert_eq!(model::number(&s.synth_editor.edit.as_ref().unwrap().draft, "vco2.gain"), Some(0.0));
+    }
+
+    #[test]
+    fn the_filter_slope_is_a_two_state_button() {
+        let mut s = session();
+        s.toggle_synth();
+        s.synth_editor.tab = SynthTab::Filter;
+        let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
+        let fi = fields.iter().position(|f| f == "filter.slope").unwrap() as u16;
+        let button = item(&s, |i| i.id == Some(Id::SynthField(fi)));
+        assert!(matches!(button.kind, Kind::TwoState { selected: 0, .. }), "{:?}", button.kind);
+        // The right half: 24 dB, written as a number.
+        let [_, right] = crate::panel::two_state_halves(button.rect);
+        let (x, y) = center(right);
+        click(&mut s, x, y);
+        let preset = s.synths.presets.get("b").unwrap();
+        assert_eq!(model::number(preset.as_object().unwrap(), "filter.slope"), Some(24.0));
+        let button = item(&s, |i| i.id == Some(Id::SynthField(fi)));
+        assert!(matches!(button.kind, Kind::TwoState { selected: 1, .. }));
     }
 
     #[test]

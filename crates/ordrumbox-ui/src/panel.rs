@@ -328,6 +328,13 @@ pub enum Kind {
         labels: Vec<String>,
         selected: usize,
     },
+    /// A two-state button: its two options side by side, the selected one
+    /// lit; a click picks the half under it.
+    TwoState {
+        values: [String; 2],
+        labels: [String; 2],
+        selected: usize,
+    },
     /// A one-line display of a choice (the synth cartridge's screen): it
     /// opens its list as a [`Kind::Select`] does; dimmed when `lit` is off.
     Screen {
@@ -386,6 +393,22 @@ pub enum Kind {
     Mark {
         color: Rgb,
     },
+}
+
+impl Kind {
+    /// A choice of two options as a [`Kind::TwoState`]; any other count of
+    /// options as a [`Kind::Select`].
+    #[must_use]
+    pub fn two_state(values: Vec<String>, labels: Vec<String>, selected: usize) -> Self {
+        match (<[String; 2]>::try_from(values), <[String; 2]>::try_from(labels)) {
+            (Ok(values), Ok(labels)) => Self::TwoState { values, labels, selected },
+            (values, labels) => Self::Select {
+                values: values.map_or_else(|v| v, Vec::from),
+                labels: labels.map_or_else(|l| l, Vec::from),
+                selected,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -480,6 +503,19 @@ pub fn fader_bar(rect: Rect, scale: Scale) -> (i32, i32) {
 /// The parts of a stepper item (with a label): its minus button, its value,
 /// its plus button. Square buttons the row's height around a value as wide
 /// as a slider's; the same width whatever the value.
+/// The two halves of a [`Kind::TwoState`] button.
+#[must_use]
+pub fn two_state_halves(rect: Rect) -> [Rect; 2] {
+    let left = rect.w / 2;
+    [Rect::new(rect.x, rect.y, left, rect.h), Rect::new(rect.x + left, rect.y, rect.w - left, rect.h)]
+}
+
+/// Which half of a [`Kind::TwoState`] button `x` is over.
+#[must_use]
+pub fn two_state_half_at(rect: Rect, x: i32) -> usize {
+    usize::from(x >= two_state_halves(rect)[1].x)
+}
+
 pub fn stepper_parts(rect: Rect, labelled: bool, scale: Scale) -> [Rect; 3] {
     let left = rect.x + if labelled { label_width(scale) } else { 0 } + 4 * scale;
     let button = rect.h;
