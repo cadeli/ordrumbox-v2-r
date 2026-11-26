@@ -11,7 +11,8 @@ use ordrumbox_dsp::synth::FM_DEVIATION;
 use ordrumbox_dsp::synth::patch::LfoTarget;
 use ordrumbox_dsp::synth::patch::MATRIX_SIZE;
 
-use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES};
+use crate::synth_preset::{ATTACK_MAX, DECAY_MAX, LFO_FREQ_MAX, RELEASE_MAX};
+use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, NOISE_MODES, OSC_BYPASS_FLAGS, OSC2_SYNCS, WAVES};
 use crate::synth_preset::{PITCH_ENV_AMOUNT_RANGE, PITCH_ENV_DECAY_DEFAULT, PITCH_ENV_DECAY_RANGE};
 
 mod choices;
@@ -20,8 +21,10 @@ mod matrix_lines;
 pub use matrix_lines::*;
 mod preview;
 pub use preview::*;
+mod power;
+pub use power::*;
 /// A group's defaults (`SYNTH_GROUP_DEFAULTS`), in order.
-const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
+const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,
     "vco1":{"gain":1,"octave":0,"detune":0,"wave":"sine"},
     "vco2":{"gain":0,"octave":0,"detune":0,"wave":"sine"},
     "vco3":{"gain":0,"octave":0,"detune":0,"wave":"sine"},
@@ -39,8 +42,11 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
 /// Fields added since the first presets, shown last in their card and written
 /// only once set (absent, the engine's default applies): kept out of
 /// [`DEFAULTS`] so a hydrated preset keeps the keys it was written with.
-const EXTRA_FIELDS: [(&str, &str); 8] = [
+const EXTRA_FIELDS: [(&str, &str); 11] = [
     ("filter", "slope"),
+    ("vco1", "semitone"),
+    ("vco2", "semitone"),
+    ("vco3", "semitone"),
     ("vco1", "width"),
     ("vco2", "width"),
     ("vco2", "ring"),
@@ -83,10 +89,9 @@ const fn meta(path: &'static str, min: f64, max: f64, step: f64, unit: &'static 
 }
 
 /// Every numeric control, in the editor's order (the LFO targets follow it).
-pub const METAS: [Meta; 33] = [
+pub const METAS: [Meta; 32] = [
     meta("masterVolume", 0.0, 1.0, 0.01, ""),
-    meta("subGain", 0.0, 1.0, 0.01, ""),
-    meta("pitchPunch", 0.0, 1.0, 0.01, ""),
+    Meta { label: Some("Sub"), ..meta("subGain", 0.0, 1.0, 0.01, "") },
     meta("vco1.gain", 0.0, 1.0, 0.01, ""),
     meta("vco1.octave", -4.0, 4.0, 1.0, "oct"),
     meta("vco1.detune", -100.0, 100.0, 1.0, "ct"),
@@ -103,8 +108,8 @@ pub const METAS: [Meta; 33] = [
     meta("filter.Q", 0.1, 24.0, 0.1, ""),
     meta("filter.drive", 0.0, 1.0, 0.01, ""),
     Meta { label: Some("Env"), ..meta("filterEnv.filterEnvelopeAmount", 0.0, 1.0, 0.01, "") },
-    Meta { log: true, ..meta("lfo.freq", 0.01, 5.0, 0.01, "Hz") },
-    Meta { log: true, ..meta("lfo2.freq", 0.01, 5.0, 0.01, "Hz") },
+    Meta { log: true, ..meta("lfo.freq", LFO_FREQ_MIN, LFO_FREQ_MAX, 0.01, "Hz") },
+    Meta { log: true, ..meta("lfo2.freq", LFO_FREQ_MIN, LFO_FREQ_MAX, 0.01, "Hz") },
     meta("noise.mix", 0.0, 1.0, 0.01, ""),
     Meta {
         log: true,
@@ -116,17 +121,28 @@ pub const METAS: [Meta; 33] = [
     Meta { label: Some("Layers"), ..meta("unison.count", 1.0, ordrumbox_dsp::synth::MAX_UNISON as f64, 1.0, "") },
     meta("unison.detune", 0.0, 100.0, 1.0, "ct"),
     meta("unison.spread", 0.0, 1.0, 0.01, ""),
-    meta("envelope.attack", 0.0, 0.5, 0.001, "s"),
-    meta("envelope.decay", 0.0, 1.0, 0.001, "s"),
+    time("envelope.attack", ATTACK_MAX),
+    time("envelope.decay", DECAY_MAX),
     meta("envelope.sustain", 0.0, 1.0, 0.01, ""),
-    meta("envelope.release", 0.0, 0.5, 0.001, "s"),
-    meta("modEnvelope.attack", 0.0, 0.5, 0.001, "s"),
-    meta("modEnvelope.decay", 0.0, 1.0, 0.001, "s"),
+    time("envelope.release", RELEASE_MAX),
+    time("modEnvelope.attack", ATTACK_MAX),
+    time("modEnvelope.decay", DECAY_MAX),
     meta("modEnvelope.sustain", 0.0, 1.0, 0.01, ""),
 ];
 
-/// `modEnvelope.release` (`METAS` is full at 32).
-const MOD_RELEASE: Meta = meta("modEnvelope.release", 0.0, 0.5, 0.001, "s");
+/// `modEnvelope.release`.
+const MOD_RELEASE: Meta = time("modEnvelope.release", RELEASE_MAX);
+
+/// The slowest LFO a knob sets, Hz (0, which a preset may hold, is still).
+const LFO_FREQ_MIN: f64 = 0.01;
+/// The shortest time of an envelope a knob sets, seconds: its knob spans
+/// milliseconds to seconds, the shortest stage as fine as the longest.
+const TIME_MIN: f64 = 0.001;
+
+/// An envelope's time at `path`, up to `max` seconds, on a logarithmic knob.
+const fn time(path: &'static str, max: f64) -> Meta {
+    Meta { log: true, ..meta(path, TIME_MIN, max, 0.001, "s") }
+}
 
 /// The amount of each line of the matrix: either way, a fraction of what a
 /// full swing is worth on the target.
@@ -219,21 +235,8 @@ pub fn lfo_scale(target: &str) -> f64 {
     }
 }
 
-/// The cards' bypass flags (`CARD_BYPASS_FLAGS`).
-pub const BYPASS_FLAGS: [(&str, &str); 9] = [
-    ("noise", "bypassNoise"),
-    ("filter", "bypassFilter"),
-    ("filterEnv", "bypassFilterEnv"),
-    ("envelope", "bypassEnv"),
-    ("lfo", "bypassLfo1"),
-    ("lfo2", "bypassLfo2"),
-    ("fm", "bypassFm"),
-    ("modEnvelope", "bypassModEnv"),
-    ("pitchEnv", "bypassPitchEnv"),
-];
-
 /// The cards in order (`SYNTH_GROUP_ORDER`), and the master card's controls.
-pub const GROUP_ORDER: [&str; 16] = [
+pub const GROUP_ORDER: [&str; 15] = [
     "scope",
     "vco1",
     "vco2",
@@ -242,16 +245,39 @@ pub const GROUP_ORDER: [&str; 16] = [
     "fm",
     "noise",
     "filter",
-    "filterEnv",
     "envelope",
     "pitchEnv",
-    "master",
     "lfo",
     "lfo2",
     "modEnvelope",
     "matrix",
+    "master",
 ];
-pub const MASTER_KEYS: [&str; 3] = ["masterVolume", "subGain", "pitchPunch"];
+pub const MASTER_KEYS: [&str; 1] = ["masterVolume"];
+
+/// The keys of a preset that hold one number (each shown in a card: the
+/// master's, or one of [`BORROWED_FIELDS`]).
+const NUMBER_KEYS: [&str; 2] = ["masterVolume", "subGain"];
+
+/// The fields shown last in another card than their group's: the card, the
+/// field. The sub-oscillator, an octave under VCO1, in VCO1's strip; the
+/// filter envelope's amount (its times are the envelope's attack and decay)
+/// in the filter's card.
+pub const BORROWED_FIELDS: [(&str, &str); 2] = [("vco1", "subGain"), ("filter", "filterEnv.filterEnvelopeAmount")];
+
+/// The groups whose fields are all shown in another card: no card of their own.
+const FOLDED_GROUPS: [&str; 1] = ["filterEnv"];
+
+/// The fields of [`BORROWED_FIELDS`] that card `group` shows.
+pub fn borrowed_fields(group: &str) -> impl Iterator<Item = &'static str> + '_ {
+    BORROWED_FIELDS.iter().filter(move |(card, _)| *card == group).map(|(_, path)| *path)
+}
+
+/// The card that shows field `path`, when it is not its group's.
+#[must_use]
+pub fn borrowing_card(path: &str) -> Option<&'static str> {
+    BORROWED_FIELDS.iter().find(|(_, field)| *field == path).map(|(card, _)| *card)
+}
 
 /// A card's title (`SYNTH_GROUP_LABELS`).
 pub fn group_label(group: &str) -> String {
@@ -263,6 +289,7 @@ pub fn group_label(group: &str) -> String {
         "fm" => "FM".into(),
         "unison" => "Unison".into(),
         "lfo" => "LFO1".into(),
+        "lfo2" => "LFO2".into(),
         "matrix" => "Matrix".into(),
         "envelope" => "Envelope".into(),
         "modEnvelope" => "Mod Env".into(),
@@ -344,26 +371,15 @@ pub fn hydrate(draft: &mut Object) {
     }
 }
 
-/// Which cards show bypassed: an oscillator at gain
-/// 0, a card whose bypass flag is set.
-pub fn bypassed(draft: &Object, group: &str) -> bool {
-    if matches!(group, "vco1" | "vco2" | "vco3") {
-        return number(draft, &format!("{group}.gain")) == Some(0.0);
-    }
-    BYPASS_FLAGS.iter().find(|(g, _)| *g == group).is_some_and(|(_, flag)| draft.get(flag).is_some_and(Value::is_true))
-}
-
-/// Whether a card has a bypass state (the oscillators and the flagged cards).
-pub fn has_power(group: &str) -> bool {
-    matches!(group, "vco1" | "vco2" | "vco3") || BYPASS_FLAGS.iter().any(|(g, _)| *g == group)
-}
-
 /// The cards of `draft`, in order: the known ones,
 /// then any other group it has (not a bypass flag nor a tag), by name.
 pub fn groups(draft: &Object) -> Vec<String> {
     let mut groups: Vec<String> = GROUP_ORDER.iter().map(|g| (*g).to_owned()).collect();
     for (key, _) in draft.iter() {
-        let is_card = !MASTER_KEYS.contains(&key) && !TAG_KEYS.contains(&key) && !key.starts_with("bypass");
+        let is_card = !NUMBER_KEYS.contains(&key)
+            && !FOLDED_GROUPS.contains(&key)
+            && !TAG_KEYS.contains(&key)
+            && !key.starts_with("bypass");
         if is_card && !groups.iter().any(|g| g == key) {
             groups.push(key.to_owned());
         }
@@ -379,7 +395,7 @@ pub fn groups(draft: &Object) -> Vec<String> {
 }
 
 /// A card's fields: the master keys, a group's own
-/// keys known to its defaults, or the value itself.
+/// keys known to its defaults (then those it borrows), or the value itself.
 pub fn fields(draft: &Object, group: &str) -> Vec<String> {
     if group == "master" {
         return MASTER_KEYS.iter().map(|k| (*k).to_owned()).collect();
@@ -394,31 +410,9 @@ pub fn fields(draft: &Object, group: &str) -> Vec<String> {
             })
             .map(|(key, _)| format!("{group}.{key}"))
             .chain(EXTRA_FIELDS.iter().filter(|(g, _)| *g == group).map(|(g, key)| format!("{g}.{key}")))
+            .chain(borrowed_fields(group).map(str::to_owned))
             .collect(),
         _ => vec![group.to_owned()],
-    }
-}
-
-/// A card turned on or off by its power button: an
-/// oscillator keeps its gain aside and goes to 0 (and gets it back), a
-/// flagged card sets its flag (the envelope, turned on, is reset).
-pub fn toggle_card(draft: &mut Object, group: &str) {
-    let off = !bypassed(draft, group);
-    if matches!(group, "vco1" | "vco2" | "vco3") {
-        let Some(Value::Object(vco)) = draft.get_mut(group) else { return };
-        if off {
-            let gain = vco.get("gain").and_then(Value::as_f64).unwrap_or(0.0);
-            vco.insert("_savedGain", Value::from(gain));
-            vco.insert("gain", Value::from(0.0));
-        } else {
-            let saved = vco.remove("_savedGain").and_then(|v| v.as_f64());
-            vco.insert("gain", Value::from(saved.unwrap_or(if group == "vco1" { 1.0 } else { 0.0 })));
-        }
-    } else if let Some((_, flag)) = BYPASS_FLAGS.iter().find(|(g, _)| *g == group) {
-        draft.insert(*flag, Value::Bool(off));
-        if group == "envelope" && !off {
-            draft.insert("_resetEnv", Value::Bool(true));
-        }
     }
 }
 
@@ -433,10 +427,14 @@ pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
     if matches!(group, "vco2" | "vco3")
         && matches!(key, "octave" | "detune" | "wave" | "width" | "ring" | "sync")
         && gain(draft, group) == 0.0
+        && bypassed(draft, group)
     {
         if let Some(Value::Object(vco)) = draft.get_mut(group) {
-            vco.insert("gain", Value::from(0.5));
-            vco.remove("_savedGain");
+            vco.insert("gain", Value::from(IMPLICIT_GAIN));
+            vco.remove(SAVED_GAIN);
+        }
+        if let Some((_, flag)) = BYPASS_FLAGS.iter().find(|(g, _)| *g == group) {
+            draft.insert(*flag, Value::Bool(false));
         }
         changed.push(format!("{group}.gain"));
     } else if group == "fm" && key == "algo" && number(draft, "fm.amount").unwrap_or(0.0) == 0.0 {
@@ -525,30 +523,6 @@ fn add_route(draft: &mut Object, source: &str, target: &str, amount: f64) -> Vec
     ["source", "target", "amount"].map(|name| format!("matrix.{name}{n}")).into()
 }
 
-/// The module pills under the cards: label, active.
-pub fn modules(draft: &Object) -> Vec<(&'static str, bool)> {
-    let n = |path: &str| number(draft, path).unwrap_or(0.0);
-    let flag = |key: &str| draft.get(key).is_some_and(Value::is_true);
-    let gain = |v: usize| number(draft, &format!("vco{v}.gain")).unwrap_or(if v == 1 { 1.0 } else { 0.0 });
-    let env_amount = number(draft, "filterEnv.filterEnvelopeAmount")
-        .or_else(|| number(draft, "filter.filterEnvelopeAmount"))
-        .unwrap_or(0.0);
-    vec![
-        ("VCO1", gain(1) > 0.01),
-        ("VCO2", gain(2) > 0.01),
-        ("VCO3", gain(3) > 0.01),
-        ("Filter", !flag("bypassFilter")),
-        ("Envelope", !flag("bypassEnv")),
-        ("LFO1", !flag("bypassLfo1") && is_routed(draft, "lfo1")),
-        ("LFO2", !flag("bypassLfo2") && is_routed(draft, "lfo2")),
-        ("FM", !flag("bypassFm") && n("fm.amount") > 0.001),
-        ("Mod", !flag("bypassModEnv") && is_routed(draft, MOD_ENV_SOURCE)),
-        ("Noise", !flag("bypassNoise") && n("noise.mix") > 0.001),
-        ("Filter Env", !flag("bypassFilterEnv") && env_amount > 0.001),
-        ("Pitch Env", !flag("bypassPitchEnv") && n("pitchEnv.amount") != 0.0),
-    ]
-}
-
 /// The name of the first free `new_preset`, `new_preset_1`….
 pub fn new_preset_name(keys: &[&str]) -> String {
     let mut name = "new_preset".to_owned();
@@ -602,15 +576,41 @@ mod tests {
         );
         assert_eq!(text(&d, "matrix.target3"), Some("filter.open"));
         assert!(implicit_enable(&mut d, "vco1.wave").is_empty());
-        // Power: an oscillator keeps its gain aside.
+        // Power: an oscillator keeps its gain, under its flag.
         toggle_card(&mut d, "vco2");
         assert!(bypassed(&d, "vco2"));
+        assert_eq!((number(&d, "vco2.gain"), d.get("bypassVco2")), (Some(0.5), Some(&Value::Bool(true))));
         toggle_card(&mut d, "vco2");
-        assert_eq!(number(&d, "vco2.gain"), Some(0.5));
+        assert!(!bypassed(&d, "vco2"));
+        // Silent, an oscillator is off unless it modulates; turned on, it gets a gain.
+        assert!(bypassed(&d, "vco3"));
+        set(&mut d, "fm.algo", Value::from(1.0));
+        assert!(!bypassed(&d, "vco3"), "VCO3 modulates VCO1");
+        set(&mut d, "fm.algo", Value::from(0.0));
+        toggle_card(&mut d, "vco3");
+        assert_eq!(number(&d, "vco3.gain"), Some(IMPLICIT_GAIN));
+        // An LFO at 0 Hz is off; turned on, it moves.
+        assert!(bypassed(&d, "lfo2"));
+        set(&mut d, "lfo2.sync", Value::from("1/4"));
+        assert!(!bypassed(&d, "lfo2"), "synced, it moves");
+        set(&mut d, "lfo2.sync", Value::from("off"));
+        toggle_card(&mut d, "lfo2");
+        assert_eq!((bypassed(&d, "lfo2"), number(&d, "lfo2.freq")), (false, Some(LFO_ON_HZ)));
         toggle_card(&mut d, "envelope");
         assert!(bypassed(&d, "envelope"));
         toggle_card(&mut d, "envelope");
         assert_eq!(d.get("_resetEnv"), Some(&Value::Bool(true)));
+    }
+
+    #[test]
+    fn the_sub_and_the_filter_env_show_in_other_cards() {
+        let d = defaults();
+        let groups = groups(&d);
+        assert!(!groups.iter().any(|g| ["filterEnv", "subGain"].contains(&g.as_str())), "{groups:?}");
+        assert_eq!(fields(&d, "master"), ["masterVolume"]);
+        assert_eq!(fields(&d, "vco1").last().map(String::as_str), Some("subGain"));
+        assert_eq!(fields(&d, "filter").last().map(String::as_str), Some("filterEnv.filterEnvelopeAmount"));
+        assert_eq!(borrowing_card("subGain"), Some("vco1"));
     }
 
     #[test]
@@ -655,9 +655,5 @@ mod tests {
         let at = |f: f64| (200.0 * (f / 20.0f64).log10() / 3.0).round() as usize;
         let steep = filter_response("lowpass", 1000.0, std::f64::consts::FRAC_1_SQRT_2, 24.0, 200);
         assert!((steep[at(1000.0)] + 3.0).abs() < 0.5 && steep[at(2000.0)] < -23.0, "{}", steep[at(2000.0)]);
-        assert_eq!(
-            modules(&defaults()).iter().filter(|(_, on)| *on).map(|(l, _)| *l).collect::<Vec<_>>(),
-            ["VCO1", "Filter", "Envelope"]
-        );
     }
 }

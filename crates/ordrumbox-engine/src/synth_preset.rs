@@ -40,13 +40,21 @@ pub const OSC2_SYNCS: [&str; 2] = ["off", "vco1"];
 /// The pitch envelope's offset, semitones, and its decay, seconds: their ranges.
 pub const PITCH_ENV_AMOUNT_RANGE: (f64, f64) = (-MAX_PITCH_ENV_SEMITONES, MAX_PITCH_ENV_SEMITONES);
 pub const PITCH_ENV_DECAY_RANGE: (f64, f64) = (0.005, 1.0);
+/// The longest attack, decay and release of an envelope, seconds.
+pub const ATTACK_MAX: f64 = 2.0;
+pub const DECAY_MAX: f64 = 4.0;
+pub const RELEASE_MAX: f64 = 4.0;
+/// The fastest LFO, Hz.
+pub const LFO_FREQ_MAX: f64 = 100.0;
+/// The semitones an oscillator is tuned by, on top of its octave.
+pub const SEMITONE_RANGE: (f64, f64) = (-12.0, 12.0);
 /// The decay of a preset's pitch envelope when it gives none, seconds.
 pub const PITCH_ENV_DECAY_DEFAULT: f64 = 0.05;
 /// What a line of a preset's `matrix` reads, by code.
 pub const MATRIX_SOURCES: [&str; 8] = ["off", "lfo1", "lfo2", "env", "modEnv", "velocity", "key", "random"];
 /// The LFO targets by their name in a preset (two names for the filter envelope amount;
 /// older names: [`legacy_modulation`]).
-const LFO_TARGETS: [(&str, LfoTarget); 42] = [
+const LFO_TARGETS: [(&str, LfoTarget); 41] = [
     ("NOT", LfoTarget::Off),
     ("masterVolume", LfoTarget::Volume),
     ("vco1.gain", LfoTarget::Osc1Gain),
@@ -64,7 +72,6 @@ const LFO_TARGETS: [(&str, LfoTarget); 42] = [
     ("filter.Q", LfoTarget::FilterQ),
     ("noise.mix", LfoTarget::NoiseMix),
     ("subGain", LfoTarget::SubGain),
-    ("pitchPunch", LfoTarget::PitchPunch),
     ("filter.drive", LfoTarget::Drive),
     ("noise.filterFreq", LfoTarget::NoiseFilterFreq),
     ("noise.filterQ", LfoTarget::NoiseFilterQ),
@@ -211,7 +218,8 @@ const PRESET_GROUPS: [&str; 14] = [
     "lfo2",
     "matrix",
 ];
-/// The keys of a preset that hold one number.
+/// The keys of a preset that hold one number (`pitchPunch`: an older one,
+/// read as the pitch envelope).
 const PRESET_NUMBERS: [&str; 3] = ["pitchPunch", "subGain", "masterVolume"];
 
 /// Report group `value` of a preset at `at` when it is not an object, or a
@@ -317,14 +325,16 @@ fn peak_velocity(preset: &Value, gains: [f64; 3], velocity: f64) -> f64 {
     note_velo * master_volume * accent * SYNTH_TRIM
 }
 
-/// The frequency of each oscillator at `note_ratio` (1 is C3); 0 for a missing one.
+/// The frequency of each oscillator at `note_ratio` (1 is C3), its octave
+/// and semitones added; 0 for a missing one.
 fn osc_frequencies(vcos: [Option<&Value>; 3], note_ratio: f64) -> [f64; 3] {
     vcos.map(|vco| {
         if !vco.is_some_and(|v| v.as_object().is_some()) {
             return 0.0;
         }
         let octave = clamp(finite(get(vco, "octave"), 0.0), -4.0, 4.0);
-        C3_FREQ * note_ratio.max(MIN_NOTE_RATIO) * 2.0_f64.powf(octave + 0.0)
+        let semitones = clamp(finite(get(vco, "semitone"), 0.0), SEMITONE_RANGE.0, SEMITONE_RANGE.1);
+        C3_FREQ * note_ratio.max(MIN_NOTE_RATIO) * 2.0_f64.powf(octave + semitones / 12.0)
     })
 }
 
@@ -332,12 +342,15 @@ fn osc_frequencies(vcos: [Option<&Value>; 3], note_ratio: f64) -> [f64; 3] {
 /// and release.
 fn adsr(env: Option<&Value>, sustain: f64) -> Adsr {
     Adsr {
-        attack: clamp(finite(get(env, "attack"), 0.01), 0.003, 0.5),
-        decay: finite(get(env, "decay"), 0.1).min(1.0),
+        attack: clamp(finite(get(env, "attack"), 0.01), 0.003, ATTACK_MAX),
+        decay: finite(get(env, "decay"), 0.1).min(DECAY_MAX),
         sustain: finite(get(env, "sustain"), sustain),
-        release: clamp(finite(get(env, "release"), 0.1), 0.008, 0.5),
+        release: clamp(finite(get(env, "release"), 0.1), 0.008, RELEASE_MAX),
     }
 }
+
+/// The flag that switches each oscillator off.
+pub const OSC_BYPASS_FLAGS: [&str; 3] = ["bypassVco1", "bypassVco2", "bypassVco3"];
 
 /// Which modules of the preset are bypassed.
 fn bypass_flags(preset: &Value) -> SynthBypass {
@@ -351,6 +364,7 @@ fn bypass_flags(preset: &Value) -> SynthBypass {
         fm: flag("bypassFm"),
         mod_env: flag("bypassModEnv"),
         filter_env: flag("bypassFilterEnv"),
+        osc: OSC_BYPASS_FLAGS.map(flag),
     }
 }
 
@@ -383,7 +397,9 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let note_ratio = finite(Some(&Value::Number(note.ratio)), 1.0).max(MIN_NOTE_RATIO);
 
     let vcos = [at("vco1"), at("vco2"), at("vco3")];
-    let gains = vcos.map(|vco| level(get(vco, "gain"), 0.0));
+    let bypass = bypass_flags(preset);
+    // Switched off, an oscillator counts for nothing in the mix.
+    let gains = std::array::from_fn(|n| if bypass.osc[n] { 0.0 } else { level(get(vcos[n], "gain"), 0.0) });
     let peak = peak_velocity(preset, gains, note.velocity);
 
     let osc_freq = osc_frequencies(vcos, note_ratio);
@@ -394,6 +410,8 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let mod_env = at("modEnvelope");
     let fm = at("fm");
     let unison = at("unison");
+    // Bypassed, the pitch envelope moves nothing.
+    let is_pitch_bypassed = at("bypassPitchEnv").is_some_and(Value::is_true);
 
     SynthPatch {
         osc_freq,
@@ -414,9 +432,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         filter_q: finite(get(filter, "Q"), 0.7),
         filter_slope: finite(get(filter, "slope"), 12.0),
         drive: finite(get(filter, "drive"), 0.0),
-        pitch_punch: finite(at("pitchPunch"), 0.0),
-        // Bypassed, the pitch envelope moves nothing.
-        pitch_env: if at("bypassPitchEnv").is_some_and(Value::is_true) {
+        pitch_env: if is_pitch_bypassed {
             PitchEnv { amount: 0.0, ..pitch_env(at("pitchEnv")) }
         } else {
             pitch_env(at("pitchEnv"))
@@ -439,7 +455,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         note_velocity: clamp(finite(Some(&Value::Number(note.velocity)), 0.0), 0.0, 1.0),
         // Two octaves each way fill the source: ratio 1 is C3.
         note_key: clamp(note_ratio.log2() / 2.0, -1.0, 1.0),
-        bypass: bypass_flags(preset),
+        bypass,
     }
 }
 
@@ -515,7 +531,7 @@ mod tests {
         let plain = synth_patch(&json::parse(r#"{"vco2":{"sync":"nope"}}"#).unwrap(), note);
         assert_eq!(plain.pitch_env, PitchEnv { amount: 0.0, decay: PITCH_ENV_DECAY_DEFAULT });
         assert_eq!((plain.ring, plain.is_osc2_synced), (0.0, false));
-        // Bypassed: no swing, the decay kept for when it is switched back on.
+        // Bypassed: no swing nor punch, the decay kept for when it is switched back on.
         let preset = r#"{"pitchEnv":{"amount":12,"decay":0.2},"bypassPitchEnv":true}"#;
         let bypassed = synth_patch(&json::parse(preset).unwrap(), note);
         assert_eq!(bypassed.pitch_env, PitchEnv { amount: 0.0, decay: 0.2 });

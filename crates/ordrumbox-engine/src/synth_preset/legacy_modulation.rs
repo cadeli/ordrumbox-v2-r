@@ -1,6 +1,7 @@
 //! What older presets hold of the modulation, read as today's: the targets
 //! they name the old way, each LFO's own target and depth, and the
-//! modulation envelope's target, now lines of the matrix.
+//! modulation envelope's target, now lines of the matrix; and the pitch
+//! punch, now the pitch envelope.
 //!
 //! `FLT` is `filter.freq`, and `VCO1` to `VCO3` (a pitch swing of 1000 cents)
 //! are the oscillator's octave (1200 cents) at the same swing.
@@ -17,12 +18,23 @@ const PITCH_SHARE: f64 = 1000.0 / 1200.0;
 
 /// Each older name, the target it is read as, and the share of a depth or an
 /// amount that keeps its swing there.
-const LEGACY_TARGETS: [(&str, &str, f64); 4] = [
+const LEGACY_TARGETS: [(&str, &str, f64); 5] = [
     ("FLT", "filter.freq", 1.0),
+    // A full punch and a full swing of the envelope's offset: 24 semitones each.
+    (PUNCH, "pitchEnv.amount", 1.0),
     ("VCO1", "vco1.octave", PITCH_SHARE),
     ("VCO2", "vco2.octave", PITCH_SHARE),
     ("VCO3", "vco3.octave", PITCH_SHARE),
 ];
+
+/// The pitch punch: a rise of up to 24 semitones at the start of a note,
+/// falling back to the note in 60 ms.
+const PUNCH: &str = "pitchPunch";
+/// The semitones of a full punch.
+const PUNCH_SEMITONES: f64 = 24.0;
+/// The decay of the pitch envelope a punch becomes: as many cents over time
+/// as the punch's straight fall (an exponential one, to a hundredth).
+const PUNCH_DECAY_SECONDS: f64 = 0.14;
 
 /// Each LFO group of a preset and the matrix source it is.
 const LFO_SOURCES: [(&str, &str); 2] = [("lfo", "lfo1"), ("lfo2", "lfo2")];
@@ -48,7 +60,10 @@ fn is_older(preset: &Object) -> bool {
         (1..=MATRIX_SIZE).any(|n| matrix.get(&format!("target{n}")).and_then(Value::as_str).and_then(renamed).is_some())
     });
     let has_mod_env_target = group("modEnvelope").is_some_and(|env| env.get("target").is_some());
-    LFO_SOURCES.iter().any(|(key, _)| has_route(key)) || has_older_name || has_mod_env_target
+    LFO_SOURCES.iter().any(|(key, _)| has_route(key))
+        || has_older_name
+        || has_mod_env_target
+        || preset.get(PUNCH).is_some()
 }
 
 /// `preset` as today's presets are, copied only when it is older.
@@ -68,8 +83,10 @@ pub fn upgraded(preset: &Value) -> Cow<'_, Value> {
 /// renamed (their depth or amount scaled), and each LFO's own target and
 /// depth, and the modulation envelope's target, moved to the first free
 /// lines of the matrix. A target that finds no free line stays, unplayed
-/// ([`stranded`]).
+/// ([`stranded`]). The pitch punch becomes the pitch envelope, close to its
+/// sound, when that one moves nothing; otherwise it goes.
 pub fn upgrade(preset: &mut Object) {
+    upgrade_punch(preset);
     if let Some(Value::Object(matrix)) = preset.get_mut("matrix") {
         for n in 1..=MATRIX_SIZE {
             rename_target(matrix, &format!("target{n}"), &format!("amount{n}"));
@@ -94,6 +111,30 @@ pub fn upgrade(preset: &mut Object) {
         }
     }
     upgrade_mod_env(preset);
+}
+
+/// The pitch punch of `preset`, taken out, as its pitch envelope when that
+/// one has no offset.
+fn upgrade_punch(preset: &mut Object) {
+    let Some(punch) = preset.remove(PUNCH).and_then(|v| v.to_number()).filter(|p| p.is_finite() && *p > 0.0) else {
+        return;
+    };
+    // To a hundredth of a semitone: 0.15 of 24 is 3.6, not 3.5999999999999996.
+    let semitones = (punch.min(1.0) * PUNCH_SEMITONES * 100.0).round() / 100.0;
+    match preset.get_mut("pitchEnv") {
+        Some(Value::Object(env)) => {
+            if env.get("amount").and_then(Value::to_number).is_none_or(|amount| amount == 0.0) {
+                env.insert("amount", Value::from(semitones));
+                env.insert("decay", Value::from(PUNCH_DECAY_SECONDS));
+            }
+        }
+        _ => {
+            let mut env = Object::default();
+            env.insert("amount", Value::from(semitones));
+            env.insert("decay", Value::from(PUNCH_DECAY_SECONDS));
+            preset.insert("pitchEnv", Value::Object(env));
+        }
+    }
 }
 
 /// Move the modulation envelope's target of `preset` to a line `modEnv` at 1.
@@ -178,6 +219,26 @@ mod tests {
 
     fn at(preset: &Object, group: &str, key: &str) -> Option<Value> {
         preset.get(group).and_then(|g| g.as_object()?.get(key).cloned())
+    }
+
+    #[test]
+    fn the_punch_becomes_the_pitch_envelope_when_that_one_moves_nothing() {
+        let mut punched = object(r#"{"pitchPunch":0.5,"pitchEnv":{"amount":0,"decay":0.05}}"#);
+        upgrade(&mut punched);
+        assert_eq!(punched.get(PUNCH), None);
+        assert_eq!(at(&punched, "pitchEnv", "amount"), Some(Value::from(12.0)));
+        assert_eq!(at(&punched, "pitchEnv", "decay"), Some(Value::from(PUNCH_DECAY_SECONDS)));
+        let mut bare = object(r#"{"pitchPunch":1}"#);
+        upgrade(&mut bare);
+        assert_eq!(at(&bare, "pitchEnv", "amount"), Some(Value::from(24.0)));
+        // An envelope that moves keeps its offset; the punch goes.
+        let mut both = object(r#"{"pitchPunch":0.5,"pitchEnv":{"amount":-7,"decay":0.2}}"#);
+        assert!(is_older(&both));
+        upgrade(&mut both);
+        assert_eq!((at(&both, "pitchEnv", "amount"), both.get(PUNCH)), (Some(Value::from(-7.0)), None));
+        let mut routed = object(r#"{"matrix":{"source1":"lfo1","target1":"pitchPunch","amount1":0.3}}"#);
+        upgrade(&mut routed);
+        assert_eq!(at(&routed, "matrix", "target1"), Some(Value::from("pitchEnv.amount")));
     }
 
     #[test]

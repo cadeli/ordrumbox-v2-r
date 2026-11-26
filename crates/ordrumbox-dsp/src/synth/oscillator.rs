@@ -57,6 +57,13 @@ const FM_ROUTINGS: [[[f64; 3]; 2]; 5] = [
     [[0.0, 1.0, 0.0], [1.0, 0.0, 0.0]],
 ];
 
+/// Which oscillators modulate another under FM `algorithm` (0 to 4).
+#[must_use]
+pub fn fm_modulators(algorithm: usize) -> [bool; 3] {
+    let [to_1, to_2] = FM_ROUTINGS[algorithm.min(FM_ROUTINGS.len() - 1)];
+    std::array::from_fn(|n| to_1[n] != 0.0 || to_2[n] != 0.0)
+}
+
 /// Initial noise state of the note numbered `serial`: every note has its own,
 /// the same from one render to the next. A xorshift never leaves a state of 0.
 pub(super) fn noise_seed(serial: u64) -> u32 {

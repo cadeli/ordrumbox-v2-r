@@ -1,13 +1,13 @@
 //! An oscillator of the synth editor as a strip, the three of them one
 //! under the other in one card: its power LED and title on
 //! the left, then its controls in one row, each over its label — the wave
-//! on a spin that draws it, the octave on a spin, the knobs (their values
+//! on a spin that draws it, the octave and the semitones on spins, the knobs (their values
 //! said in their tooltip, not on the card, for a lower strip), oscillator
 //! 2's sync LED. A control an oscillator lacks leaves no gap.
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
-use ordrumbox_engine::synth_preset::WAVES;
+use ordrumbox_engine::synth_preset::{SEMITONE_RANGE, WAVES};
 
 use crate::panel::{Id, Item, Kind};
 use crate::scale::Scale;
@@ -15,7 +15,7 @@ use crate::synth_cells::{Cell, Place, QUIET_H, push_head, push_row, value_tip};
 use crate::synth_view::knob_kind;
 
 /// The width of the title, left of the controls (at scale 1).
-const TITLE_W: i32 = 64;
+const TITLE_W: i32 = 48;
 /// The space between two strips of the oscillators' card (at scale 1).
 pub const STRIP_GAP: i32 = 4;
 /// The waves' names in the list a spin opens.
@@ -25,9 +25,10 @@ const WAVE_POINTS: usize = 48;
 
 /// A strip's controls in order: the key of the field, the label under it,
 /// its name in its tooltip.
-const CELLS: [(&str, &str, &str); 7] = [
+const CELLS: [(&str, &str, &str); 8] = [
     ("wave", "Wave", "Wave"),
     ("octave", "Oct", "Octave"),
+    ("semitone", "Semi", "Semitone"),
     ("detune", "Cent", "Detune"),
     ("width", "Width", "Width"),
     ("gain", "Gain", "Gain"),
@@ -60,13 +61,23 @@ fn push_strip(
         let id = Id::SynthField(fi as u16);
         let kind = match *key {
             "wave" => wave_spin(draft, &path),
-            "octave" => octave_spin(draft, &path),
+            "octave" => {
+                let range = model::find_meta(&path).map_or((-4.0, 4.0), |m| (m.min, m.max));
+                whole_spin(draft, &path, range)
+            }
+            "semitone" => whole_spin(draft, &path, SEMITONE_RANGE),
             "sync" => Kind::Led { on: model::is_osc2_synced(draft) },
             _ => quiet_knob(draft, &path, lfo),
         };
         Some(Cell { id, kind, label: (*label).to_owned(), place: Place::Beside })
     });
-    push_row(items, cells, (x + TITLE_W * s, top), QUIET_H, s)
+    // The fields of other groups the strip shows (VCO1's sub-oscillator), last.
+    let borrowed = model::borrowed_fields(group).filter_map(|path| {
+        let fi = fields.iter().position(|f| f == path)?;
+        let label = model::find_meta(path).and_then(|m| m.label).unwrap_or(path).to_owned();
+        Some(Cell { id: Id::SynthField(fi as u16), kind: quiet_knob(draft, path, lfo), label, place: Place::Beside })
+    });
+    push_row(items, cells.chain(borrowed), (x + TITLE_W * s, top), QUIET_H, s)
 }
 
 /// The knob of field `path`, with no value written under it: its tooltip says it.
@@ -77,10 +88,10 @@ fn quiet_knob(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option<f64>) -> 
     }
 }
 
-/// The octave of `path` on a spin, ▲▼ through its whole octaves, signed.
-fn octave_spin(draft: &Object, path: &str) -> Kind {
-    let (min, max) = model::find_meta(path).map_or((-4.0, 4.0), |m| (m.min, m.max));
-    // Whole octaves, the range of a preset's octave: saturating is meant.
+/// The whole number at `path` (an octave, semitones) on a spin, ▲▼ through
+/// `min` to `max`, signed.
+fn whole_spin(draft: &Object, path: &str, (min, max): (f64, f64)) -> Kind {
+    // Whole numbers, the range of a preset's value: saturating is meant.
     let (low, high) = (min.round() as i32, max.round() as i32);
     let current = model::number(draft, path).unwrap_or(0.0).round().clamp(min, max) as i32;
     let values = (low..=high).map(|o| o.to_string()).collect();
@@ -92,8 +103,12 @@ fn octave_spin(draft: &Object, path: &str) -> Kind {
 /// name, then its value; none for a control that shows its value.
 #[must_use]
 pub fn tip(draft: &Object, path: &str) -> Option<[String; 2]> {
+    if let Some(card) = model::borrowing_card(path) {
+        let name = model::find_meta(path).and_then(|m| m.label)?;
+        return is_strip(card).then(|| value_tip(draft, (card, path), name)).flatten();
+    }
     let (group, key) = path.split_once('.')?;
-    if !is_strip(group) || matches!(key, "wave" | "octave" | "sync") {
+    if !is_strip(group) || matches!(key, "wave" | "octave" | "semitone" | "sync") {
         return None;
     }
     let (.., name) = CELLS.iter().find(|(k, ..)| *k == key)?;
@@ -178,7 +193,9 @@ mod tests {
     fn the_octave_is_a_spin_and_the_knobs_say_their_value_in_their_tooltip() {
         let mut d = draft();
         model::set(&mut d, "vco2.octave", Value::from(-2.0));
-        let Kind::Spin { values, labels, selected, .. } = octave_spin(&d, "vco2.octave") else { panic!("a spin") };
+        let Kind::Spin { values, labels, selected, .. } = whole_spin(&d, "vco2.octave", (-4.0, 4.0)) else {
+            panic!("a spin")
+        };
         assert_eq!(values.first().map(String::as_str), Some("-4"));
         assert_eq!(labels.last().map(String::as_str), Some("+4"));
         assert_eq!(values[selected], "-2");

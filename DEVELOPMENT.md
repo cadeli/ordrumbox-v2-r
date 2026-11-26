@@ -235,6 +235,38 @@ the filter slopes have labels that fit: `Wht`, `Long`, `Shrt`, `12dB`, `24dB`). 
 The pitch envelope's card has a power LED: a preset's `bypassPitchEnv` (new, read only when true) plays it with no
 swing, its decay kept. A preset without it plays as before. No snapshot changed.
 
+The synth editor shows the master card last, after the matrix, and no longer draws the pills of the modules in
+use under the cards (`synth_model::modules` is gone); the cards take the room they left. The master card holds
+the volume only: the sub-oscillator is a knob of VCO1's strip, the filter envelope's amount a knob of the filter's
+card (the Filter Env card is gone: its times were the envelope's; `BORROWED_FIELDS`, `synth_model.rs`). The
+second LFO's card is titled LFO2 (it read `lfo2`). Knobs that only say their value in their tooltip (the
+oscillators' strips) are 44 px wide, not 64, and a strip's title 48, not 64, so that the cards fit the smallest
+window.
+
+The pitch punch is gone (`SynthPatch::pitch_punch`, `LfoTarget::PitchPunch`): it did what the pitch envelope
+does. A preset's `pitchPunch` is read as its pitch envelope, an amount of 24 semitones at 1 (to a hundredth) and a
+decay of 0.14 s, when that envelope has no amount; otherwise it is dropped; a matrix line on `pitchPunch` moves
+`pitchEnv.amount` at the same amount (`legacy_modulation.rs`). The 29 factory presets that set one sound
+different, the 11 with a pitch envelope of their own lose it.
+
+Each oscillator has a power flag, `bypassVco1` to `bypassVco3` (read only when true): switched off, it is not
+heard and modulates nothing (FM, VCO2's ring, VCO1's sub-oscillator), whatever the matrix does
+(`SynthBypass::osc`). Its power button sets the flag and keeps the gain; before, it set the gain to 0 (keeping it
+in `_savedGain`), which left the oscillator modulating in FM. A card shows off when its oscillator is silent and
+modulates nothing, or for an LFO at 0 Hz; turning it on gives it a gain (the one kept in `_savedGain`, else 1 for
+VCO1 and 0.5 for the others) or a rate of 1 Hz. No factory preset sets a flag: their sound is unchanged by it.
+
+An oscillator has semitones on top of its octave, `vcoN.semitone` (−12 to +12, a spin of its strip, written once
+set). The envelopes reach 2 s of attack and 4 s of decay and release (they stopped at 0.5, 1 and 0.5 s, which
+cut the pads and pianos of the factory presets that ask for more), on logarithmic knobs from 1 ms; the LFOs reach
+100 Hz (5, which the knob could not pass while presets asked for up to 70). A pulse width under another wave than
+the square, and the noise's rate in white noise, are greyed out (`synth_model::is_inert`). The FM algorithm's spin
+shows its routing (`2→1`…`2↔1`, spelled out in its tooltip), not 1 to 5.
+
+These rewrote `synth_renders.bin` (dsp: its cases lost their punch, two matrix lines on it moved to the pitch
+envelope), `mapping_rust.txt`, `pattern_renders.bin` (`synth_and_effects` plays `BASS0`, which had a punch) and
+`synth_editor_rust.txt` (engine). The effect renders are unchanged.
+
 A double-click on a track's name in the grid opens the piano roll on that track (`press_track_name`,
 `session_grid.rs`); a single press still selects the track and may drag it. No snapshot changed.
 

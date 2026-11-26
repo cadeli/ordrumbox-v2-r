@@ -24,7 +24,6 @@ pub enum LfoTarget {
     FilterQ,
     NoiseMix,
     SubGain,
-    PitchPunch,
     Drive,
     NoiseFilterFreq,
     NoiseFilterQ,
@@ -61,7 +60,7 @@ pub enum LfoTarget {
 
 impl LfoTarget {
     /// Every target, each at its code.
-    pub const ALL: [Self; 41] = [
+    pub const ALL: [Self; 40] = [
         Self::Off,
         Self::Volume,
         Self::Osc1Gain,
@@ -78,7 +77,6 @@ impl LfoTarget {
         Self::FilterQ,
         Self::NoiseMix,
         Self::SubGain,
-        Self::PitchPunch,
         Self::Drive,
         Self::NoiseFilterFreq,
         Self::NoiseFilterQ,
@@ -225,6 +223,9 @@ pub struct SynthBypass {
     pub fm: bool,
     pub mod_env: bool,
     pub filter_env: bool,
+    /// Each oscillator switched off: not heard, and modulating nothing (FM,
+    /// ring; oscillator 1 its sub-oscillator too), whatever the matrix does.
+    pub osc: [bool; 3],
 }
 
 /// Everything one note plays with.
@@ -256,7 +257,6 @@ pub struct SynthPatch {
     /// dB per octave: 12, or 24 (two filter stages).
     pub filter_slope: f64,
     pub drive: f64,
-    pub pitch_punch: f64,
     pub pitch_env: PitchEnv,
     pub sub_gain: f64,
     pub envelope: Adsr,
@@ -311,7 +311,6 @@ impl Default for SynthPatch {
             filter_q: 0.7,
             filter_slope: 12.0,
             drive: 0.0,
-            pitch_punch: 0.0,
             pitch_env: PitchEnv { amount: 0.0, decay: 0.05 },
             sub_gain: 0.0,
             envelope: Adsr { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.1 },

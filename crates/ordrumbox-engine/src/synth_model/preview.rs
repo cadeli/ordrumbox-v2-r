@@ -6,7 +6,9 @@ use ordrumbox_core::lfo;
 use ordrumbox_core::num::gain_to_db;
 use ordrumbox_dsp::synth::ring;
 
-use super::{EXTRA_METAS, FM_DEVIATION, LFOS, WAVES, is_osc2_synced, lfo_scale, number, routes_of, slope, text};
+use super::{
+    EXTRA_METAS, FM_DEVIATION, LFOS, OSC_BYPASS_FLAGS, WAVES, is_osc2_synced, lfo_scale, number, routes_of, slope, text,
+};
 
 /// The LFOs playing (not bypassed), each with the matrix source it is.
 fn playing_lfos(draft: &Object) -> impl Iterator<Item = (&Object, &'static str)> {
@@ -131,7 +133,7 @@ fn fm_increments(algo: i64, inc: [f64; 3], (depth1, depth2): (f64, f64), wave: i
 }
 
 /// Points of the scope: four cycles of the three
-/// oscillators with their gains, octaves, detunes, FM, the sync and ring
+/// oscillators (those switched on) with their gains, octaves, semitones, detunes, FM, the sync and ring
 /// modulation of oscillator 2, and sub, the drive's
 /// saturation, scaled to the master volume. `time`: when (the LFOs).
 pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
@@ -140,25 +142,31 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     let waves: Vec<String> =
         (1..=3).map(|n| text(draft, &format!("vco{n}.wave")).unwrap_or("sine").to_owned()).collect();
     let modded = |path: &str| lfo_mod_on(draft, path, time, bpm);
+    let is_off = OSC_BYPASS_FLAGS.map(|flag| draft.get(flag).is_some_and(Value::is_true));
     let (width_min, width_max) = (EXTRA_METAS[0].min, EXTRA_METAS[0].max);
     let width: Vec<f64> = (1..=3)
         .map(|n| (vco(n, "width", 0.5) + modded(&format!("vco{n}.width"))).clamp(width_min, width_max))
         .collect();
     let ratio: Vec<f64> = (1..=3)
         .map(|n| {
-            let octave = vco(n, "octave", 0.0) + modded(&format!("vco{n}.octave"));
+            let octave = vco(n, "octave", 0.0) + modded(&format!("vco{n}.octave")) + vco(n, "semitone", 0.0) / 12.0;
             let detune = vco(n, "detune", 0.0) + modded(&format!("vco{n}.detune"));
             octave.exp2() * (detune / 1200.0).exp2()
         })
         .collect();
     let gain: Vec<f64> = (1..=3)
         .map(|n| (vco(n, "gain", if n == 1 { 1.0 } else { 0.0 }) + modded(&format!("vco{n}.gain"))).clamp(0.0, 1.0))
+        .zip(is_off)
+        .map(|(gain, is_off)| if is_off { 0.0 } else { gain })
         .collect();
-    let ring_amount = (number(draft, "vco2.ring").unwrap_or(0.0) + modded("vco2.ring")).clamp(0.0, 1.0);
+    // Oscillator 1 switched off takes its ring modulation and its sub-oscillator with it.
+    let osc1_share = if is_off[0] { 0.0 } else { 1.0 };
+    let ring_amount = osc1_share * (number(draft, "vco2.ring").unwrap_or(0.0) + modded("vco2.ring")).clamp(0.0, 1.0);
     let is_synced = is_osc2_synced(draft);
-    let fm_amount = number(draft, "fm.amount").unwrap_or(0.0);
+    let is_fm_off = draft.get("bypassFm").is_some_and(Value::is_true);
+    let fm_amount = if is_fm_off { 0.0 } else { number(draft, "fm.amount").unwrap_or(0.0) };
     let fm_algo = number(draft, "fm.algo").unwrap_or(0.0);
-    let sub_gain = number(draft, "subGain").unwrap_or(0.0);
+    let sub_gain = osc1_share * number(draft, "subGain").unwrap_or(0.0);
     let drive = number(draft, "filter.drive").or_else(|| number(draft, "drive")).unwrap_or(0.0);
     let base = 4.0 / SAMPLES as f64;
     let inc: Vec<f64> = ratio.iter().map(|r| base * r).collect();
@@ -166,7 +174,7 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     let (mut phase, mut cycle) = ([0.0f64; 3], [0.0f64; 3]);
     let mut out = Vec::with_capacity(SAMPLES);
     for _ in 0..SAMPLES {
-        let wave = |i: usize| wave_at(&waves[i], phase[i], cycle[i], width[i]);
+        let wave = |i: usize| if is_off[i] { 0.0 } else { wave_at(&waves[i], phase[i], cycle[i], width[i]) };
         let increments = if fm_amount > 0.001 {
             fm_increments(fm_algo as i64, [inc[0], inc[1], inc[2]], (depth1, depth2), wave)
         } else {

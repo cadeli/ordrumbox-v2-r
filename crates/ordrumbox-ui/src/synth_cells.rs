@@ -20,6 +20,9 @@ pub(crate) const KNOB_H: i32 = 56;
 /// a knob over its label (at scale 1). Tall enough for a knob drawn over
 /// its label, not beside it.
 pub(crate) const QUIET_H: i32 = 40;
+/// A knob's place in a quiet row (at scale 1): as wide as its label needs,
+/// the knob over it being no wider.
+const QUIET_KNOB_W: i32 = 44;
 /// A fader's place in a row (at scale 1): as high as a knob, narrow.
 const FADER_W: i32 = 20;
 /// The space between two controls (at scale 1).
@@ -115,6 +118,11 @@ pub(crate) fn push_row(
     right
 }
 
+/// The width of a knob in a row `row_h` high at scale 1.
+fn knob_width(row_h: i32, s: Scale) -> i32 {
+    if row_h == QUIET_H { QUIET_KNOB_W * s } else { KNOB_W * s }
+}
+
 /// The width of the screen of `kind`, a spin or a switch.
 fn screen_width(kind: &Kind, s: Scale) -> i32 {
     if matches!(kind, Kind::Spin { .. }) { spin_width(SPIN_CHARS, s) } else { SWITCH_W * s }
@@ -129,8 +137,14 @@ fn push_cell(
     s: Scale,
 ) -> i32 {
     if let Kind::Value { spec, value, text, lfo, .. } = kind {
-        let w = if spec.style == Style::Fader { FADER_W * s } else { KNOB_W * s };
+        let w = if spec.style == Style::Fader { FADER_W * s } else { knob_width(row_h, s) };
         let kind = Kind::Value { spec, value, label: Some(label), text, lfo };
+        items.push(Item::new(Some(id), Rect::new(next, top, w, row_h * s), kind));
+        return w;
+    }
+    // A knob greyed out keeps the knob's place, its label on it.
+    if let Kind::Disabled { .. } = kind {
+        let w = knob_width(row_h, s);
         items.push(Item::new(Some(id), Rect::new(next, top, w, row_h * s), kind));
         return w;
     }

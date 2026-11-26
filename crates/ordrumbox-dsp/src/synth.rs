@@ -37,7 +37,7 @@ use modulation::{
     DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, Late, LateMods, MOD_ENV_SLOTS, Matrix, Mods, Slot, SourceValues, WIDTH_SLOTS,
     is_moved, is_targeted, modulated, modulated_adsr,
 };
-pub use oscillator::FM_DEVIATION;
+pub use oscillator::{FM_DEVIATION, fm_modulators};
 use oscillator::{
     LFSR_SEED, NOISE_SEED, WIDTH_MAX, WIDTH_MIN, WaveTables, fm_frequencies, lfsr_sample, lfsr_step, noise_sample,
     noise_seed, oscillator, phase_step, sin_lookup, sine_table, xorshift32,
@@ -50,10 +50,6 @@ use unison::{Layer, layers, start_phases, unison_oscillator};
 
 /// Cents to a natural-log ratio.
 const LN2_OVER_1200: f64 = std::f64::consts::LN_2 / 1200.0;
-/// Pitch rise of a full pitch punch at the start of a note, cents.
-const PITCH_PUNCH_CENTS: f64 = 2400.0;
-/// How long the pitch punch lasts, seconds.
-const PITCH_PUNCH_SECONDS: f64 = 0.06;
 /// A level, an amount or a depth at or below this does nothing: its stage is skipped.
 const SILENT: f64 = 0.001;
 
@@ -147,7 +143,7 @@ impl<'a> Block<'a> {
             widths: p.osc_width.map(|width| clamp(width, WIDTH_MIN, WIDTH_MAX)),
             has_pitch_env: p.pitch_env.amount != 0.0 || is_targeted(p, LfoTarget::PitchEnvAmount),
             pitch_fall: fall_per_sample(p.pitch_env.decay, sample_rate),
-            has_ring: p.ring > 0.0 || is_targeted(p, LfoTarget::Osc2Ring),
+            has_ring: !p.bypass.osc[0] && (p.ring > 0.0 || is_targeted(p, LfoTarget::Osc2Ring)),
             is_synced: p.is_osc2_synced,
             noise_mode: p.noise_mode,
             noise_step: clamp(p.noise_rate / sample_rate, 0.0, 1.0),
@@ -357,7 +353,13 @@ impl SynthVoice {
         }
         self.width = pulse_widths(b, mods, p.osc_width);
         let pitch_env = if b.has_pitch_env { self.pitch_env_ratio(p, b, mods) } else { 1.0 };
-        let frequencies = self.frequencies(p, b, mods, &mut gains, (&late, pitch_env), t);
+        let frequencies = self.frequencies(p, b, mods, &mut gains, (&late, pitch_env));
+        // After the matrix and the shape, which may raise a gain: off stays silent.
+        for (gain, is_off) in gains.iter_mut().zip(p.bypass.osc) {
+            if is_off {
+                *gain = 0.0;
+            }
+        }
         let oscillators = self.oscillators(p, b, mods, frequencies, gains);
         let noise = self.noise(p, b, mods);
         let mut dry = [oscillators[0] * (1.0 - p.noise_mix) + noise, oscillators[1] * (1.0 - p.noise_mix) + noise];
@@ -501,7 +503,7 @@ mod tests {
     /// its start. Oscillators not set are silent.
     fn held(patch: SynthPatch, frames: usize) -> Vec<f32> {
         let mut voice = SynthVoice::default();
-        let bypass = SynthBypass { filter: true, env: true, ..SynthBypass::default() };
+        let bypass = SynthBypass { filter: true, env: true, ..patch.bypass };
         let base = SynthPatch { osc_freq: [100.0; 3], volume: 1.0, bypass, ..patch };
         voice.start(&base, 0, 0.0, 1);
         render(&mut voice, frames)
@@ -606,25 +608,27 @@ mod tests {
     }
 
     #[test]
+    fn an_oscillator_switched_off_is_not_heard_and_modulates_nothing() {
+        let fm = SynthPatch { osc_gain: [1.0, 0.0, 0.0], fm_amount: 1.0, ..SynthPatch::default() };
+        let plain = held(SynthPatch { fm_amount: 0.0, ..fm }, 4_800);
+        assert_ne!(held(fm, 4_800), plain, "silent, oscillator 2 modulates");
+        let off = SynthBypass { osc: [false, true, false], ..SynthBypass::default() };
+        assert_eq!(held(SynthPatch { bypass: off, ..fm }, 4_800), plain);
+        assert_eq!(
+            held(SynthPatch { osc_gain: [1.0; 3], bypass: off, ..fm }, 4_800),
+            held(SynthPatch { osc_gain: [1.0, 0.0, 1.0], fm_amount: 0.0, ..fm }, 4_800)
+        );
+        let first_off = SynthBypass { osc: [true, false, false], ..SynthBypass::default() };
+        let sub = SynthPatch { osc_gain: [1.0, 0.0, 0.0], sub_gain: 1.0, bypass: first_off, ..SynthPatch::default() };
+        assert!(held(sub, 4_800).iter().all(|s| *s == 0.0), "oscillator 1 takes its sub-oscillator with it");
+    }
+
+    #[test]
     fn the_sub_sounds_an_octave_below_with_no_dc() {
         let out = held(SynthPatch { osc_gain: [0.0; 3], sub_gain: 1.0, ..SynthPatch::default() }, 48_000);
         let dc = out.iter().map(|&x| f64::from(x)).sum::<f64>() / out.len() as f64;
         assert!(dc.abs() < 1e-3, "{dc}");
         assert!(tone_level(&out, 50.0) > 100.0 * tone_level(&out, 100.0));
-    }
-
-    #[test]
-    fn a_full_punch_starts_two_octaves_up_and_ends_on_the_note() {
-        let crossings = |s: &[f32]| s.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count();
-        let patch =
-            SynthPatch { osc_gain: [1.0, 0.0, 0.0], pitch_punch: 1.0, osc_freq: [1000.0; 3], ..SynthPatch::default() };
-        let mut voice = SynthVoice::default();
-        let bypass = SynthBypass { filter: true, env: true, ..SynthBypass::default() };
-        voice.start(&SynthPatch { bypass, ..patch }, 0, 0.0, 1);
-        let out = render(&mut voice, 7680);
-        // 2 ms at nearly 4 kHz, then 20 ms at 1 kHz once the punch is over.
-        assert!(crossings(&out[..96]) >= 6, "{}", crossings(&out[..96]));
-        assert_eq!(crossings(&out[2880..3840]), 20);
     }
 
     #[test]

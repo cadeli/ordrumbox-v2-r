@@ -1,12 +1,12 @@
 //! What the sources of a voice play each sample: the frequencies of the
-//! three oscillators (detune, punch, pitch envelope, FM), their output with
+//! three oscillators (detune, pitch envelope, FM), their output with
 //! unison and the hard sync of oscillator 2, and the noise.
 
 use super::*;
 
 impl SynthVoice {
     /// The frequencies of the three oscillators for this sample, Hz: detune,
-    /// pitch punch, the pitch envelope's ratio, FM and what the `late` values
+    /// the pitch envelope's ratio, FM and what the `late` values
     /// of the matrix add (pitch, more FM), which also raise `gains` (shape).
     #[inline]
     pub(super) fn frequencies(
@@ -16,16 +16,10 @@ impl SynthVoice {
         mods: &Mods,
         gains: &mut [f64; 3],
         (late, pitch_env): (&LateMods, f64),
-        t: f64,
     ) -> [f64; 3] {
         let mut detuned = [0.0; 3];
         for (n, frequency) in detuned.iter_mut().enumerate() {
             *frequency = p.osc_freq[n] * cents_ratio(modulated(mods, p.osc_detune[n], DETUNE_SLOTS[n]));
-        }
-        let pitch_punch = clamp(modulated(mods, p.pitch_punch, Slot::PitchPunch), 0.0, 1.0);
-        if pitch_punch > SILENT && t < PITCH_PUNCH_SECONDS {
-            let punch = (((1.0 - t / PITCH_PUNCH_SECONDS) * pitch_punch * PITCH_PUNCH_CENTS) * LN2_OVER_1200).exp();
-            detuned = detuned.map(|frequency| frequency * punch);
         }
         if b.has_pitch_env {
             detuned = detuned.map(|frequency| frequency * pitch_env);
@@ -67,12 +61,15 @@ impl SynthVoice {
         self.pitch_fall.step(modulated(mods, p.pitch_env.amount, Slot::PitchEnvAmount), fall)
     }
 
-    /// The three oscillators where they stand, at full gain: what FM
-    /// modulates with.
+    /// The three oscillators where they stand, at full gain, but 0 for one
+    /// switched off: what FM modulates with.
     #[inline]
     pub(super) fn raw_oscillators(&self, p: &SynthPatch, b: &Block, frequencies: [f64; 3]) -> [f64; 3] {
         let mut raw = [0.0; 3];
         for (n, value) in raw.iter_mut().enumerate() {
+            if p.bypass.osc[n] {
+                continue;
+            }
             let dt = (frequencies[n] / b.sample_rate).min(0.49);
             *value = oscillator(b.tables, p.osc_wave[n], self.phase[n][0], dt, self.osc_cycle[n][0], self.width[n]);
         }
@@ -92,7 +89,7 @@ impl SynthVoice {
         frequencies: [f64; 3],
         gains: [f64; 3],
     ) -> [f64; 2] {
-        let sub_gain = clamp(modulated(mods, p.sub_gain, Slot::SubGain), 0.0, 1.0);
+        let sub_gain = if p.bypass.osc[0] { 0.0 } else { clamp(modulated(mods, p.sub_gain, Slot::SubGain), 0.0, 1.0) };
         let ring_amount = if b.has_ring { clamp(modulated(mods, p.ring, Slot::Ring), 0.0, 1.0) } else { 0.0 };
         let mut sum = if b.layer_count > 1 {
             self.layered_oscillators(p, b, frequencies, gains, ring_amount)

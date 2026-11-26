@@ -358,11 +358,13 @@ impl Session {
     }
 
     /// The tooltip of field `fi` when it says its value (a fader of an envelope or the filter,
-    /// a knob of an oscillator).
+    /// a knob of an oscillator, the FM algorithm's routing).
     pub(super) fn synth_field_tip(&self, fi: u16) -> Option<[String; 2]> {
         let path = self.synth_field(fi)?;
         let draft = &self.synth_editor.edit.as_ref()?.draft;
-        crate::synth_faders::tip(draft, &path).or_else(|| crate::synth_strip::tip(draft, &path))
+        crate::synth_faders::tip(draft, &path)
+            .or_else(|| crate::synth_strip::tip(draft, &path))
+            .or_else(|| synth_view::fm_tip(draft, &path))
     }
 
     /// A knob of the editor turned; a stepped knob of a list (the LFOs'

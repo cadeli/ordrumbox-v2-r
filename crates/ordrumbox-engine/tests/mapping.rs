@@ -71,7 +71,7 @@ fn lfo_ticks() -> impl Iterator<Item = f64> {
 }
 
 /// The targets an LFO of the busy patches modulates, one patch each.
-const LFO_TARGETS: [&str; 33] = [
+const LFO_TARGETS: [&str; 32] = [
     "FLT",
     "VCO1",
     "VCO2",
@@ -91,7 +91,6 @@ const LFO_TARGETS: [&str; 33] = [
     "filter.Q",
     "noise.mix",
     "subGain",
-    "pitchPunch",
     "filter.drive",
     "noise.filterFreq",
     "noise.filterQ",
@@ -218,7 +217,6 @@ fn patch_fields(p: &SynthPatch) -> Vec<(String, f64)> {
     add("filterFreq", p.filter_freq);
     add("filterQ", p.filter_q);
     add("drive", p.drive);
-    add("pitchPunch", p.pitch_punch);
     add("subGain", p.sub_gain);
     add("attack", p.envelope.attack);
     add("decay", p.envelope.decay);

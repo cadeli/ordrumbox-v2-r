@@ -2,12 +2,11 @@
 //! the grid: the preset bar (the preset list, delete, new, duplicate,
 //! revert, tags, export, import), the line of the track it is for, and
 //! every card on one screen — what makes the sound (the sources, the
-//! filter, the envelopes, the master), then what moves it (the LFOs, the
-//! modulation envelope, the matrix) — each as small as what it holds, side by side — its power LED
+//! filter, the envelopes), then what moves it (the LFOs, the modulation
+//! envelope, the matrix), then the master — each as small as what it holds, side by side — its power LED
 //! and title, then its plot (the filter curve, the envelope) left of its
 //! knobs, faders, spins and switches in a row (`synth_cells.rs`; the
-//! filter's slope under its type) — and the
-//! module pills under them. The oscillators are strips one under the other
+//! filter's slope under its type). The oscillators are strips one under the other
 //! in one card (`synth_strip.rs`), the scope (four cycles of them), with no
 //! title, in the room VCO1's strip leaves right of its controls.
 //!
@@ -20,7 +19,7 @@ use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS};
 use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES};
 
-use crate::canvas::{Canvas, Rgb, text_width};
+use crate::canvas::{Canvas, Rgb};
 use crate::control::Spec;
 use crate::editors::FILTER_ICONS;
 use crate::frame;
@@ -125,7 +124,9 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
         );
     }
     if path == "fm.algo" {
-        return Field::List((0..FM_ALGORITHMS).map(|i| (i.to_string(), (i + 1).to_string())).collect());
+        return Field::List(
+            FM_ALGORITHMS.iter().enumerate().map(|(i, (l, _))| (i.to_string(), (*l).to_owned())).collect(),
+        );
     }
     if path == "filter.slope" {
         return Field::List(FILTER_SLOPES.iter().map(|(v, l)| ((*v).to_owned(), (*l).to_owned())).collect());
@@ -150,8 +151,22 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     }
 }
 
-/// The FM algorithms, offered on a spin as 1 to 5 (a preset holds 0 to 4).
-const FM_ALGORITHMS: usize = 5;
+/// The FM algorithms (a preset holds 0 to 4), offered on a spin: which
+/// oscillators modulate which, short on the spin, in full in its tooltip.
+const FM_ALGORITHMS: [(&str, &str); 5] =
+    [("2→1", "2 → 1"), ("3→1", "3 → 1"), ("3→2", "3 → 2 → 1"), ("2+3", "2 + 3 → 1"), ("2↔1", "2 ↔ 1")];
+
+/// The tooltip of the FM algorithm's spin (`path` `fm.algo`): its routing in full.
+#[must_use]
+pub fn fm_tip(draft: &Object, path: &str) -> Option<[String; 2]> {
+    if path != "fm.algo" {
+        return None;
+    }
+    // A whole algorithm, 0 to 4: the cast saturates.
+    let algorithm = model::number(draft, path).unwrap_or(0.0).round().max(0.0) as usize;
+    let (_, routing) = FM_ALGORITHMS.get(algorithm)?;
+    Some(["FM Algorithm".to_owned(), (*routing).to_owned()])
+}
 
 /// A plot of a card.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,7 +202,7 @@ impl SynthLayout {
         });
         let track_line = Rect::new(margin, top + 20 * s, (width - 2 * margin).max(0), 14 * s);
         let area_top = top + 42 * s;
-        let bottom = frame::footer_top(height, scale, status_lines) - 20 * s;
+        let bottom = frame::footer_top(height, scale, status_lines) - margin / 2;
         Self {
             scale,
             preset,
@@ -334,13 +349,16 @@ fn is_bypassed(draft: &Object, group: &str) -> bool {
 
 /// The oscillators' strips one under the other in one card, each strip a
 /// band of it; with `scope`, the scope's plot right of the first strip's
-/// controls, when it leaves room for it.
+/// controls, the card made wide enough for it.
 fn oscillators_block(source: &Source, strips: &[(&str, usize)], scope: bool) -> Block {
     let s = source.s;
     let mut items = Vec::new();
     let origin = (PAD_X * s, PAD_Y * s);
     let rows = synth_strip::push_strips(&mut items, source.draft, strips, source.fields, origin, s, source.lfo);
     let right = rows.iter().map(|&(_, right)| right).max().unwrap_or(origin.0);
+    // Wide enough for the scope right of the first strip's controls.
+    let scope_right = rows.first().filter(|_| scope).map(|&(_, first)| first + (PLOT_GAP + SCOPE_MIN_W) * s);
+    let right = right.max(scope_right.unwrap_or(right));
     let (w, h) = (right + PAD_X * s, rows.last().map_or(origin.1, |(top, _)| top + QUIET_H * s) + PAD_Y * s);
     let half_gap = synth_strip::STRIP_GAP * s / 2;
     let frame =
@@ -446,11 +464,14 @@ fn card_plot(group: &str) -> Option<Plot> {
 }
 
 /// The knob of numeric field `path`, at the value an LFO gives it now if
-/// one moves it.
+/// one moves it; greyed out where it does nothing ([`model::is_inert`]).
 pub(crate) fn knob_kind(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option<f64>) -> Kind {
     let meta = model::find_meta(path);
     let key = path.rsplit('.').next().unwrap_or(path);
     let label = meta.and_then(|m| m.label).unwrap_or(key).to_owned();
+    if model::is_inert(draft, path) {
+        return Kind::Disabled { label };
+    }
     let base = model::number(draft, path).or_else(|| model::extra_default(path)).unwrap_or(0.0);
     let spec = meta.map_or_else(|| Spec::knob(0.0, 1.0, 0.01, 0.0), knob_spec);
     let value = lfo(path).map_or(base, |m| m.clamp(spec.min, spec.max));
@@ -510,7 +531,7 @@ fn field_cells(draft: &Object, group: &str, fields: &[String], lfo: &dyn Fn(&str
     cells
 }
 
-/// Paint the cards (under their items), their plots and the module pills.
+/// Paint the cards (under their items) and their plots.
 pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLayout, time: f64, bpm: f64) {
     let s = layout.scale;
     for card in &built.cards {
@@ -533,15 +554,6 @@ pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLa
     }
     if let Some(list) = built.matrix.filter(MatrixList::scrolls) {
         scroll_thumb::draw(canvas, list.bar, list.thumb(), s);
-    }
-    // The modules in use, under the cards.
-    let mut x = layout.area.x;
-    let y = layout.area.y + layout.area.h + 4 * s;
-    for (label, on) in model::modules(draft) {
-        let w = text_width(label, s) + 8 * s;
-        canvas.fill_rect(x, y, w, 12 * s, if on { accent_dim() } else { card_off_color() });
-        canvas.text(x + 4 * s, y + 2 * s, label, s, if on { ACCENT } else { theme::muted() });
-        x += w + 4 * s;
     }
 }
 
@@ -635,13 +647,17 @@ mod tests {
             assert!(item.rect.x + item.rect.w <= layout.area.x + layout.area.w + 1, "{item:?}");
         }
         // Every numeric control but the algorithm and the three octaves
-        // (spins) is a knob or a fader; the matrix lists its free line only.
-        assert_eq!(knobs, model::metas().count() - 4 - (ordrumbox_engine::MATRIX_SIZE - 1));
+        // (spins) is a knob or a fader, greyed out where it does nothing (the
+        // widths of sine waves, the clock of white noise); the matrix lists
+        // its free line only.
+        let inert = fields.iter().filter(|path| model::is_inert(&d, path)).count();
+        assert_eq!(inert, 4);
+        assert_eq!(knobs, model::metas().count() - 4 - inert - (ordrumbox_engine::MATRIX_SIZE - 1));
         assert!(matches!(built.items[0].kind, Kind::Select { selected: 1, .. }));
         // The oscillators' card, its strips (vco2, vco3 off: gain 0) and the
-        // scope, the unison, FM (its flag unset), the noise, the filter and
-        // its envelope, the envelopes and the master, then the LFOs, the mod
-        // envelope and the matrix.
+        // scope, the unison, FM (its flag unset), the noise, the filter, the
+        // envelopes, then the LFOs (off: at 0 Hz), the mod envelope, the
+        // matrix and the master.
         let groups: Vec<_> = built.cards.iter().map(|c| (c.group.as_str(), c.bypassed)).collect();
         assert_eq!(
             groups,
@@ -655,14 +671,13 @@ mod tests {
                 ("fm", false),
                 ("noise", false),
                 ("filter", false),
-                ("filterEnv", false),
                 ("envelope", false),
                 ("pitchEnv", false),
-                ("master", false),
-                ("lfo", false),
-                ("lfo2", false),
+                ("lfo", true),
+                ("lfo2", true),
                 ("modEnvelope", false),
-                ("matrix", false)
+                ("matrix", false),
+                ("master", false)
             ]
         );
         // The scope, with no title, in VCO1's band right of its controls; the
