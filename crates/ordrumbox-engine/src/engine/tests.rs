@@ -160,9 +160,9 @@ fn ducked_level(playing: &[usize], keys: Vec<Option<usize>>) -> f32 {
     signal[9_000..].iter().fold(0.0_f32, |peak, s| peak.max(s.abs()))
 }
 
-/// The tracks whose voices still sound once track 0 (in `first`'s choke group)
-/// started a long sample at frame 0 and track 1 (in `second`'s) another at frame 1000.
-fn sounding_after(first: Option<u8>, second: Option<u8>) -> Vec<usize> {
+/// An engine whose one sample is a second at full scale: a note of it sounds
+/// at one level until it is cut.
+fn long_sample_engine() -> Engine {
     let mut engine = engine();
     engine.bank = Arc::new(SampleBank {
         samples: vec![crate::kit::BankSample {
@@ -170,17 +170,26 @@ fn sounding_after(first: Option<u8>, second: Option<u8>) -> Vec<usize> {
             ..engine.bank.samples[0].clone()
         }],
     });
-    let note = |frame, track, choke_group| {
-        let mut event = Event { mono: false, choke_group, ..sample_event(frame) };
-        if let Sound::Sample(voice) = &mut event.sound {
-            voice.track = track;
-        }
-        event
-    };
+    engine
+}
+
+/// A note of the long sample on `track`, in `choke_group`, not mono.
+fn choke_note(frame: u64, track: usize, choke_group: Option<u8>) -> Event {
+    let mut event = Event { mono: false, choke_group, ..sample_event(frame) };
+    if let Sound::Sample(voice) = &mut event.sound {
+        voice.track = track;
+    }
+    event
+}
+
+/// The tracks whose voices still sound once track 0 (in `first`'s choke group)
+/// started a long sample at frame 0 and track 1 (in `second`'s) another at frame 1000.
+fn sounding_after(first: Option<u8>, second: Option<u8>) -> Vec<usize> {
+    let mut engine = long_sample_engine();
     engine.play(Arc::new(Pass {
         frames: 48_000,
         ticks: TICK,
-        events: vec![note(0, 0, first), note(1000, 1, second)],
+        events: vec![choke_note(0, 0, first), choke_note(1000, 1, second)],
         strips: vec![StripSettings::default(); 2],
         ..Pass::default()
     }));
@@ -196,6 +205,75 @@ fn a_note_cuts_the_tracks_of_its_choke_group() {
     assert_eq!(sounding_after(Some(1), Some(2)), [0, 1], "another group cuts nothing");
     assert_eq!(sounding_after(None, Some(1)), [0, 1], "a track in no group is not cut");
     assert_eq!(sounding_after(Some(1), None), [0, 1], "a track in no group cuts nothing");
+}
+
+/// Frame of the cutting note of [`choke_render`], 50 ms in.
+const CUT_FRAME: u64 = 2400;
+/// Frames rendered by [`choke_render`]: the synth's 0.1 s release and some.
+const CHOKE_RENDER_FRAMES: usize = 12_000;
+
+/// What is heard when track 0 plays `first` (a long sample or a long synth
+/// note) at frame 0 in choke group `group`, and track 1, in `cutting`, a note
+/// on a silent strip at [`CUT_FRAME`]: the output is track 0's alone.
+fn choke_render(first: Event, cutting: Option<u8>) -> Vec<f32> {
+    let mut engine = long_sample_engine();
+    let silent = StripSettings { volume: 0.0, ..StripSettings::default() };
+    engine.play(Arc::new(Pass {
+        frames: 48_000,
+        ticks: TICK,
+        events: vec![first, choke_note(CUT_FRAME, 1, cutting)],
+        strips: vec![StripSettings::default(), silent],
+        patches: vec![SynthPatch { velocity: 0.5, volume: 1.0, ..SynthPatch::default() }],
+        ..Pass::default()
+    }));
+    render(&mut engine, CHOKE_RENDER_FRAMES)
+}
+
+/// A synth note of track 0 held a second, in `choke_group`.
+fn synth_choke_note(choke_group: Option<u8>) -> Event {
+    Event {
+        sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 1.0, sample: None }),
+        ..choke_note(0, 0, choke_group)
+    }
+}
+
+fn peak(signal: &[f32]) -> f32 {
+    signal.iter().fold(0.0_f32, |peak, s| peak.max(s.abs()))
+}
+
+/// The largest step from one frame to the next in `signal`: a click is a big one.
+fn largest_step(signal: &[f32]) -> f32 {
+    signal.windows(2).fold(0.0_f32, |step, w| step.max((w[1] - w[0]).abs()))
+}
+
+#[test]
+fn a_choked_sample_fades_to_silence_without_a_click() {
+    let cut = CUT_FRAME as usize;
+    let choked = choke_render(choke_note(0, 0, Some(1)), Some(1));
+    let held = choke_render(choke_note(0, 0, Some(1)), Some(2));
+    assert!(peak(&choked[cut / 2..cut]) > 0.5, "the sample sounds before the cut");
+    assert_eq!(choked[..cut], held[..cut], "nothing changes before the cut");
+    // The voice's release is 15 ms (720 frames): silent well within 30 ms.
+    assert!(peak(&choked[cut + 1440..]) < 1e-4, "silent after the cut: {}", peak(&choked[cut + 1440..]));
+    // A hard cut would step by the whole level; the release steps by under 1 %.
+    let step = largest_step(&choked[cut - 64..cut + 1440]);
+    assert!(step < 0.02, "the cut fades, it does not click: a step of {step}");
+    assert!(peak(&held[CHOKE_RENDER_FRAMES - 1200..]) > 0.5, "another group leaves it sounding");
+    assert_eq!(held, choke_render(choke_note(0, 0, Some(1)), None), "another group is no group");
+    assert_eq!(choke_render(choke_note(0, 0, None), Some(1)), held, "a track in no group is never cut");
+}
+
+#[test]
+fn a_choked_synth_note_releases_to_silence() {
+    let cut = CUT_FRAME as usize;
+    let choked = choke_render(synth_choke_note(Some(3)), Some(3));
+    let held = choke_render(synth_choke_note(Some(3)), Some(4));
+    assert!(peak(&choked[cut / 2..cut]) > 0.05, "the synth sounds before the cut");
+    assert_eq!(choked[..cut], held[..cut], "nothing changes before the cut");
+    // Released at the cut with the patch's 0.1 s release (4800 frames).
+    let tail = cut + 4800 + 600;
+    assert!(peak(&choked[tail..]) < 1e-4, "silent after its release: {}", peak(&choked[tail..]));
+    assert!(peak(&held[tail..]) > 0.05, "another group leaves it sounding");
 }
 
 #[test]

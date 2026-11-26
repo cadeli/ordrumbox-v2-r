@@ -8,10 +8,13 @@ use std::process::ExitCode;
 
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_engine::SynthPresets;
+use ordrumbox_engine::offline::{EXPORT_RATE, RenderSetup};
 use ordrumbox_engine::synth_preset::note_seconds;
-use ordrumbox_engine::{SampleBuffer, wav};
+use ordrumbox_engine::{SampleBank, SampleBuffer, kits_from_json, wav};
+use ordrumbox_probe::choke::{HAT_GROUP, left_to_text, render_choke};
 use ordrumbox_probe::fix::{FixSettings, fix};
 use ordrumbox_probe::kit::{parse_note, sample_flags, summarize};
+use ordrumbox_probe::kit_files::read_kits;
 use ordrumbox_probe::measure::{Measures, amplitude_db, measure};
 use ordrumbox_probe::mix::measure_mix;
 use ordrumbox_probe::plot::to_svg;
@@ -27,6 +30,7 @@ ordrumbox-probe kit [<kit>...]  [--kits d] [...]      review kits: a summary and
 ordrumbox-probe mix <file>...  [--bpm n] [...]        measure exports: loudness, true peak, hits
 ordrumbox-probe compare <before.json> <after.json>    what changed between two reports
 ordrumbox-probe fix <file|folder>...  [--write] [...] repair what kit flags: lists it, saves it with --write
+ordrumbox-probe choke [<kit>...]  [--wav d] [...]     an open hi-hat cut by a closed one, with and without choke
 
 options of preset:
   --presets <file>        presets file (default: assets/data/synth_presets.json of this checkout)
@@ -38,8 +42,10 @@ options of preset:
   --gate <seconds>        hold the note this long instead
   --rate <hz>             default 48000
   --wav <folder>          also write each note there, <name>.wav in lower case: mono, 16-bit PCM
-options of kit:
+options of kit and choke:
   --kits <folder>         one folder per kit (default: assets/kits of this checkout)
+options of choke:
+  --wav <folder>          also write the mixes there, choke-<kit>-on.wav and choke-<kit>-off.wav
 options of mix:
   --bpm <n>               check the hits on a grid of this tempo
   --steps-per-beat <n>    of that grid, default 4
@@ -55,6 +61,7 @@ all:
 ";
 const PRESETS_FILE: &str = "assets/data/synth_presets.json";
 const KITS_FOLDER: &str = "assets/kits";
+const KITS_FILE: &str = "assets/data/kits.json";
 const WAV_EXTENSION: &str = "wav";
 /// MIDI note of ratio 1 (`synth_preset::C3_FREQ`).
 const C3_MIDI: i32 = 48;
@@ -407,6 +414,61 @@ fn run_fix(arguments: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// Render the choke pattern with each kit given (every kit when none is),
+/// with the hi-hats in a choke group and in none: print what is left of the
+/// open hi-hat after the closed one, and write the mixes with `--wav`.
+fn run_choke(arguments: &[String]) -> Result<(), String> {
+    let options = parse_options(arguments)?;
+    let root = options.kits.clone().map_or_else(|| in_checkout(KITS_FOLDER, "--kits"), Ok)?;
+    let kits_file = in_checkout(KITS_FILE, "--kits")?;
+    let (described, _) =
+        kits_from_json(&read_json(&kits_file)?).map_err(|e| format!("{}: {e}", kits_file.display()))?;
+    let (kits, issues) = read_kits(&root, &described)?;
+    for issue in &issues {
+        println!("{}: {}: {}", root.display(), issue.at, issue.message);
+    }
+    let names: Vec<&str> = kits.iter().map(|kit| kit.name.as_str()).collect();
+    if let Some(unknown) = options.positional.iter().find(|name| !names.contains(&name.as_str())) {
+        return Err(format!("no kit {unknown}; {} holds: {}", root.display(), names.join(" ")));
+    }
+    let (bank, unreadable) = SampleBank::load(&kits, |path| fs::read(root.join(path)));
+    if !unreadable.is_empty() {
+        return Err(format!("{} samples could not be read:\n{}", unreadable.len(), unreadable.join("\n")));
+    }
+    let presets = in_checkout(PRESETS_FILE, "--presets")?;
+    let mut setup = RenderSetup {
+        bank: bank.into_shared(),
+        scales: Default::default(),
+        synths: SynthPresets::from_json(&read_json(&presets)?).map_err(|e| format!("{}: {e}", presets.display()))?,
+        kit: String::new(),
+        sample_rate: EXPORT_RATE,
+        seed: 1,
+        returns: Default::default(),
+    };
+    println!("what is left of the open hi-hat 30 ms after the closed one, against its level");
+    for name in
+        names.iter().filter(|name| options.positional.is_empty() || options.positional.iter().any(|p| p == *name))
+    {
+        setup.kit = (*name).to_owned();
+        let on = render_choke(&setup, Some(HAT_GROUP))?;
+        let off = render_choke(&setup, None)?;
+        println!(
+            "{name:<16} open {:>6.1} dB   choke {:>10}   no choke {:>10}",
+            on.open_db,
+            left_to_text(on.left_db),
+            left_to_text(off.left_db)
+        );
+        let Some(folder) = &options.wav else { continue };
+        fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
+        for (render, state) in [(&on, "on"), (&off, "off")] {
+            let path = folder.join(format!("choke-{name}-{state}.{WAV_EXTENSION}"));
+            fs::write(&path, wav::encode(&render.mix.0, &render.mix.1, EXPORT_RATE))
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
 fn run(arguments: &[String]) -> Result<(), String> {
     match arguments.split_first() {
         Some((command, rest)) if command == "preset" => run_presets(rest),
@@ -414,6 +476,7 @@ fn run(arguments: &[String]) -> Result<(), String> {
         Some((command, rest)) if command == "kit" => run_kits(rest),
         Some((command, rest)) if command == "mix" => run_mixes(rest),
         Some((command, rest)) if command == "fix" => run_fix(rest),
+        Some((command, rest)) if command == "choke" => run_choke(rest),
         Some((command, [before, after])) if command == "compare" => {
             print!("{}", compare(&read_json(Path::new(before))?, &read_json(Path::new(after))?)?);
             Ok(())

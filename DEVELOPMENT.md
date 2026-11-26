@@ -574,7 +574,12 @@ and `Engine::release_cut` (`engine/render.rs`) releases, as `mono` does for the 
 every track whose last note was in the same group (`Engine::choke_groups`, a fixed table: nothing allocated on the
 audio thread). A track has no group by default, so no snapshot changed. A hi-hat added or renamed in the editor
 (`Editor::add_track`, `change_track_name`) joins `HAT_CHOKE_GROUP`; `Track::new` gives none, so that the styles'
-generation and MIDI import (and their snapshots) stay as they were.
+generation and MIDI import (and their snapshots) stay as they were. The engine's tests render the cut
+(`a_choked_sample_fades_to_silence_without_a_click`, `a_choked_synth_note_releases_to_silence`): the cut track is
+silent within twice the release, with no click, and another group or none changes nothing. To hear it with the kits,
+`cargo run -p ordrumbox-probe -- choke [<kit>...] --wav <folder>` renders an open hi-hat on each beat and a closed one
+half a beat later, with the hi-hats in a group and in none (`choke-<kit>-on.wav`, `-off.wav`), and prints what is
+left of the open one 30 ms after the closed one.
 
 The piano roll's drag moves a note (`note_drag.rs`, `NoteMove`; `session_roll_move.rs`): the steps and rows the pointer
 crossed since the press, never onto another note, one undo step (`update_note` coalesced on beat, step and pitch); it

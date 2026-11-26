@@ -3,9 +3,11 @@
 //! preset is rendered by the real voice, before the channel strip and the
 //! master bus; a WAV file is measured as it is.
 
+pub mod choke;
 pub mod fft;
 pub mod fix;
 pub mod kit;
+pub mod kit_files;
 pub mod measure;
 pub mod mix;
 pub mod plot;
