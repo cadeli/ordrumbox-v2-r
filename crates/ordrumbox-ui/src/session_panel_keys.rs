@@ -124,6 +124,23 @@ impl Session {
                 }
                 true
             }
+            Kind::Spin { values, labels, selected, .. } => {
+                // As its ▲ and ▼: up is the next one.
+                let delta = match key {
+                    PanelKey::Up | PanelKey::Right | PanelKey::Plus => 1,
+                    PanelKey::Down | PanelKey::Left | PanelKey::Minus => -1,
+                    PanelKey::Enter | PanelKey::Space => {
+                        let screen = panel::spin_parts(item.rect, size.2)[1];
+                        self.open_select(id, screen, values, labels, selected);
+                        return true;
+                    }
+                    _ => return false,
+                };
+                if let Some(value) = moved_value(&values, selected, delta) {
+                    self.select(id, value);
+                }
+                true
+            }
             Kind::TwoState { values, selected, .. } => {
                 let to = match key {
                     PanelKey::Up | PanelKey::Left | PanelKey::Minus => 0,

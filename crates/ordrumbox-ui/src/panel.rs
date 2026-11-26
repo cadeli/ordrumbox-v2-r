@@ -343,6 +343,15 @@ pub enum Kind {
         selected: usize,
         lit: bool,
     },
+    /// A choice on a screen with ▲ and ▼ beside it, which step through it;
+    /// a click on the screen opens its list. `curve` (values from -1 to 1
+    /// across) is drawn on the screen in place of the label when it has any.
+    Spin {
+        values: Vec<String>,
+        labels: Vec<String>,
+        selected: usize,
+        curve: Vec<f64>,
+    },
     /// An ON/OFF button.
     Toggle {
         on: bool,
@@ -396,6 +405,12 @@ pub enum Kind {
 }
 
 impl Kind {
+    /// A choice as a [`Kind::Spin`] showing its label.
+    #[must_use]
+    pub fn spin(values: Vec<String>, labels: Vec<String>, selected: usize) -> Self {
+        Self::Spin { values, labels, selected, curve: Vec::new() }
+    }
+
     /// A choice of two options as a [`Kind::TwoState`]; any other count of
     /// options as a [`Kind::Select`].
     #[must_use]
@@ -521,6 +536,23 @@ pub fn stepper_parts(rect: Rect, labelled: bool, scale: Scale) -> [Rect; 3] {
     let button = rect.h;
     let value = Rect::new(left + button, rect.y, value_width(scale), rect.h);
     [Rect::new(left, rect.y, button, rect.h), value, Rect::new(value.x + value.w, rect.y, button, rect.h)]
+}
+
+/// The height of a spin's screen (at scale 1).
+pub const SPIN_SCREEN_H: i32 = 20;
+/// The width of a spin's ▲ and ▼ (at scale 1).
+const SPIN_ARROW_W: i32 = 12;
+
+/// The parts of a [`Kind::Spin`]: its ▼, its screen, its ▲. The screen at
+/// the left of `rect` (at most [`SPIN_SCREEN_H`] high), the ▲ over the ▼
+/// on its right.
+#[must_use]
+pub fn spin_parts(rect: Rect, scale: Scale) -> [Rect; 3] {
+    let (arrow_w, screen_h) = (SPIN_ARROW_W * scale, rect.h.min(SPIN_SCREEN_H * scale));
+    let screen = Rect::new(rect.x, rect.y, (rect.w - arrow_w).max(0), screen_h);
+    let x = screen.x + screen.w;
+    let half = screen_h / 2;
+    [Rect::new(x, rect.y + half, arrow_w, screen_h - half), screen, Rect::new(x, rect.y, arrow_w, half)]
 }
 
 /// Diameter of a knob in a row of knobs (at scale 1).

@@ -13,7 +13,7 @@ use std::time::Instant;
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
-use ordrumbox_engine::synth_preset::{FILTER_TYPES, WAVES};
+use ordrumbox_engine::synth_preset::FILTER_TYPES;
 
 use super::session_files::NO_SYNTHS;
 use super::session_types::Workspace;
@@ -355,11 +355,20 @@ impl Session {
         synth_view::all_fields(&self.synth_editor.edit.as_ref()?.draft).into_iter().nth(usize::from(fi))
     }
 
-    /// A knob of the editor turned.
+    /// A knob of the editor turned; a stepped knob of a list (the LFOs'
+    /// sync) sets the option at its notch.
     pub(super) fn synth_value(&mut self, fi: u16, value: f64) {
-        if let Some(path) = self.synth_field(fi) {
-            self.edit_synth(&path, Value::from(if value.is_nan() { 0.0 } else { value }));
-        }
+        let Some(path) = self.synth_field(fi) else { return };
+        let value = if value.is_nan() { 0.0 } else { value };
+        let value = match model::choices(&path) {
+            Some(options) => {
+                // Saturating: a notch below the first is the first.
+                let Some(option) = options.get(value.round().max(0.0) as usize) else { return };
+                model::choice_value(&path, option)
+            }
+            None => Value::from(value),
+        };
+        self.edit_synth(&path, value);
     }
 
     /// A list of the editor set: the preset, or a field.
@@ -393,9 +402,7 @@ impl Session {
             Id::SynthIcon(gi, oi) => {
                 let Some(edit) = &self.synth_editor.edit else { return };
                 let Some(group) = model::groups(&edit.draft).into_iter().nth(usize::from(gi)) else { return };
-                let (path, value) = if group.starts_with("vco") || group.starts_with("lfo") {
-                    (format!("{group}.wave"), WAVES.get(usize::from(oi)).map(|w| Value::from(*w)))
-                } else if group == "filter" || group == "noise" {
+                let (path, value) = if group == "filter" || group == "noise" {
                     let key = if group == "filter" { "type" } else { "filterType" };
                     (format!("{group}.{key}"), FILTER_TYPES.get(usize::from(oi)).map(|t| Value::from(*t)))
                 } else {
@@ -580,12 +587,14 @@ mod tests {
         let mut s = session();
         s.toggle_synth();
         assert_eq!(s.synth_editor.edit.as_ref().map(|e| e.key.as_str()), Some("b"));
-        // VCO2's wave: VCO2 switches on (gain 0.5), the preset follows.
+        // VCO2's wave, two clicks on its ▲: VCO2 switches on (gain 0.5), the preset follows.
         let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
-        let groups = model::groups(&s.synth_editor.edit.as_ref().unwrap().draft);
-        let vco2 = groups.iter().position(|g| g == "vco2").unwrap() as u8;
-        let icon = item(&s, |i| i.id == Some(Id::SynthIcon(vco2, 2)));
-        let (x, y) = center(icon.rect);
+        let wave = fields.iter().position(|f| f == "vco2.wave").unwrap() as u16;
+        let spin = item(&s, |i| i.id == Some(Id::SynthField(wave)));
+        assert!(matches!(spin.kind, Kind::Spin { selected: 0, .. }), "{:?}", spin.kind);
+        let up = crate::panel::spin_parts(spin.rect, Scale::ONE)[2];
+        let (x, y) = center(up);
+        click(&mut s, x, y);
         click(&mut s, x, y);
         let preset = s.synths.presets.get("b").unwrap();
         assert_eq!(model::get(preset.as_object().unwrap(), "vco2.wave"), Some(&Value::from("sawtooth")));
@@ -604,22 +613,79 @@ mod tests {
     }
 
     #[test]
-    fn the_filter_slope_is_a_two_state_button() {
+    fn every_card_fits_the_smallest_window() {
+        let mut s = session();
+        s.toggle_synth();
+        let scale = Scale::ONE;
+        let (w, h) = crate::view::min_window_size(scale, crate::view::Shown::all());
+        s.set_size((w, h, scale));
+        for tab in SynthTab::ALL {
+            s.synth_editor.tab = tab;
+            let (built, layout) = s.synth_built((w, h, scale)).expect("the editor");
+            let bottom = layout.area.y + layout.area.h;
+            for card in &built.cards {
+                assert!(
+                    card.rect.y + card.rect.h <= bottom,
+                    "{tab:?}: {} ends at {} under {bottom}",
+                    card.group,
+                    card.rect.y + card.rect.h
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_lfo_sync_is_a_stepped_knob() {
+        let mut s = session();
+        s.toggle_synth();
+        s.synth_editor.tab = SynthTab::Modulation;
+        let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
+        let fi = fields.iter().position(|f| f == "lfo2.sync").unwrap() as u16;
+        let knob = item(&s, |i| i.id == Some(Id::SynthField(fi)));
+        assert!(matches!(&knob.kind, Kind::Value { value: 0.0, text, .. } if text == "free"), "{:?}", knob.kind);
+        // Three notches up: the fourth option, as the preset writes it.
+        let (x, y) = center(knob.rect);
+        s.wheel(SIZE, x, y, 3, false, false);
+        let preset = s.synths.presets.get("b").unwrap();
+        assert_eq!(model::get(preset.as_object().unwrap(), "lfo2.sync"), Some(&Value::from("1/4")));
+        let knob = item(&s, |i| i.id == Some(Id::SynthField(fi)));
+        assert!(matches!(&knob.kind, Kind::Value { value: 3.0, text, .. } if text == "1/4"), "{:?}", knob.kind);
+    }
+
+    #[test]
+    fn an_lfo_wave_is_a_spin_that_draws_it() {
+        let mut s = session();
+        s.toggle_synth();
+        s.synth_editor.tab = SynthTab::Modulation;
+        let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
+        let fi = fields.iter().position(|f| f == "lfo.wave").unwrap() as u16;
+        let spin = item(&s, |i| i.id == Some(Id::SynthField(fi)));
+        assert!(matches!(&spin.kind, Kind::Spin { selected: 0, curve, .. } if !curve.is_empty()), "{:?}", spin.kind);
+        let up = crate::panel::spin_parts(spin.rect, Scale::ONE)[2];
+        let (x, y) = center(up);
+        click(&mut s, x, y);
+        let preset = s.synths.presets.get("b").unwrap();
+        assert_eq!(model::get(preset.as_object().unwrap(), "lfo.wave"), Some(&Value::from("triangle")));
+    }
+
+    #[test]
+    fn the_filter_slope_is_a_spin() {
         let mut s = session();
         s.toggle_synth();
         s.synth_editor.tab = SynthTab::Filter;
         let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
         let fi = fields.iter().position(|f| f == "filter.slope").unwrap() as u16;
-        let button = item(&s, |i| i.id == Some(Id::SynthField(fi)));
-        assert!(matches!(button.kind, Kind::TwoState { selected: 0, .. }), "{:?}", button.kind);
-        // The right half: 24 dB, written as a number.
-        let [_, right] = crate::panel::two_state_halves(button.rect);
-        let (x, y) = center(right);
+        let spin = item(&s, |i| i.id == Some(Id::SynthField(fi)));
+        assert!(matches!(spin.kind, Kind::Spin { selected: 0, .. }), "{:?}", spin.kind);
+        // Its ▲: 24 dB, written as a number; ▲ again goes no further.
+        let up = crate::panel::spin_parts(spin.rect, Scale::ONE)[2];
+        let (x, y) = center(up);
+        click(&mut s, x, y);
         click(&mut s, x, y);
         let preset = s.synths.presets.get("b").unwrap();
         assert_eq!(model::number(preset.as_object().unwrap(), "filter.slope"), Some(24.0));
-        let button = item(&s, |i| i.id == Some(Id::SynthField(fi)));
-        assert!(matches!(button.kind, Kind::TwoState { selected: 1, .. }));
+        let spin = item(&s, |i| i.id == Some(Id::SynthField(fi)));
+        assert!(matches!(spin.kind, Kind::Spin { selected: 1, .. }));
     }
 
     #[test]

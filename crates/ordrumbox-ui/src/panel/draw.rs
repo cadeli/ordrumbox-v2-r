@@ -85,6 +85,16 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
             }
         }
         Kind::Screen { labels, selected, lit, .. } => draw_screen(canvas, r, labels, *selected, *lit, scale),
+        Kind::Spin { labels, selected, curve, .. } => {
+            let room = StepperRoom { down: *selected > 0, up: *selected + 1 < labels.len() };
+            let screen = draw_spin(canvas, r, room, scale);
+            if curve.is_empty() {
+                let label = labels.get(*selected).map_or("", String::as_str);
+                centered_label(canvas, screen, label, scale, ON);
+            } else {
+                draw_curve(canvas, screen, curve, scale);
+            }
+        }
         Kind::Toggle { on } => {
             canvas.fill_rect(r.x, r.y, r.w, r.h, if *on { ON } else { field_color() });
             let text = if *on { "ON" } else { "OFF" };
@@ -258,6 +268,39 @@ fn draw_stepper_item(canvas: &mut Canvas, r: Rect, room: StepperRoom, label: Opt
     }
     let text = fit(text, field.w, scale);
     canvas.text(field.x + (field.w - text_width(&text, scale)) / 2, ty, &text, scale, value_color());
+}
+
+/// A spin's frame: its screen (dark glass), its ▲ over its ▼, a button
+/// greyed out at its end of the range; the screen, to write on.
+fn draw_spin(canvas: &mut Canvas, r: Rect, room: StepperRoom, scale: Scale) -> Rect {
+    let t = scale.px();
+    let [down, screen, up] = spin_parts(r, scale);
+    canvas.fill_rect(screen.x, screen.y, screen.w, screen.h, border_color());
+    canvas.fill_rect(screen.x + t, screen.y + t, screen.w - 2 * t, screen.h - 2 * t, theme::screen());
+    for (button, points_up, live) in [(up, true, room.up), (down, false, room.down)] {
+        canvas.fill_rect(button.x + t, button.y + t, button.w - 2 * t, button.h - 2 * t, field_color());
+        draw_arrow(canvas, button, points_up, if live { theme::text() } else { dim() }, scale);
+    }
+    Rect::new(screen.x + 2 * t, screen.y + 2 * t, screen.w - 4 * t, screen.h - 4 * t)
+}
+
+/// A small triangle in the middle of `r`, pointing up or down.
+fn draw_arrow(canvas: &mut Canvas, r: Rect, points_up: bool, color: Rgb, scale: Scale) {
+    let rows = 3 * scale;
+    let (cx, top) = (r.x + r.w / 2, r.y + (r.h - rows) / 2);
+    for row in 0..rows {
+        let half = if points_up { row } else { rows - 1 - row };
+        canvas.fill_rect(cx - half, top + row, 2 * half + 1, 1, color);
+    }
+}
+
+/// `values` (-1 to 1) across the screen `r`, in the lit color.
+fn draw_curve(canvas: &mut Canvas, r: Rect, values: &[f64], scale: Scale) {
+    let mid = r.y + r.h / 2;
+    let reach = f64::from(r.h / 2 - scale.px());
+    let last = values.len().saturating_sub(1).max(1) as i32;
+    let points = values.iter().enumerate().map(|(i, v)| (r.x + i as i32 * (r.w - 1) / last, mid - (v * reach) as i32));
+    canvas.polyline(points, scale.px(), ON);
 }
 
 /// A sample's waveform, mirrored around the middle and scaled to its own

@@ -109,6 +109,25 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    /// A line from `a` to `b`, `t` thick.
+    pub fn line(&mut self, (x0, y0): (i32, i32), (x1, y1): (i32, i32), t: i32, color: Rgb) {
+        let steps = (x1 - x0).abs().max((y1 - y0).abs()).max(1);
+        for i in 0..=steps {
+            self.fill_rect(x0 + (x1 - x0) * i / steps - t / 2, y0 + (y1 - y0) * i / steps - t / 2, t, t, color);
+        }
+    }
+
+    /// Lines through `points`, in order, `t` thick.
+    pub fn polyline(&mut self, points: impl Iterator<Item = (i32, i32)>, t: i32, color: Rgb) {
+        let mut previous = None;
+        for p in points {
+            if let Some(q) = previous {
+                self.line(q, p, t, color);
+            }
+            previous = Some(p);
+        }
+    }
+
     /// Draw `text` with its top-left corner at `(x, y)`, one cell of
     /// `font::SIZE × scale` pixels per character, blended over what is there;
     /// returns the x after the last character.

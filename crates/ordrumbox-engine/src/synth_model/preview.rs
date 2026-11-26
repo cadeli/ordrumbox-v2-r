@@ -57,6 +57,20 @@ pub fn lfo_targeted(draft: &Object, path: &str) -> bool {
 
 // ─── What the canvases plot ──────────────────────────────────────────────────
 
+/// Two cycles of `wave` in `points` values (-1 to 1), as a picture of it: a
+/// square is high for half of each cycle, a random wave holds a value per cycle.
+#[must_use]
+pub fn wave_shape(wave: &str, points: usize) -> Vec<f64> {
+    let last = points.saturating_sub(1).max(1) as f64;
+    (0..points)
+        .map(|i| {
+            let phase = 2.0 * i as f64 / last;
+            let cycle = phase.floor().min(1.0);
+            wave_at(wave, phase - cycle, cycle, 0.5)
+        })
+        .collect()
+}
+
 /// A wave's value at phase `p` (0–1) of cycle `cycle`; a square is high for `width` of it.
 fn wave_at(wave: &str, p: f64, cycle: f64, width: f64) -> f64 {
     use std::f64::consts::PI;

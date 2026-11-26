@@ -1,5 +1,5 @@
-//! The synth editor's Matrix card: one line per route, a source, a target
-//! and an amount, each a field of the preset's `matrix` group.
+//! The synth editor's Matrix card: one line per route, a source and a
+//! target (spins) and an amount, each a field of the preset's `matrix` group.
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::MATRIX_SIZE;
@@ -17,15 +17,15 @@ const GAP: i32 = 4;
 /// A line's height, with the space under it.
 const LINE_H: i32 = 16;
 
-/// The list of field `path`: its options as (value, label), `NOT` shown as "off".
-fn select(draft: &Object, path: &str, options: &[&str]) -> Kind {
+/// The spin of list field `path`: its options as (value, label), `NOT` shown as "off".
+fn spin(draft: &Object, path: &str, options: &[&str]) -> Kind {
     let label = |option: &str| if option == "NOT" { "off".to_owned() } else { option.to_owned() };
     let current = model::get(draft, path).and_then(Value::to_text).unwrap_or_default();
-    Kind::Select {
-        values: options.iter().map(|&option| option.to_owned()).collect(),
-        labels: options.iter().map(|&option| label(option)).collect(),
-        selected: options.iter().position(|&option| option == current).unwrap_or(0),
-    }
+    Kind::spin(
+        options.iter().map(|&option| option.to_owned()).collect(),
+        options.iter().map(|&option| label(option)).collect(),
+        options.iter().position(|&option| option == current).unwrap_or(0),
+    )
 }
 
 /// Push the lines of the matrix, from `inner`'s left at height `y`; the height under them.
@@ -54,9 +54,9 @@ pub(super) fn push_lines(
         items.push(Item::new(
             field_id("source", n),
             source,
-            select(draft, &format!("matrix.source{n}"), &MATRIX_SOURCES),
+            spin(draft, &format!("matrix.source{n}"), &MATRIX_SOURCES),
         ));
-        items.push(Item::new(field_id("target", n), target, select(draft, &format!("matrix.target{n}"), &targets)));
+        items.push(Item::new(field_id("target", n), target, spin(draft, &format!("matrix.target{n}"), &targets)));
         let value = model::number(draft, &format!("matrix.amount{n}")).unwrap_or(0.0).clamp(spec.min, spec.max);
         let text = Format::Fmt.value(value, "");
         items.push(Item::new(

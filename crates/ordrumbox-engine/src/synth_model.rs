@@ -579,6 +579,16 @@ pub fn after_delete<'a>(keys: &[&'a str], deleted: &str) -> Option<&'a str> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_wave_shape_is_two_cycles_of_it() {
+        let square = wave_shape("square", 9);
+        assert_eq!(square, [1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0]);
+        let saw = wave_shape("sawtooth", 5);
+        assert_eq!(saw, [-1.0, 0.0, -1.0, 0.0, 1.0]);
+        assert!(wave_shape("random", 48).iter().all(|v| (-1.0..=1.0).contains(v)));
+    }
+
     use super::*;
 
     #[test]

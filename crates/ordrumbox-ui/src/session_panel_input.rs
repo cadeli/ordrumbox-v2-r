@@ -83,6 +83,10 @@ impl Session {
                 self.chrome.widgets.focus = Some(id);
                 self.open_select(id, item.rect, values, labels, selected);
             }
+            Kind::Spin { values, labels, selected, .. } => {
+                self.chrome.widgets.focus = Some(id);
+                self.press_spin(item.rect, (id, values, labels, selected), (x, y), scale);
+            }
             Kind::TwoState { values, selected, .. } => {
                 self.chrome.widgets.focus = Some(id);
                 let half = panel::two_state_half_at(item.rect, x);
@@ -93,6 +97,27 @@ impl Session {
             _ => self.activate(id),
         }
         true
+    }
+
+    /// A press on choice spin `rect` (`id`, its options and the one shown) at
+    /// `(x, y)`: its ▲ or ▼ steps, its screen opens its list.
+    fn press_spin(
+        &mut self,
+        rect: panel::Rect,
+        (id, values, labels, selected): (Id, Vec<String>, Vec<String>, usize),
+        (x, y): (i32, i32),
+        scale: Scale,
+    ) {
+        let [down, screen, up] = panel::spin_parts(rect, scale);
+        // A button is one step a click, however fast the clicks.
+        if let Some(delta) = [(down, -1), (up, 1)].iter().find(|(r, _)| r.contains(x, y)).map(|p| p.1) {
+            self.chrome.widgets.last_click = None;
+            if let Some(value) = moved_value(&values, selected, delta) {
+                self.select(id, value);
+            }
+        } else if screen.contains(x, y) {
+            self.open_select(id, screen, values, labels, selected);
+        }
     }
 
     /// A press at `at` while `dropdown` is open: on its scroll bar (its thumb
@@ -469,7 +494,9 @@ impl Session {
                     self.set_value(id, v);
                 }
             }
-            Kind::Select { values, selected, .. } | Kind::Screen { values, selected, .. } => {
+            Kind::Select { values, selected, .. }
+            | Kind::Screen { values, selected, .. }
+            | Kind::Spin { values, selected, .. } => {
                 if let Some(value) = moved_value(&values, selected, lines) {
                     self.select(id, value);
                 }
