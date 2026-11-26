@@ -6,10 +6,11 @@ use std::collections::HashMap;
 use crate::chance::Chance;
 use crate::drum_taxonomy::{mono_from_track_name, pan_from_track_name};
 use crate::effect_types::{DelayType, FilterType};
+use crate::groove::Groove;
 use crate::json::{Object, Value};
 use crate::note::{Note, decode_notes, encode_notes};
 use crate::num::round2;
-use crate::record::{Issue, SetField, check_duplicate, json_record, past_max};
+use crate::record::{Issue, JsonField, SetField, check_duplicate, json_record, past_max};
 use crate::steps::{MAX_BEATS, MAX_LOADED_BEATS, MAX_LOADED_STEPS, MAX_LOADED_STEPS_PER_BEAT};
 
 json_record! {
@@ -30,8 +31,10 @@ json_record! {
         steps_per_beat: i32 = 4 => "stepsPerBeat",
         /// Loop point in steps; `None` loops over the track length.
         loop_steps: Option<i32> = None => "loopLength" | "loopAtStep",
-        swing_resolution: i32 = 1 => "swingResolution",
-        swing_amount: f64 = 0.0 => "swingAmount",
+        /// Timing and velocity of each step of a beat; straight time when empty.
+        groove: Groove = Groove::default() => "groove",
+        /// How much of the groove plays, 0–1: the delay, in beats, of its latest step.
+        groove_amount: f64 = 0.0 => "grooveAmount" | "swingAmount",
         volume: f64 = 1.0 => "volume" | "velocity",
         /// LFO objects (`{freq, min, max, phase, type}`) are kept as written
         /// and read leniently when played (see [`crate::lfo`]).
@@ -140,7 +143,7 @@ json_record! {
         synth_preset: Option<String> = None => "synthPreset" | "synthSoundKey",
         // Not in TRACK_DEFAULTS: written by the auto generator / scale picker,
         // saved only when set.
-        /// Hit variation amount in auto mode, 0–100 (Groove's Var Hits); the
+        /// Hit variation amount in auto mode, 0–100 (Groovy's Var Hits); the
         /// generator picks one while it is `None`.
         auto_hit_variation: Option<f64> = None => "autoHitVariation" | "auto_variation",
         /// Note variation amount in auto mode, 0–100 (Engine's Var Notes); the
@@ -157,7 +160,7 @@ json_record! {
 }
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
-const VALUE_RANGES: [(&str, f64, f64); 51] = [
+const VALUE_RANGES: [(&str, f64, f64); 50] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
@@ -165,8 +168,7 @@ const VALUE_RANGES: [(&str, f64, f64); 51] = [
     ("stepsPerBeat", 1.0, MAX_STEPS_PER_BEAT as f64),
     ("loopLength", 0.0, 1024.0),
     ("chokeGroup", 1.0, MAX_CHOKE_GROUPS as f64),
-    ("swingResolution", 1.0, MAX_STEPS_PER_BEAT as f64),
-    ("swingAmount", 0.0, 1.0),
+    ("grooveAmount", 0.0, 1.0),
     ("filterCutoff", MIN_FILTER_FREQ, MAX_FILTER_FREQ),
     ("filterQ", MIN_FILTER_Q, MAX_FILTER_Q),
     ("filterSlope", 12.0, 24.0),
@@ -247,7 +249,7 @@ const ROUND_2D: [&str; 17] = [
     "compMix",
     "compRatio",
     "duckAmount",
-    "swingAmount",
+    "grooveAmount",
     "filterCutoff",
     "filterQ",
 ];
@@ -339,11 +341,17 @@ impl Track {
         };
         let mut track = Self::default();
         let mut seen = Vec::new();
+        let mut swing_resolution = None;
         for (key, value) in object.iter() {
             check_duplicate(&mut seen, Self::canonical_key(key), key, at, issues);
             match key {
                 // `fxSelected`: an editor tab the web version saved with the track.
                 "notes" | "noteKeys" | "fxSelected" => {}
+                // Older files: the swing's grid, read as a groove below.
+                "swingResolution" => match i32::from_json(value) {
+                    Some(resolution) => swing_resolution = Some(resolution),
+                    None => issues.push(Issue::new(format!("{at}.{key}"), i32::refusal(value))),
+                },
                 _ if Self::canonical_key(key)
                     .and_then(|field| LOADED_MAX.iter().find(|(k, _)| *k == field))
                     .is_some_and(|&(_, max)| past_max(value, max, format!("{at}.{key}"), issues)) => {}
@@ -361,6 +369,9 @@ impl Track {
                     }
                 },
             }
+        }
+        if let Some(resolution) = swing_resolution.filter(|_| !object.contains_key("groove")) {
+            track.groove = Groove::swing(resolution);
         }
         if !object.get("pan").is_some_and(|pan| pan.as_f64().is_some()) {
             track.pan = pan_from_track_name(&track.name);
@@ -543,6 +554,24 @@ mod tests {
         assert_eq!(issues, [Issue::new("t.chokeGroup", "past 8 (9), default kept")]);
         assert_eq!(Track { choke_group: Some(0), ..Track::default() }.choke(), None);
         assert_eq!(Track::value_range("chokeGroup"), Some((1.0, 8.0)));
+    }
+
+    #[test]
+    fn an_old_swing_is_read_as_a_groove() {
+        let (track, issues) = load(r#"{"name":"HAT","swingResolution":2,"swingAmount":0.3}"#);
+        assert!(issues.is_empty(), "{issues:?}");
+        assert_eq!((track.groove.clone(), track.groove_amount), (Groove::swing(2), 0.3));
+        assert!(track.extra.is_empty(), "no key kept as unknown");
+        assert_eq!(
+            track.to_json().to_json(),
+            r#"{"name":"HAT","groove":{"timing":[0,1]},"grooveAmount":0.3}"#,
+            "written as a groove only"
+        );
+        let (track, _) = load(r#"{"name":"HAT","swingResolution":3,"groove":{"timing":[0,0.5]},"grooveAmount":0.3}"#);
+        assert_eq!(track.groove.swing_resolution(), None, "the groove written wins over the old grid");
+        let (_, issues) = load(r#"{"swingResolution":"two"}"#);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].at, "t.swingResolution");
     }
 
     #[test]

@@ -20,7 +20,7 @@ pub use mutate::{fill, vary_line};
 pub use score::syncopation;
 
 use ordrumbox_core::num::round2;
-use ordrumbox_core::{Macros, RetriggerSpacing, Rng, Style, StylePart, Track};
+use ordrumbox_core::{Groove, Macros, RetriggerSpacing, Rng, Style, StylePart, Track};
 
 use crate::generate::add_note;
 
@@ -246,8 +246,10 @@ pub(crate) fn set_meter(track: &mut Track, style: &Style) {
         track.notes.clear();
     }
     track.loop_steps = Some(track.beat_count * track.steps_per_beat);
-    track.swing_amount = style.swing_amount;
-    track.swing_resolution = style.swing_resolution;
+    if track.groove.swing_resolution().is_some() {
+        track.groove = if style.swing_amount > 0.0 { Groove::swing(style.swing_resolution) } else { Groove::default() };
+        track.groove_amount = style.swing_amount;
+    }
 }
 
 /// A new line on `track` for its part of `style` under the pattern's

@@ -18,7 +18,7 @@ use super::session_labels::style_label;
 use super::session_types::Workspace;
 use crate::control::Spec;
 use crate::editors::{
-    self, FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL,
+    self, FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVY, GENERATION_MANUAL,
     GenerationRow, KIT_KNOBS, KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_KNOBS, NoteRow,
 };
 use crate::frame;
@@ -373,13 +373,14 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
             .or_else(|| editors::SHAPE_KNOBS.iter().find(|(f, ..)| *f == field).map(|(_, label, _)| (*label, "ms")))
             .unwrap_or(("", "")),
         Id::TrackSelect("autoVariant") => ("Variant", ""),
+        Id::TrackSelect("groove") => ("Groove", ""),
         Id::TrackSelect(key) => (editors::fx_label(key), ""),
         Id::Toggle("mono") => ("Mono", ""),
         Id::Toggle("legato") => ("Legato", ""),
         Id::Toggle("autoMode") => ("Auto", ""),
         Id::Toggle("composeLock") => ("Lock", ""),
         Id::Toggle(key) => {
-            let mut rows = GENERATION_GROOVE.iter().chain(GENERATION_ENGINE.iter());
+            let mut rows = GENERATION_GROOVY.iter().chain(GENERATION_ENGINE.iter());
             let label = rows.find_map(|r| match r {
                 GenerationRow::Toggle(k, label) if *k == key => Some(*label),
                 _ => None,
@@ -403,7 +404,7 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
 
 /// The label of the Groove or Engine slider `key`.
 fn generation_slider_label(key: &str) -> Option<&'static str> {
-    GENERATION_GROOVE.iter().chain(GENERATION_ENGINE.iter()).find_map(|r| match r {
+    GENERATION_GROOVY.iter().chain(GENERATION_ENGINE.iter()).find_map(|r| match r {
         GenerationRow::Slider(p) if p.key == key => Some(p.label),
         _ => None,
     })

@@ -39,6 +39,9 @@ pub(super) fn flag(track: &Track, key: &str) -> bool {
 
 /// The text of setting `key`, as a select compares it (empty without one).
 pub(crate) fn text_of(track: &Track, key: &str) -> String {
+    if key == "groove" {
+        return track.groove.preset_name().unwrap_or(super::tables::CUSTOM_GROOVE).to_owned();
+    }
     match track.field(key) {
         Some(Value::String(s)) => s,
         Some(Value::Number(n)) => ordrumbox_core::num::text(n),
@@ -302,8 +305,8 @@ pub fn track_tooltip(track: &Track, sound: &str) -> Vec<String> {
     if let Some(steps) = track.loop_steps {
         length.push(format!("loop:{steps}"));
     }
-    if track.swing_amount != 0.0 {
-        length.push(format!("swing:{}", fmt(track.swing_amount)));
+    if track.groove_amount != 0.0 && !track.groove.is_straight() {
+        length.push(format!("groove:{}", fmt(track.groove_amount)));
     }
     let mut lines = vec![title];
     if !sound.is_empty() {

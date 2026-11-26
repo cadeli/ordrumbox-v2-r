@@ -4,7 +4,7 @@ use super::super::Session;
 use crate::kits::KitSet;
 use crate::panel::{Id, Step};
 use ordrumbox_core::json;
-use ordrumbox_core::{DelayType, FilterType, Library};
+use ordrumbox_core::{DelayType, FilterType, Groove, Library};
 use ordrumbox_engine::SynthPresets;
 
 /// A pattern of one KICK track, three synth presets.
@@ -85,6 +85,24 @@ fn an_effect_s_arrows_step_through_its_types() {
     assert_eq!(reverb(&s), ("gated".into(), 0.0));
     s.select(Id::TrackSelect("reverbType"), "plate");
     assert_eq!(reverb(&s), ("plate".into(), 0.5));
+}
+
+#[test]
+fn a_groove_is_picked_by_name_and_keeps_the_amount_set() {
+    let mut s = session();
+    let groove = |s: &Session| {
+        let track = &s.pattern().unwrap().tracks[0];
+        (track.groove.clone(), track.groove_amount)
+    };
+    s.select(Id::TrackSelect("groove"), "Swing 16th");
+    assert_eq!(groove(&s), (Groove::swing(2), 0.5), "an amount, so that the pick is heard");
+    s.set_value(Id::Loop("grooveAmount"), 0.2);
+    s.select(Id::TrackSelect("groove"), "Accent");
+    assert_eq!(groove(&s), (Groove::preset("Accent").unwrap(), 0.2), "the amount set is kept");
+    s.select(Id::TrackSelect("groove"), "Custom");
+    assert_eq!(groove(&s).0, Groove::preset("Accent").unwrap(), "Custom shows a table of its own, it is not a pick");
+    s.select(Id::TrackSelect("groove"), "Straight");
+    assert_eq!(groove(&s), (Groove::default(), 0.2));
 }
 
 #[test]

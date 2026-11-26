@@ -207,6 +207,15 @@ Each change of behaviour, with the snapshots it rewrote, or "No snapshot changed
 says what was true when it was written; when a later change undoes part of it, that part is taken out of it, so that
 no two entries contradict each other.
 
+A track's swing is a groove (`ordrumbox-core/src/groove.rs`): a table, repeated over the steps of each beat, of a delay
+in beats and a velocity for each step, scaled by `grooveAmount`; the swing is its table `[0, 1, 0…]`. The track keys
+`swingAmount` and `swingResolution` are read (the first as an alias of `grooveAmount`, the second as `Groove::swing`)
+and never written; the Swing lane is the Groove lane (`swing` is still read). A style's swing sets a swing groove only
+while its amount is above 0, and a track with a groove of its own is left as it is by the generation. The sound of a
+swing is the same: no audio snapshot changed. The files that hold a track got `grooveAmount` and `groove` in place of
+`swingAmount` and `swingResolution` (a style's track no longer carries `swingResolution` with no swing): this rewrote
+`library_rust.json`, `edge_library_rust.json`, `compose_rust.txt` and `generators_rust.txt`, by their `--ignored` tests.
+
 Loading says more of what it cannot read (`Issue`s, `AGENTS.md` "Errors"); a value read from a sound file is
 unchanged, but for the scales. Newly reported, the default kept: a library's `info` or `patterns` of the wrong type;
 a project's `selectedPattern` or `selectedSong` that is not a whole number from 0 (a fraction used to be cut,
@@ -529,12 +538,12 @@ target is moved to `ordrumbox-core/src/automation/target.rs`. The engine carries
 `StripLfo::controls` (`strip_control`, `set_strip_control`), which the strip approaches once a quantum as it does a
 host's change: the render path is unchanged. Without lanes nothing changes: no snapshot changed.
 
-Lanes also set a track's transpose (whole semitones), probability and swing amount (`Transpose`, `Probability`,
-`Swing`). They act on each note of a song pass as it starts, at the lane's value on its step
+Lanes also set a track's transpose (whole semitones), probability and groove amount (`Transpose`, `Probability`,
+`Groove`). They act on each note of a song pass as it starts, at the lane's value on its step
 (`ordrumbox-engine/src/pass/song_notes.rs`): a track with a probability lane is expanded with its probability at 1
-(`lane_pattern`) and each hit is then drawn against the lane's (or the track's), from the pass's `Rng`; a swing lane on
-a straight track swings pairs of steps. `note_frame` takes the swing in ticks (`swing_ticks`, with the note's own swing
-in beats). The track editor's Generation and Loop sliders show what a lane sets, as the knob bar does. Without these
+(`lane_pattern`) and each hit is then drawn against the lane's (or the track's), from the pass's `Rng`; a groove lane on
+a straight track swings pairs of steps. `note_frame` takes the groove's delay in ticks (`groove_ticks`, with the note's own
+delay in beats); the hit takes the velocity of its step (`Hit::grooved`). The track editor's Generation and Loop sliders show what a lane sets, as the knob bar does. Without these
 lanes nothing is drawn and nothing moves: no snapshot changed.
 
 A level lane glides from a point to the next one on the next step only when they are part of a run of three

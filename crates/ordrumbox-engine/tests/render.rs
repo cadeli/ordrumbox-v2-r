@@ -72,7 +72,7 @@ fn every_note_becomes_an_event_on_its_frame() {
                 notes.iter().filter(|n| matches!(sounds[n.track], TrackSound::Sample(_)) && audible(n.track)).map(
                     move |n| {
                         let track = &pattern.tracks[n.track];
-                        let late = n.swing_beats(track) * f64::from(TICK);
+                        let late = n.groove_beats(track) * f64::from(TICK);
                         (((f64::from(tick) + late) * per_tick).round() as u64).min(pass.frames - 1)
                     },
                 )

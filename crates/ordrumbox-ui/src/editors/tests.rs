@@ -239,7 +239,7 @@ fn the_engine_tab_shows_the_amounts_and_the_variants_a_track_can_use() {
         track_editor(&view, &state, Rect::new(0, 0, 360, 600), Scale::ONE).items
     };
     let kick = Track { name: "KICK".into(), auto_mode: true, auto_hit_variation: Some(20.0), ..Track::default() };
-    let groove = ids(&kick, GenerationTab::Groove);
+    let groove = ids(&kick, GenerationTab::Groovy);
     let hits = groove.iter().find(|i| i.id == Some(Id::Generation("autoHitVariation"))).unwrap();
     assert!(matches!(&hits.kind, Kind::Value { value, .. } if *value == 20.0));
     // A drum line: no variant, no density; the note amount unset shows the one used.

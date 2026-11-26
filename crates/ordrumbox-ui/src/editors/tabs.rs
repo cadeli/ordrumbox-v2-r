@@ -2,7 +2,7 @@
 
 use super::tables::{FX_DEFS, FX_KNOBS, FxDef, GENERATION_COMPOSE};
 use super::tables::{
-    GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, LFO_TARGETS, LOOP_PROPS, LfoTarget, Prop,
+    GENERATION_ENGINE, GENERATION_GROOVY, GENERATION_MANUAL, GenerationRow, LFO_TARGETS, LOOP_PROPS, LfoTarget, Prop,
     fx_label, prop, track_select_options,
 };
 use super::values::{
@@ -248,9 +248,9 @@ pub(super) fn lfo_strip(rows: &mut Rows, track: &Track, i: u8, target: &LfoTarge
     rows.y += knob_row_h(s) + FX_STRIP_GAP * s;
 }
 
-/// The loop tab of `track`, its swing at the value `moved` gives it (a song
-/// lane's, while it plays) when it gives one.
-pub(super) fn loop_tab(rows: &mut Rows, track: &Track, moved: &[(&'static str, f64)]) {
+/// The loop tab of `track`, its groove amount at the value `moved` gives it
+/// (a song lane's, while it plays) when it gives one.
+pub(super) fn loop_tab(rows: &mut Rows, track: &Track, moved: &[(&'static str, f64)], state: &EditorState) {
     let spb = track.steps_per_beat;
     let max_steps = f64::from(track.beat_count * spb);
     for p in &LOOP_PROPS {
@@ -263,8 +263,11 @@ pub(super) fn loop_tab(rows: &mut Rows, track: &Track, moved: &[(&'static str, f
                 value_spec(&Prop { max: max_steps, ..*p }, p.min, false),
                 Format::LoopLength(spb),
             ),
-            key => (moved_value(moved, key).unwrap_or(track.swing_amount), value_spec(p, default, false), p.format),
+            key => (moved_value(moved, key).unwrap_or(track.groove_amount), value_spec(p, default, false), p.format),
         };
+        if p.key == "grooveAmount" {
+            groove_select(rows, track, state);
+        }
         let is_moved = moved_value(moved, p.key).is_some();
         rows.slider(Id::Loop(p.key), spec, value, p.label, format.value(value, ""), is_moved);
     }
@@ -320,7 +323,7 @@ fn generation_toggle(rows: &mut Rows, (key, label): (&'static str, &str), on: bo
     rows.items.push(Item::new(Some(Id::Toggle(key)), rows.field(r, 36 * rows.scale), Kind::Toggle { on }));
 }
 
-/// The unfolded Advanced part of the generation tab: its tabs (Groove and
+/// The unfolded Advanced part of the generation tab: its tabs (Groovy and
 /// Engine, or Manual; Compose) and the settings of the one shown.
 fn advanced_generation(
     rows: &mut Rows,
@@ -334,10 +337,10 @@ fn advanced_generation(
     let tabs = if track.auto_mode {
         [
             Some((
-                Id::GenerationTab(GenerationTab::Groove),
+                Id::GenerationTab(GenerationTab::Groovy),
                 None,
-                "Groove",
-                !compose_tab && state.generation_tab == GenerationTab::Groove,
+                "Groovy",
+                !compose_tab && state.generation_tab == GenerationTab::Groovy,
                 false,
             )),
             Some((
@@ -350,7 +353,7 @@ fn advanced_generation(
             None,
         ]
     } else {
-        [Some((Id::GenerationTab(GenerationTab::Groove), None, "Manual", !compose_tab, false)), None, None]
+        [Some((Id::GenerationTab(GenerationTab::Groovy), None, "Manual", !compose_tab, false)), None, None]
     };
     let [first, second, _] = tabs;
     let compose_slot =
@@ -368,7 +371,7 @@ fn advanced_generation(
         }
         return;
     }
-    for row in if state.generation_tab == GenerationTab::Groove { &GENERATION_GROOVE } else { &GENERATION_ENGINE } {
+    for row in if state.generation_tab == GenerationTab::Groovy { &GENERATION_GROOVY } else { &GENERATION_ENGINE } {
         match row {
             // A drum line comes from its style (Compose); a melodic one has them above.
             GenerationRow::Select("autoVariant", _) | GenerationRow::Slider(Prop { key: "autoDensity", .. }) => {}
@@ -399,7 +402,7 @@ pub(super) fn simple_part_bottom(top: i32, scale: Scale) -> i32 {
 
 /// The rows of the Generate tab's tallest sub-tab.
 pub(super) const GENERATION_ROWS: usize =
-    max_len(&[GENERATION_GROOVE.len(), GENERATION_ENGINE.len(), GENERATION_COMPOSE.len(), GENERATION_MANUAL.len()]);
+    max_len(&[GENERATION_GROOVY.len(), GENERATION_ENGINE.len(), GENERATION_COMPOSE.len(), GENERATION_MANUAL.len()]);
 
 pub(super) const fn max_len(lens: &[usize]) -> usize {
     let mut max = 0;
@@ -467,6 +470,15 @@ pub(super) fn generation_slider(
 /// The value `moved` gives the setting `key`, if it gives one.
 fn moved_value(moved: &[(&'static str, f64)], key: &str) -> Option<f64> {
     moved.iter().find(|(k, _)| *k == key).map(|&(_, value)| value)
+}
+
+/// The loop tab's groove: a preset of its table (`Custom` for one of the file's own).
+fn groove_select(rows: &mut Rows, track: &Track, state: &EditorState) {
+    let key = "groove";
+    let r = rows.row();
+    rows.label(r, "Groove", Some(key), state.selected_prop == Some(key));
+    let choice = select_choice(track, key, state);
+    rows.items.push(Item::new(Some(Id::TrackSelect(key)), rows.field(r, 120 * rows.scale), choice.kind()));
 }
 
 /// The variant a melodic track plays (`""`: its style's).

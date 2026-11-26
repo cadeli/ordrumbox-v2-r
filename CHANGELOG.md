@@ -8,6 +8,10 @@
   Lo-fi Hip-Hop, Blues Shuffle, Afrobeat, Electroclash, Electro-Punk.
 
 ### Changed
+- The track editor's **Swing** is now a **Groove**: a list (Straight, Swing 16th, Swing 8th, Shuffle, Laid back,
+  Accent) and an **Amount**. A groove is a table of delays and accents for the steps of a beat; the swing is one of
+  them. The Swing lane of a song is the Groove lane. Files with `swingAmount` and `swingResolution` still load
+  and are saved as a groove.
 - A new library starts with the **starter library** (a funk song and a few beats), not every demo;
   File > Load the demo library... is now File > Load the starter library...
 - The demo arrangement is named **Funk Song**.

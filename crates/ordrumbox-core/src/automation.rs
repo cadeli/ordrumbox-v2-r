@@ -1,7 +1,7 @@
 //! Song automation: lanes that set a control of an instrument along an
 //! song, at the resolution of a step (a sixteenth note): switch it on
 //! and off (mute, solo) or set its level (volume, pan, filter cutoff and Q,
-//! sends, effect amounts; transpose, probability and swing, which act on
+//! sends, effect amounts; transpose, probability and groove, which act on
 //! each note as it starts: [`AutomationTarget`]).
 //!
 //! Every lane holds values from 0 to 1: a switch is off below one half and
@@ -66,8 +66,9 @@ pub enum AutomationTarget {
     Transpose,
     /// The track's probability: whether each note plays.
     Probability,
-    /// The track's swing amount: how late the second step of a pair plays.
-    Swing,
+    /// The track's groove amount: how much of its timing and accents play (a
+    /// straight track swings in pairs of steps).
+    Groove,
 }
 
 /// How a lane's values act on its control.

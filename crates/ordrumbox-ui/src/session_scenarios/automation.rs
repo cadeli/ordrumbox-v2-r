@@ -270,11 +270,11 @@ fn transpose_probability_and_swing_controls_write_and_show_their_lanes() {
     assert!(s.track_view(0).unwrap().lfo.contains(&("transpose", 7.0)), "the knob shows its lane");
     // The generation tab's probability and the loop tab's swing.
     s.set_value(Id::Generation("probability"), 0.25);
-    s.set_value(Id::Loop("swingAmount"), 0.5);
+    s.set_value(Id::Loop("grooveAmount"), 0.5);
     assert_eq!(lane_points(&s, AutomationTarget::Probability)[0].1, Some(0.25));
-    assert_eq!(lane_points(&s, AutomationTarget::Swing)[0].1, Some(0.5));
+    assert_eq!(lane_points(&s, AutomationTarget::Groove)[0].1, Some(0.5));
     let track = s.track(0).unwrap();
-    assert_eq!((track.transpose, track.probability, track.swing_amount), (0.0, 1.0, 0.0), "the track is not edited");
+    assert_eq!((track.transpose, track.probability, track.groove_amount), (0.0, 1.0, 0.0), "the track is not edited");
     let lfo = &s.track_view(0).unwrap().lfo;
-    assert!(lfo.contains(&("probability", 0.25)) && lfo.contains(&("swingAmount", 0.5)));
+    assert!(lfo.contains(&("probability", 0.25)) && lfo.contains(&("grooveAmount", 0.5)));
 }

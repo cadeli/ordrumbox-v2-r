@@ -244,7 +244,7 @@ fn a_new_pattern_has_its_style_tracks_meter_and_tempo() {
                 assert!(style.tracks.contains(&track.name), "{}: {}", style.name, track.name);
                 if instrument_family(&track.name).is_drum() {
                     assert_eq!(track.steps_per_beat, style.steps_per_beat, "{}: {}", style.name, track.name);
-                    assert_eq!(track.swing_amount, style.swing_amount);
+                    assert_eq!(track.groove_amount, style.swing_amount);
                 }
             }
             // The parts every pattern of the style has.

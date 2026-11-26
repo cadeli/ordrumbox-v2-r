@@ -30,11 +30,11 @@ impl EditorTab {
 }
 
 /// A sub-tab of the Generate tab's Advanced settings. Out of auto mode,
-/// Groove's slot is labelled Manual and Engine has none.
+/// Groovy's slot is labelled Manual and Engine has none.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum GenerationTab {
     #[default]
-    Groove,
+    Groovy,
     Engine,
     /// A drum track's compose settings (only shown for one).
     Compose,
@@ -42,7 +42,7 @@ pub enum GenerationTab {
 
 impl GenerationTab {
     /// The sub-tabs, left to right.
-    pub const ALL: [Self; 3] = [Self::Groove, Self::Engine, Self::Compose];
+    pub const ALL: [Self; 3] = [Self::Groovy, Self::Engine, Self::Compose];
 }
 
 /// A view button of the header: a view of the main editor, or the kit

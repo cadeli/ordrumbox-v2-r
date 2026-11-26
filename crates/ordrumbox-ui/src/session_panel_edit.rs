@@ -4,8 +4,8 @@
 //! its control.
 
 use super::session_types::PlayMode;
-use ordrumbox_core::SetField;
 use ordrumbox_core::json::{Object, Value};
+use ordrumbox_core::{Groove, SetField, Track};
 use ordrumbox_engine::assign::synth_for;
 
 use super::session_cartridge::{fx_switch, fx_type_updates};
@@ -402,6 +402,10 @@ impl Session {
                 let Some(track) = self.track(t) else { return };
                 let updates = match editors::fx_of_type(key) {
                     Some(fx) => fx_type_updates(track, fx, value),
+                    None if key == "groove" => match groove_updates(track, value) {
+                        Some(updates) => updates,
+                        None => return,
+                    },
                     None if editors::NUMERIC_SELECTS.contains(&key) => {
                         vec![(key, Value::from(value).to_number().map_or(Value::Null, number))]
                     }
@@ -544,4 +548,18 @@ impl Session {
             Err(e) => self.message = e,
         }
     }
+}
+
+/// Amount a groove picked on a track that had none plays at, so the pick is heard.
+const PICKED_GROOVE_AMOUNT: f64 = 0.5;
+
+/// The updates the groove select `name` makes to `track`: the preset's table, and an
+/// amount when the track had none; `None` for a name that is no preset (`Custom`).
+fn groove_updates(track: &Track, name: &str) -> Option<Vec<(&'static str, Value)>> {
+    let groove = Groove::preset(name)?;
+    let mut updates = vec![("groove", groove.to_value())];
+    if track.groove_amount == 0.0 && !groove.is_straight() {
+        updates.push(("grooveAmount", number(PICKED_GROOVE_AMOUNT)));
+    }
+    Some(updates)
 }

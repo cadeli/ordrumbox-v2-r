@@ -186,9 +186,9 @@ fn new_style(name: &str, patterns: &[&Pattern]) -> Option<Style> {
     }
     style.parts = parts;
     let drums: Vec<&Track> = drum_tracks(patterns).collect();
-    style.swing_amount = drums.iter().map(|t| t.swing_amount).sum::<f64>() / drums.len().max(1) as f64;
+    style.swing_amount = drums.iter().map(|t| t.groove_amount).sum::<f64>() / drums.len().max(1) as f64;
     if let Some(t) = drums.first() {
-        style.swing_resolution = t.swing_resolution;
+        style.swing_resolution = t.groove.swing_resolution().unwrap_or(1);
     }
     style.fill.part = style.parts.iter().find(|(n, _)| rank(n) == 1).map_or(style.fill.part, |(n, _)| n.clone());
     style.learned = Some((patterns.len(), measures));
@@ -225,7 +225,7 @@ fn blend(style: &mut Style, patterns: &[&Pattern]) {
         }
     }
     let swing =
-        drum_tracks(patterns).map(|t| t.swing_amount).sum::<f64>() / drum_tracks(patterns).count().max(1) as f64;
+        drum_tracks(patterns).map(|t| t.groove_amount).sum::<f64>() / drum_tracks(patterns).count().max(1) as f64;
     let share = measures as f64 / (measures as f64 + LEARNING_MEASURES);
     style.swing_amount += share * (swing - style.swing_amount);
     style.learned = Some((patterns.len(), measures));

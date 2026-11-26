@@ -159,7 +159,7 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   rows, lists the instruments the song's patterns play; pick one, then the control: **Mute**,
   **Solo**, **Volume**, **Pan**, **Cutoff**, **Q**, **Echo send**, **Reverb send**, **Reverb mix**,
   **Delay mix**, **Delay feedback**, **Saturation**, **Bitcrush**, **Hard clip**, **Comp mix**,
-  **Transpose**, **Probability** or **Swing**, and a lane for it appears under the patterns. The panel opens zoomed in
+  **Transpose**, **Probability** or **Groove**, and a lane for it appears under the patterns. The panel opens zoomed in
   far enough to show each step (a sixteenth note). Press a step and **drag** along the
   lane to select steps. On a Mute or Solo lane, from a step that is not on, the selection
   is switched on; from a step that is on, it is switched off. On a Volume lane, the height
@@ -181,10 +181,10 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   replaces the track's value (and its LFO) where it is set. A cutoff lane filters a track
   whose filter is off, as a lowpass; an effect lane plays its effect even with its light off,
   but a reverb or a delay of type `none` stays off, and a slap delay stays one echo.
-  Transpose, Probability and Swing act on each note as it starts, at the value of its step:
+  Transpose, Probability and Groove act on each note as it starts, at the value of its step:
   a transposed note keeps its pitch to its end (the track's transpose LFO still moves it), a
-  probability lane decides each note on its own (a repeat too), and a swing lane swings a
-  track whose swing grid is straight in pairs of steps. A click, left or
+  probability lane decides each note on its own (a repeat too), and a groove lane sets how much of the track's groove plays (a
+  straight track swings in pairs of steps). A click, left or
   right, on a lane's name opens its menu: clear all its points, delete the lane, or
   delete every lane. Lanes are saved with the song.
 - **Automation and the mixer** while a song plays: the mixer shows what the lanes set (a

@@ -77,7 +77,7 @@ const fn target_color(target: AutomationTarget) -> Rgb {
         | AutomationTarget::Bitcrush
         | AutomationTarget::HardClip
         | AutomationTarget::CompMix => theme::ACCENT,
-        AutomationTarget::Transpose | AutomationTarget::Swing => theme::LIVE,
+        AutomationTarget::Transpose | AutomationTarget::Groove => theme::LIVE,
         AutomationTarget::Probability => theme::CHANCE,
     }
 }

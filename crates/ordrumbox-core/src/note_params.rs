@@ -1,4 +1,4 @@
-//! What a hit sounds like once its track is applied: stereo position, playback ratio, swing.
+//! What a hit sounds like once its track is applied: stereo position, playback ratio, groove.
 
 use crate::pattern_engine::Hit;
 use crate::steps::semitone_ratio;
@@ -19,25 +19,24 @@ impl Hit {
         semitone_ratio(self.pitch + track.transpose)
     }
 
-    /// Swing delay, in beats: with a swing grid of
-    /// `swing_resolution` steps (1 = straight), the note on the second step of
-    /// each group is pushed late by `swing_amount` beats (0.33 is a triplet feel).
-    pub fn swing_beats(&self, track: &Track) -> f64 {
-        self.swing_beats_with(track.swing_resolution, track.swing_amount)
+    /// How late the track's groove plays the hit, in beats, at the track's amount.
+    #[must_use]
+    pub fn groove_beats(&self, track: &Track) -> f64 {
+        track.groove.timing_beats(self.step, track.groove_amount)
     }
 
-    /// Swing delay, in beats, with a swing grid of `resolution` steps
-    /// pushing late by `amount` beats ([`Self::swing_beats`]).
+    /// The hit with the velocity the track's groove gives its step at `amount`, kept within 0–1.
     #[must_use]
-    pub fn swing_beats_with(&self, resolution: i32, amount: f64) -> f64 {
-        let grid = resolution.max(1);
-        if grid == 1 || self.step % grid != 1 { 0.0 } else { amount }
+    pub fn grooved(&self, track: &Track, amount: f64) -> Self {
+        let delta = track.groove.velocity_delta(self.step, amount);
+        Self { velocity: (self.velocity + delta).clamp(0.0, 1.0), ..self.clone() }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::groove::Groove;
 
     fn note(beat_step: i32, pitch: f64, pan: f64) -> Hit {
         Hit { track: 0, source: Some(0), beat: 0, step: beat_step, pitch, velocity: 0.8, pan, length_steps: 1.0 }
@@ -59,12 +58,16 @@ mod tests {
     }
 
     #[test]
-    fn swing_pushes_the_second_step_of_each_group() {
-        let swung = Track { swing_resolution: 2, swing_amount: 0.33, ..Track::default() };
-        assert_eq!(note(1, 0.0, 0.0).swing_beats(&swung), 0.33);
-        assert_eq!(note(3, 0.0, 0.0).swing_beats(&swung), 0.33);
-        assert_eq!(note(2, 0.0, 0.0).swing_beats(&swung), 0.0);
-        let straight = Track { swing_amount: 0.5, ..Track::default() };
-        assert_eq!(note(1, 0.0, 0.0).swing_beats(&straight), 0.0);
+    fn the_groove_pushes_and_accents_its_steps() {
+        let swung = Track { groove: Groove::swing(2), groove_amount: 0.33, ..Track::default() };
+        assert_eq!(note(1, 0.0, 0.0).groove_beats(&swung), 0.33);
+        assert_eq!(note(3, 0.0, 0.0).groove_beats(&swung), 0.33);
+        assert_eq!(note(2, 0.0, 0.0).groove_beats(&swung), 0.0);
+        let straight = Track { groove_amount: 0.5, ..Track::default() };
+        assert_eq!(note(1, 0.0, 0.0).groove_beats(&straight), 0.0);
+        let accent = Track { groove: Groove::preset("Accent").unwrap(), ..Track::default() };
+        assert_eq!(note(0, 0.0, 0.0).grooved(&accent, 1.0).velocity, 1.0, "0.8 + 0.5, kept to 1");
+        assert!((note(1, 0.0, 0.0).grooved(&accent, 0.5).velocity - 0.65).abs() < 1e-12);
+        assert_eq!(note(1, 0.0, 0.0).grooved(&accent, 0.0).velocity, 0.8);
     }
 }

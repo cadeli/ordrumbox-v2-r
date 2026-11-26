@@ -15,11 +15,11 @@ pub fn help(id: Id) -> Option<Help> {
         Id::Tab(tab) => tab_help(tab),
         Id::FxPower(fx) => fx_help(fx)?,
         Id::GenerationTab(tab) => match tab {
-            GenerationTab::Groove => ["Groove (Manual out of auto mode)", "how the hits vary from loop to loop"],
+            GenerationTab::Groovy => ["Groovy (Manual out of auto mode)", "how the hits vary from loop to loop"],
             GenerationTab::Engine => ["Engine", "what the auto engine adds to the notes"],
             GenerationTab::Compose => ["Compose", "how a drum line is written: hits, complexity, style"],
         },
-        Id::GenerationAdvanced => ["Advanced settings", "the manual, Groove, Engine and Compose settings"],
+        Id::GenerationAdvanced => ["Advanced settings", "the manual, Groovy, Engine and Compose settings"],
         Id::Regenerate => ["New line", "write this track's line again, in its style"],
         Id::NoteTab(tab) => match tab {
             0 => ["Trigger", "when the note plays: every N loops, its chance"],
@@ -130,7 +130,7 @@ const fn tab_help(tab: EditorTab) -> Help {
         EditorTab::Fx => ["Effects", "reverb, delay, saturation, filter"],
         EditorTab::Sound => ["Sound", "the sample or synth the track plays"],
         EditorTab::Lfo => ["LFO", "a setting moved up and down as it plays"],
-        EditorTab::Loop => ["Loop", "steps per beat, loop length, swing"],
+        EditorTab::Loop => ["Loop", "steps per beat, loop length, groove"],
         EditorTab::Generate => ["Generation", "auto mode and how the line is written"],
     }
 }
@@ -212,14 +212,15 @@ fn setting_help(key: &str) -> Option<Help> {
         // Loop.
         "stepsPerBeat" => ["Steps per beat", "the grid of the track: 4 is 16ths, 3 triplets"],
         "loopLength" => ["Loop length", "the track loops after this many steps"],
-        "swingAmount" => ["Swing", "delays every other step"],
+        "grooveAmount" => ["Groove amount", "how much of the groove plays: its delays, in beats, and its accents"],
+        "groove" => ["Groove", "which steps of the beat play late or hard (Straight: none)"],
         // Generation, simple view and manual.
         "autoMode" => ["Auto mode (Z)", "the engine writes and varies the line as it plays"],
         "composeLock" => ["Lock", "the generation leaves this track as it is"],
         "hitVariation" | "autoHitVariation" => ["Hit variation", "how much the hits change from loop to loop"],
         "noteVariation" | "autoNoteVariation" => ["Note variation", "how much the notes change from loop to loop"],
         "probability" => ["Probability", "the chance a note plays, 0 to 1"],
-        // Groove.
+        // Groovy.
         "autoPitchChance" => ["Pitch chance", "a hit changes pitch"],
         "autoVelocityChance" => ["Velocity chance", "a hit gets louder or softer"],
         "autoSilenceChance" => ["Silence chance", "a hit is left out"],
@@ -273,7 +274,7 @@ fn setting_help(key: &str) -> Option<Help> {
 mod tests {
     use super::*;
     use crate::editors::{
-        FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow,
+        FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVY, GENERATION_MANUAL, GenerationRow,
         KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_TABS, NoteRow,
     };
 
@@ -283,7 +284,7 @@ mod tests {
         keys.extend(
             FX_KNOBS.iter().chain(&GENERATION_MANUAL).chain(&GENERATION_COMPOSE).chain(&LOOP_PROPS).map(|p| p.key),
         );
-        for row in GENERATION_GROOVE.iter().chain(&GENERATION_ENGINE) {
+        for row in GENERATION_GROOVY.iter().chain(&GENERATION_ENGINE) {
             keys.push(match row {
                 GenerationRow::Slider(p) => p.key,
                 GenerationRow::Toggle(key, _) | GenerationRow::Select(key, _) => key,

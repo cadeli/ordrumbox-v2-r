@@ -10,7 +10,7 @@
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::num::{clamp, round2};
-use ordrumbox_core::{Macros, Pattern, Scales, Style, Styles, Track};
+use ordrumbox_core::{Groove, Macros, Pattern, Scales, Style, Styles, Track};
 
 use super::melodic;
 use super::structure::{Structure, random_key_offset, random_scale, section_harmony};
@@ -140,10 +140,13 @@ pub(super) fn random_density(g: &mut AutoGenerator<'_>, track: &Track) -> f64 {
 
 /// The style's swing on a melodic track, ±0.08 when it swings at all.
 fn apply_style_swing(g: &mut AutoGenerator<'_>, track: &mut Track, style: &Style) {
+    if track.groove.swing_resolution().is_none() {
+        return; // a groove of the user's own
+    }
     let jitter = (g.random() * 2.0 - 1.0) * 0.08;
     let amount = if style.swing_amount > 0.0 { style.swing_amount + jitter } else { 0.0 };
-    track.swing_amount = round2(clamp(amount, 0.0, 0.45));
-    track.swing_resolution = style.swing_resolution;
+    track.groove_amount = round2(clamp(amount, 0.0, 0.45));
+    track.groove = if track.groove_amount > 0.0 { Groove::swing(style.swing_resolution) } else { Groove::default() };
 }
 
 /// The variation amounts of a generated track, when it has

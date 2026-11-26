@@ -48,8 +48,8 @@ const TRACK_VALUES: [(&str, &str); 79] = [
     ("beatCount", "8"),
     ("stepsPerBeat", "3"),
     ("loopLength", "20"),
-    ("swingResolution", "2"),
-    ("swingAmount", "0.3"),
+    ("groove", r#"{"timing":[0,0.5],"velocity":[0,-0.25]}"#),
+    ("grooveAmount", "0.3"),
     ("volume", "0.7"),
     ("volumeLfo", LFO),
     ("transpose", "-5"),
@@ -138,7 +138,7 @@ const NOTE_WEB_KEYS: [(&str, &str); 10] = [
 ];
 
 /// Web-version track keys and the key each is saved under.
-const TRACK_WEB_KEYS: [(&str, &str); 45] = [
+const TRACK_WEB_KEYS: [(&str, &str); 46] = [
     ("useAutoAssignSound", "autoAssign"),
     ("sampleId", "samplePath"),
     ("loopAtStep", "loopLength"),
@@ -184,6 +184,7 @@ const TRACK_WEB_KEYS: [(&str, &str); 45] = [
     ("synthSoundKey", "synthPreset"),
     ("auto_variation", "autoHitVariation"),
     ("auto_variation2", "autoNoteVariation"),
+    ("swingAmount", "grooveAmount"),
 ];
 
 fn parse(text: &str) -> Value {

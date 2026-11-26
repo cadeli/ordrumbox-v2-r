@@ -653,7 +653,8 @@ after). An LFO that is off shows <em>sine</em>, the wave its LED turns it on at;
 <tr><th>Control</th><th>Range</th><th>What it does</th></tr>
 <tr><td><strong>Steps per Beat</strong></td><td>1–8</td><td>The track's grid (<kbd>Ctrl</kbd>+<kbd>G</kbd> steps through it). Tracks may differ: 3 for triplets, 4 for sixteenths…</td></tr>
 <tr><td><strong>Loop Length</strong></td><td>1 step to the track's length</td><td>The track loops after this many steps (<strong>Pattern › Loop one step shorter</strong>: one shorter). Polyrhythms come from tracks of different lengths.</td></tr>
-<tr><td><strong>Swing</strong></td><td>0–1</td><td>Delays the off-beat steps.</td></tr>
+<tr><td><strong>Groove</strong></td><td>a list</td><td>Which steps of each beat play late or hard: Straight, Swing 16th, Swing 8th, Shuffle (for triplets), Laid back, Accent. A table of its own, loaded from a file, shows as Custom. Swing 16th and Swing 8th are for a grid of 4 steps a beat. Picking one on a track whose amount is 0 sets the amount to 0.5.</td></tr>
+<tr><td><strong>Amount</strong></td><td>0–1</td><td>How much of the groove plays: its delays, in beats, and its accents. 0.33 on Shuffle is a triplet feel.</td></tr>
 </table>
 
 <h3>Generate tab</h3>
@@ -677,7 +678,7 @@ after). An LFO that is off shows <em>sine</em>, the wave its LED turns it on at;
 <table>
 <tr><th>Sub-tab</th><th>Shown</th><th>Settings</th></tr>
 <tr><td><strong>Manual</strong></td><td>Auto mode off</td><td><strong>Hit Variation</strong> (0–100), <strong>Note Variation</strong> (0–100), <strong>Probability</strong> (the track's note probability)</td></tr>
-<tr><td><strong>Groove</strong></td><td>Auto mode on</td><td><strong>Hit Variation</strong>, chances (0–100) of <strong>Pitch</strong>, <strong>Velocity</strong>, <strong>Silence</strong>, <strong>Fill</strong>, <strong>Ghost</strong>; <strong>Pitch Range</strong> (1–24); <strong>Scale Lock</strong></td></tr>
+<tr><td><strong>Groovy</strong></td><td>Auto mode on</td><td><strong>Hit Variation</strong>, chances (0–100) of <strong>Pitch</strong>, <strong>Velocity</strong>, <strong>Silence</strong>, <strong>Fill</strong>, <strong>Ghost</strong>; <strong>Pitch Range</strong> (1–24); <strong>Scale Lock</strong></td></tr>
 <tr><td><strong>Engine</strong></td><td>Auto mode on</td><td><strong>Note Variation</strong>, chances of <strong>Retrigger</strong>, <strong>Euclidean</strong>, <strong>Probability</strong> and its <strong>Depth</strong>, <strong>Arpeggio</strong>; <strong>Variant</strong>; <strong>Density</strong></td></tr>
 <tr><td><strong>Compose</strong></td><td>Drum track</td><td><strong>Measure Hits</strong> (0–32), <strong>Complexity</strong>, <strong>Syncopation</strong> (0–100), <strong>Coupling</strong> (−100 to +100, toward or away from the coupled part), <strong>Variation</strong>, <strong>Style Weight</strong> (how much the style's weights count against the plain meter), <strong>Seed</strong> (0 = new each time; above 0 the same line every time)</td></tr>
 </table>
@@ -889,7 +890,7 @@ then the control, and its lane appears under the patterns. The panel opens zoome
 <tr><td><strong>Delay feedback</strong></td><td>0 → 95 %. A slap delay stays one echo.</td></tr>
 <tr><td><strong>Transpose</strong></td><td>−24 → +24 semitones, in whole semitones.</td></tr>
 <tr><td><strong>Probability</strong></td><td>0 → 100 %: the chance each note plays.</td></tr>
-<tr><td><strong>Swing</strong></td><td>0 → 100 %, in pairs of steps, on a track whose swing grid is straight.</td></tr>
+<tr><td><strong>Groove</strong></td><td>0 → 100 %: the groove's amount; a straight track swings in pairs of steps.</td></tr>
 </table>
 <ul>
   <li><strong>Draw</strong>: press a step and drag along the lane. On a Mute or Solo lane, from a step that is off the
@@ -907,7 +908,7 @@ then the control, and its lane appears under the patterns. The panel opens zoome
       <strong>Taller</strong> / <strong>Shorter</strong> in its menu (saved with the song).</li>
 </ul>
 <p>Where a lane sets nothing, the instrument plays as its patterns say; where it sets a value, that value replaces the
-track's (and its LFO's). Transpose, Probability and Swing act on each note as it starts, at the value of its step: a
+track's (and its LFO's). Transpose, Probability and Groove act on each note as it starts, at the value of its step: a
 transposed note keeps its pitch to its end (the track's transpose LFO still moves it), and a probability lane decides each
 note on its own, a repeat too.</p>
 
@@ -1167,7 +1168,7 @@ taken before the master bus, has the track's own sound without the returns.</p>
 <ol>
   <li><strong>The header</strong>: STYLE, ↻, AUTO and the ENERGY / COMPLEXITY / VARIATION knobs act on the whole pattern.</li>
   <li><strong>The Generate tab</strong> of a track: Auto, Lock, a new line for the track alone, and its main settings.</li>
-  <li><strong>Advanced</strong> in the Generate tab: the Manual, Groove, Engine and full Compose settings.</li>
+  <li><strong>Advanced</strong> in the Generate tab: the Manual, Groovy, Engine and full Compose settings.</li>
 </ol>
 <p><kbd>Shift</kbd>+<kbd>D</kbd> and <kbd>Shift</kbd>+<kbd>S</kbd> (and <strong>Generate › Chords (auto)</strong>) make the drum, bass or chord lines alone, in auto mode.
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> makes a new pattern in the chosen style.</p>

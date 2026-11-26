@@ -23,7 +23,7 @@ impl AutomationTarget {
         Self::CompMix,
         Self::Transpose,
         Self::Probability,
-        Self::Swing,
+        Self::Groove,
     ];
 
     /// Its key in a file.
@@ -47,7 +47,7 @@ impl AutomationTarget {
             Self::CompMix => "compMix",
             Self::Transpose => "transpose",
             Self::Probability => "probability",
-            Self::Swing => "swing",
+            Self::Groove => "groove",
         }
     }
 
@@ -72,7 +72,7 @@ impl AutomationTarget {
             Self::CompMix => "Comp mix",
             Self::Transpose => "Transpose",
             Self::Probability => "Probability",
-            Self::Swing => "Swing",
+            Self::Groove => "Groove",
         }
     }
 
@@ -83,7 +83,7 @@ impl AutomationTarget {
             Self::Cutoff => "filterCutoff",
             Self::Q => "filterQ",
             Self::Saturation => "saturationMix",
-            Self::Swing => "swingAmount",
+            Self::Groove => "grooveAmount",
             _ => self.key(),
         }
     }
@@ -96,6 +96,8 @@ impl AutomationTarget {
 
     #[must_use]
     pub fn from_key(key: &str) -> Option<Self> {
+        // `swing`: the key of the lane before the groove took its place.
+        let key = if key == "swing" { "groove" } else { key };
         Self::ALL.into_iter().find(|target| target.key() == key)
     }
 
@@ -127,7 +129,7 @@ impl AutomationTarget {
             Self::Cutoff => format!("{control:.0} Hz"),
             Self::Q => format!("{control:.2}"),
             Self::Transpose => format!("{control:+} st"),
-            Self::Swing => format!("{control:.2} beat"),
+            Self::Groove => format!("{control:.2} beat"),
             _ => format!("{:.0}%", control * 100.0),
         }
     }
@@ -190,7 +192,7 @@ mod tests {
             CompMix => 14,
             Transpose => 15,
             Probability => 16,
-            Swing => 17,
+            Groove => 17,
         }
     }
 
@@ -233,7 +235,7 @@ mod tests {
         let transpose = AutomationTarget::Transpose;
         assert_eq!([0.0, 0.51, 0.5, 1.0].map(|v| transpose.to_control(v)), [-24.0, 0.0, 0.0, 24.0], "whole semitones");
         assert_eq!([transpose.value_label(0.75), transpose.value_label(0.0)], ["+12 st", "-24 st"]);
-        assert_eq!(AutomationTarget::Swing.value_label(0.33), "0.33 beat");
+        assert_eq!(AutomationTarget::Groove.value_label(0.33), "0.33 beat");
         assert_eq!(AutomationTarget::Probability.value_label(0.5), "50%");
         // A probability has no range of its own to clamp to: 0 to 1.
         let without_range = [AutomationTarget::Mute, AutomationTarget::Solo, AutomationTarget::Probability];

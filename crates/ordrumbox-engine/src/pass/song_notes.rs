@@ -1,6 +1,6 @@
 //! What a song's automation lanes do to its notes as they start: a
-//! transpose lane sets their pitch, a swing lane how late the second step of
-//! a pair plays, a probability lane whether they play. A note takes the
+//! transpose lane sets their pitch, a groove lane how much of the track's groove
+//! plays (a swing in pairs of steps on a straight track), a probability lane whether they play. A note takes the
 //! lanes' values on its step; the track's own where they set nothing.
 
 use std::borrow::Cow;
@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use ordrumbox_core::automation::{AutomationLane, AutomationTarget, lanes_value_at};
 use ordrumbox_core::{Hit, Pattern, Rng, Track};
 
-/// The steps of a swing pair: the grid a swing lane swings a straight track on.
+/// The steps of a swing pair: the grid a groove lane swings a straight track on.
 const SWING_PAIR: i32 = 2;
 
 /// `pattern` as a song with `lanes` expands it: a track with a probability
@@ -33,7 +33,8 @@ pub(super) struct NoteLanes {
     /// The chance it plays: the lane's, or the track's where it sets
     /// nothing; `None` when the track has no probability lane.
     probability: Option<f64>,
-    swing: Option<f64>,
+    /// The groove amount the lane sets.
+    groove: Option<f64>,
 }
 
 impl NoteLanes {
@@ -47,7 +48,7 @@ impl NoteLanes {
         Self {
             transpose: value(AutomationTarget::Transpose),
             probability: has_probability.then(|| value(AutomationTarget::Probability).unwrap_or(own_probability)),
-            swing: value(AutomationTarget::Swing),
+            groove: value(AutomationTarget::Groove),
         }
     }
 
@@ -56,24 +57,29 @@ impl NoteLanes {
         self.probability.is_none_or(|probability| rng.chance(probability))
     }
 
-    /// `note` of `track` with the lanes' transpose in place of the track's.
+    /// `note` of `track` with the lanes' transpose in place of the track's and
+    /// the velocity the groove, at the lane's amount, gives its step.
     pub(super) fn apply(&self, note: &Hit, track: &Track) -> Hit {
-        let mut note = note.clone();
+        let mut note = note.grooved(track, self.groove.unwrap_or(track.groove_amount));
         if let Some(transpose) = self.transpose {
             note.pitch += transpose - track.transpose;
         }
         note
     }
 
-    /// How late `note` of `track` swings, in beats: by the lane's amount
-    /// (on pairs of steps when the track is straight), else the track's.
-    pub(super) fn swing_beats(&self, note: &Hit, track: &Track) -> f64 {
-        match self.swing {
-            Some(amount) => {
-                let resolution = if track.swing_resolution > 1 { track.swing_resolution } else { SWING_PAIR };
-                note.swing_beats_with(resolution, amount)
+    /// How late `note` of `track` plays, in beats: at the lane's amount
+    /// (swung in pairs of steps when the track is straight), else the track's.
+    pub(super) fn groove_beats(&self, note: &Hit, track: &Track) -> f64 {
+        match self.groove {
+            Some(amount) if track.groove.is_straight() => {
+                if note.step.rem_euclid(SWING_PAIR) == 1 {
+                    amount
+                } else {
+                    0.0
+                }
             }
-            None => note.swing_beats(track),
+            Some(amount) => track.groove.timing_beats(note.step, amount),
+            None => note.groove_beats(track),
         }
     }
 }
@@ -81,7 +87,7 @@ impl NoteLanes {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ordrumbox_core::AutomationStroke;
+    use ordrumbox_core::{AutomationStroke, Groove};
 
     fn lane(instrument: &str, target: AutomationTarget, from: u32, value: f64) -> AutomationLane {
         let mut lane = AutomationLane::new(instrument, target);
@@ -112,18 +118,18 @@ mod tests {
     }
 
     #[test]
-    fn transpose_and_swing_lanes_set_each_note() {
+    fn transpose_and_groove_lanes_set_each_note() {
         let track = Track { name: "BASS".into(), transpose: 5.0, ..Track::default() };
         let lanes =
-            [lane("BASS", AutomationTarget::Transpose, 8, 0.75), lane("BASS", AutomationTarget::Swing, 8, 0.25)];
+            [lane("BASS", AutomationTarget::Transpose, 8, 0.75), lane("BASS", AutomationTarget::Groove, 8, 0.25)];
         let before = NoteLanes::at(&lanes, &track, 7);
         assert_eq!(before.apply(&hit(1, 2.0), &track).pitch, 2.0, "the track's transpose kept");
-        assert_eq!(before.swing_beats(&hit(1, 0.0), &track), 0.0, "a straight track");
+        assert_eq!(before.groove_beats(&hit(1, 0.0), &track), 0.0, "a straight track");
         let after = NoteLanes::at(&lanes, &track, 8);
         assert_eq!(after.apply(&hit(1, 2.0), &track).pitch + track.transpose, 14.0, "+12 in place of +5");
-        let swing = [0, 1, 2, 3].map(|step| after.swing_beats(&hit(step, 0.0), &track));
+        let swing = [0, 1, 2, 3].map(|step| after.groove_beats(&hit(step, 0.0), &track));
         assert_eq!(swing, [0.0, 0.25, 0.0, 0.25], "a straight track swung in pairs");
-        let triplets = Track { swing_resolution: 3, ..track };
-        assert_eq!([1, 2, 4].map(|step| after.swing_beats(&hit(step, 0.0), &triplets)), [0.25, 0.0, 0.25]);
+        let triplets = Track { groove: Groove::swing(3), ..track };
+        assert_eq!([1, 2, 4].map(|step| after.groove_beats(&hit(step, 0.0), &triplets)), [0.25, 0.0, 0.25]);
     }
 }

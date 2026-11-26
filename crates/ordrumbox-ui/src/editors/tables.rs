@@ -5,13 +5,13 @@ use crate::control::Format;
 use ordrumbox_engine::kit::edit::SampleField;
 
 use crate::kits::{ATTACK_RANGE, DECAY_RANGE, GAIN_RANGE, HOLD_RANGE, TRANSPOSE_RANGE};
-use ordrumbox_core::Note;
 use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::note::{MAX_LENGTH_STEPS, MAX_SHIFT_STEPS};
 use ordrumbox_core::track::{
     COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, DUCK_RELEASE_MS_RANGE,
     MAX_CHOKE_GROUPS, MAX_STEPS_PER_BEAT,
 };
+use ordrumbox_core::{Groove, Note};
 use ordrumbox_logic::generate;
 
 /// An effect: the setting its on / off button reads and writes, its name,
@@ -136,6 +136,9 @@ pub(super) const FILTER_SLOPE_LABELS: [&str; 2] = ["12 dB", "24 dB"];
 /// an empty value is none).
 pub const NUMERIC_SELECTS: [&str; 3] = ["delayBeats", "filterSlope", "chokeGroup"];
 
+/// What the groove select shows for a groove that is none of the presets.
+pub const CUSTOM_GROOVE: &str = "Custom";
+
 /// What a select of a track setting offers: values and labels.
 pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
     let list = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
@@ -150,6 +153,10 @@ pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
             let groups = (1..=MAX_CHOKE_GROUPS).map(|g| g.to_string());
             let values = std::iter::once(String::new()).chain(groups.clone()).collect();
             (values, std::iter::once("off".to_owned()).chain(groups).collect())
+        }
+        "groove" => {
+            let names: Vec<String> = Groove::preset_names().map(str::to_owned).collect();
+            (names.iter().cloned().chain(std::iter::once(CUSTOM_GROOVE.to_owned())).collect(), Vec::new())
         }
         "autoVariant" => {
             // Every melodic variant (a bass track plays the bass ones, a chord track the others).
@@ -252,6 +259,7 @@ pub fn fx_label(key: &str) -> &'static str {
         "filterSlope" => "Slope",
         "sidechainSource" => "Key",
         "chokeGroup" => "Choke",
+        "groove" => "Groove",
         _ => "Type",
     }
 }
@@ -274,7 +282,7 @@ pub const GENERATION_MANUAL: [Prop; 3] = [
     prop("probability", "Probability", 0.0, 1.0, 0.01, Format::Percent),
 ];
 
-/// A row of the Groove / Engine sub-tabs.
+/// A row of the Groovy / Engine sub-tabs.
 #[derive(Debug, Clone, Copy)]
 pub enum GenerationRow {
     Slider(Prop),
@@ -282,7 +290,7 @@ pub enum GenerationRow {
     Select(&'static str, &'static str),
 }
 
-pub const GENERATION_GROOVE: [GenerationRow; 8] = [
+pub const GENERATION_GROOVY: [GenerationRow; 8] = [
     GenerationRow::Slider(prop("autoHitVariation", "Spot Variation", 0.0, 100.0, 1.0, Format::Chance)),
     GenerationRow::Slider(prop("autoPitchChance", "Pitch", 0.0, 100.0, 1.0, Format::Chance)),
     GenerationRow::Slider(prop("autoVelocityChance", "Velocity", 0.0, 100.0, 1.0, Format::Chance)),
@@ -319,7 +327,7 @@ pub const GENERATION_COMPOSE: [Prop; 7] = [
 pub const LOOP_PROPS: [Prop; 3] = [
     count("stepsPerBeat", "Steps per Beat", 1.0, MAX_STEPS_PER_BEAT as f64, Format::Plain),
     count("loopLength", "Loop Length", 1.0, 128.0, Format::Plain),
-    prop("swingAmount", "Swing", 0.0, 1.0, 0.01, Format::Plain),
+    prop("grooveAmount", "Amount", 0.0, 1.0, 0.01, Format::Plain),
 ];
 
 /// Note editor tabs.

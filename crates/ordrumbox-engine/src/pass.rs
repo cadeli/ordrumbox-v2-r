@@ -120,9 +120,9 @@ pub struct PassContext<'a> {
     pub first_tick: u64,
 }
 
-/// How late a note plays, in ticks, at its swing `own_beats` (its track's,
+/// How late a note plays, in ticks, at its groove's `own_beats` (its track's,
 /// or a song lane's).
-fn swing_ticks(own_beats: f64) -> f64 {
+fn groove_ticks(own_beats: f64) -> f64 {
     own_beats * f64::from(TICK)
 }
 
@@ -165,10 +165,10 @@ fn midi_note(target: Option<Target>, note: &Hit, track: &Track, lfo_tick: u64) -
     Some(target?.note(note.pitch + track.transpose + lfo))
 }
 
-/// The frame of a note at pass tick `tick`, swung `swing_ticks` late: a note
+/// The frame of a note at pass tick `tick`, late by `groove_ticks`: a note
 /// swung past the end still plays, on the last of the pass's `frames`.
-fn note_frame(tick: u32, swing_ticks: f64, per_tick: f64, frames: u64) -> u64 {
-    (((f64::from(tick) + swing_ticks) * per_tick).round() as u64).min(frames - 1)
+fn note_frame(tick: u32, groove_ticks: f64, per_tick: f64, frames: u64) -> u64 {
+    (((f64::from(tick) + groove_ticks) * per_tick).round() as u64).min(frames - 1)
 }
 
 /// The event that plays `sound` for `note` on `frame`, with its MIDI note.
@@ -239,7 +239,8 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
                 continue;
             }
             let track = &pattern.tracks[note.track];
-            let frame = note_frame(tick, swing_ticks(note.swing_beats(track)), per_tick, frames);
+            let frame = note_frame(tick, groove_ticks(note.groove_beats(track)), per_tick, frames);
+            let note = &note.grooved(track, track.groove_amount);
             let lfo_tick = context.first_tick + u64::from(tick);
             let Some(assigned) = context.sounds.get(note.track) else { continue };
             let voice = Voice { strip: note.track, lfo_tick, bpm };

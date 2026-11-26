@@ -273,7 +273,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
         EditorTab::Fx => fx_tab(&mut rows, view, state),
         EditorTab::Sound => sound_tab(&mut rows, view),
         EditorTab::Lfo => lfo_tab(&mut rows, view),
-        EditorTab::Loop => loop_tab(&mut rows, track, &view.lfo),
+        EditorTab::Loop => loop_tab(&mut rows, track, &view.lfo, state),
         EditorTab::Generate => generation_tab(&mut rows, (track, &view.lfo), view.compose.as_ref(), state),
     }
     TrackEditor { items: rows.items, sound_bottom, tabs_top, bottom }

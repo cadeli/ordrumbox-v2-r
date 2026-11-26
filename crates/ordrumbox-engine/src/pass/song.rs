@@ -12,8 +12,8 @@ use ordrumbox_dsp::SynthPatch;
 
 use super::keymap::key_strips;
 use super::{
-    Event, Pass, PassContext, SONG_PASS_TICKS, Voice, event_for, frames_per_tick, midi_note, note_frame, root_key,
-    song_notes, sound_for, swing_ticks,
+    Event, Pass, PassContext, SONG_PASS_TICKS, Voice, event_for, frames_per_tick, groove_ticks, midi_note, note_frame,
+    root_key, song_notes, sound_for,
 };
 use crate::assign::TrackSound;
 use crate::kit::SampleBank;
@@ -187,8 +187,8 @@ impl SongPassParts<'_> {
                 continue;
             }
             let note = &lanes.apply(note, track);
-            let swing = swing_ticks(lanes.swing_beats(note, track));
-            let frame = note_frame(t, swing, self.per_tick, self.frames);
+            let groove = groove_ticks(lanes.groove_beats(note, track));
+            let frame = note_frame(t, groove, self.per_tick, self.frames);
             let voice = Voice { strip, lfo_tick: tick, bpm: self.bpm };
             if let Some(sound) = sound_for(pattern, note, assigned, voice, &pass_context, patches) {
                 let midi = midi_note(self.targets.get(strip).copied().flatten(), note, track, tick);

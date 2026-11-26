@@ -58,7 +58,7 @@
         {
           "name": "SNARE",
           "stepsPerBeat": 3,
-          "swingAmount": 0.33,
+          "grooveAmount": 0.33,
           "volume": 0.88,
           "pan": 0.3,
           "panLfo": {
