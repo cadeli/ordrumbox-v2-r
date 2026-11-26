@@ -81,10 +81,11 @@ pub fn choices(path: &str) -> Option<Vec<&'static str>> {
     })
 }
 
-/// Value `value` of list control `path` as a preset holds it: the slope
-/// and the FM algorithm (a number, which the editor offers on a list) hold numbers.
+/// Value `value` of list control `path` as a preset holds it: the slope,
+/// the FM algorithm and the oscillators' octaves (numbers, which the editor
+/// offers on a list) hold numbers.
 pub fn choice_value(path: &str, value: &str) -> Value {
-    if matches!(path, "filter.slope" | "fm.algo") {
+    if matches!(path, "filter.slope" | "fm.algo" | "vco1.octave" | "vco2.octave" | "vco3.octave") {
         Value::from(value).to_number().map_or_else(|| Value::from(value), Value::from)
     } else {
         Value::from(value)

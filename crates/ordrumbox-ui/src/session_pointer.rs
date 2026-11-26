@@ -40,7 +40,7 @@ impl Session {
         if self.roll.drag.is_some() {
             return PointerShape::Move;
         }
-        if self.kit_editor.list.is_bar_held() || self.is_mixer_bar_held() {
+        if self.kit_editor.list.is_bar_held() || self.is_mixer_bar_held() || self.is_synth_matrix_bar_held() {
             return HELD_SHAPE;
         }
         if let Some(shape) = self.dropdown_pointer_shape(size, x, y) {
@@ -64,6 +64,9 @@ impl Session {
         }
         if self.mixer_open() {
             return self.mixer_pointer_shape(size, x, y);
+        }
+        if self.synth_open() {
+            return self.synth_matrix_pointer_shape(size, x, y);
         }
         self.grid_pointer_shape(size, x, y)
     }

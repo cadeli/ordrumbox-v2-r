@@ -1,11 +1,15 @@
 //! The synth editor, in the place of
 //! the grid: the preset bar (the preset list, delete, new, duplicate,
-//! revert, tags, export, import), the tabs (OSC, FLT, MOD, ENV), and the cards of
-//! the tab, each as small as what it holds, side by side — its power LED
-//! and title, then its knobs, spins and switches in a row
-//! (`synth_cells.rs`) — with the scope (four cycles of the oscillators),
-//! the filter curve and the envelope, and the module pills under them. The
-//! oscillators are strips, each on a row of its own (`synth_strip.rs`).
+//! revert, tags, export, import), the line of the track it is for, and
+//! every card on one screen — what makes the sound (the sources, the
+//! filter, the envelopes, the master), then what moves it (the LFOs, the
+//! modulation envelope, the matrix) — each as small as what it holds, side by side — its power LED
+//! and title, then its plot (the filter curve, the envelope) left of its
+//! knobs, faders, spins and switches in a row (`synth_cells.rs`; the
+//! filter's slope under its type) — and the
+//! module pills under them. The oscillators are strips one under the other
+//! in one card (`synth_strip.rs`), the scope (four cycles of them), with no
+//! title, in the room VCO1's strip leaves right of its controls.
 //!
 //! [`SynthLayout`] and [`build`] place everything as panel items (the ids
 //! name groups and fields by their index in [`model::groups`] and
@@ -13,17 +17,19 @@
 
 use crate::scale::Scale;
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS, TABS};
+use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS};
 use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
 use crate::editors::FILTER_ICONS;
 use crate::frame;
-use crate::panel::{Id, Item, Kind, Rect, SynthTab};
-use crate::synth_cells::{Cell, KNOB_H, push_head, push_row};
+use crate::panel::{Id, Item, Kind, Rect};
+use crate::synth_cells::{Cell, KNOB_H, Place, QUIET_H, push_head, push_row};
+use crate::synth_faders;
+use crate::synth_matrix::MatrixList;
 use crate::synth_strip;
-use crate::theme;
+use crate::{scroll_thumb, theme};
 
 /// The preset bar's buttons: id, label, width (scale units).
 pub const BUTTONS: [(&str, &str, i32); 7] = [
@@ -40,11 +46,16 @@ pub const BUTTONS: [(&str, &str, i32); 7] = [
 const PAD_X: i32 = 6;
 const PAD_Y: i32 = 4;
 /// The space between two cards (at scale 1).
-const CARD_GAP: i32 = 10;
+const CARD_GAP: i32 = 8;
 /// The height of a card's head, the space under it included (at scale 1).
 const HEAD_H: i32 = 18;
-/// The narrowest a plot is (at scale 1): four knobs.
-const PLOT_MIN_W: i32 = 280;
+/// A plot's width left of its card's controls, and the space right of it (at scale 1).
+const PLOT_W: i32 = 120;
+const PLOT_GAP: i32 = 8;
+/// The scope in the oscillators' card: its narrowest (at scale 1), else
+/// it has a card of its own, its plot this high.
+const SCOPE_MIN_W: i32 = 60;
+const SCOPE_H: i32 = 60;
 
 fn card_color() -> Rgb {
     theme::panel()
@@ -156,7 +167,8 @@ pub struct SynthLayout {
     scale: Scale,
     pub preset: Rect,
     pub buttons: [Rect; 7],
-    pub tabs: [Rect; SynthTab::ALL.len()],
+    /// The line under the preset bar: what the track edited plays.
+    pub track_line: Rect,
     pub area: Rect,
 }
 
@@ -173,78 +185,116 @@ impl SynthLayout {
             x += (w + 4) * s;
             r
         });
-        let tabs = [0, 1, 2, 3].map(|i| Rect::new(margin + i * 56 * s, top + 20 * s, 52 * s, 14 * s));
+        let track_line = Rect::new(margin, top + 20 * s, (width - 2 * margin).max(0), 14 * s);
         let area_top = top + 42 * s;
         let bottom = frame::footer_top(height, scale, status_lines) - 20 * s;
         Self {
             scale,
             preset,
             buttons,
-            tabs,
+            track_line,
             area: Rect::new(margin, area_top, (width - 2 * margin).max(0), (bottom - area_top).max(0)),
         }
     }
 }
 
-/// A card as built: its place, whether it is bypassed, its plot.
+/// A card as built: its place, whether it is bypassed, its plot; `framed`:
+/// drawn with its border (an oscillator's strip is a band of the
+/// oscillators' card, shaded only when bypassed).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Card {
     pub group: String,
     pub rect: Rect,
     pub bypassed: bool,
     pub plot: Option<(Plot, Rect)>,
+    pub framed: bool,
 }
 
-// A synth tab for each of the engine's tabs.
-const _: () = assert!(TABS.len() == SynthTab::ALL.len());
+impl Card {
+    fn moved(self, x: i32, y: i32) -> Self {
+        Self { rect: self.rect.moved(x, y), plot: self.plot.map(|(plot, r)| (plot, r.moved(x, y))), ..self }
+    }
+}
 
-/// What the editor shows, as built: the panel items, the cards.
+/// The group name of the card that holds the oscillators' strips.
+pub const OSCILLATORS: &str = "oscillators";
+
+/// What the editor shows, as built: the panel items, the cards, the
+/// matrix's list.
 #[derive(Debug, Default)]
 pub struct Built {
     pub items: Vec<Item>,
     pub cards: Vec<Card>,
+    pub matrix: Option<MatrixList>,
 }
 
-/// The editor for `draft` (preset `current` of `presets`) on tab `tab`;
+/// A card (or the oscillators' card) built from (0, 0), before the flow places it.
+struct Block {
+    items: Vec<Item>,
+    size: (i32, i32),
+    cards: Vec<Card>,
+    matrix: Option<MatrixList>,
+}
+
+impl Built {
+    /// `block` at its place in `flow`.
+    fn place(&mut self, flow: &mut Flow, block: Block) {
+        let (x, y) = flow.place(block.size.0, block.size.1);
+        self.items.extend(block.items.into_iter().map(|item| Item { rect: item.rect.moved(x, y), ..item }));
+        self.cards.extend(block.cards.into_iter().map(|card| card.moved(x, y)));
+        if let Some(list) = block.matrix {
+            self.matrix = Some(list.moved(x, y));
+        }
+    }
+}
+
+/// What a card is built from: the draft, its fields ([`all_fields`]), the
+/// scale, the LFOs' values now, the first line of the matrix shown.
+struct Source<'a> {
+    draft: &'a Object,
+    fields: &'a [String],
+    s: Scale,
+    lfo: &'a dyn Fn(&str) -> Option<f64>,
+    matrix_first: usize,
+}
+
+/// The editor for `draft` (preset `current` of `presets`), its matrix scrolled to line `matrix_first` of those listed;
 /// `lfo`: the value an LFO gives a control now, if it moves it.
 pub fn build(
     draft: &Object,
-    presets: &[String],
-    current: &str,
-    tab: SynthTab,
+    (presets, current): (&[String], &str),
     layout: &SynthLayout,
+    matrix_first: usize,
     lfo: &dyn Fn(&str) -> Option<f64>,
 ) -> Built {
     let s = layout.scale;
     let mut built = Built::default();
-    push_header(&mut built.items, presets, current, tab, layout);
+    push_header(&mut built.items, presets, current, layout);
 
     let groups = model::groups(draft);
     let fields = all_fields(draft);
+    let source = Source { draft, fields: &fields, s, lfo, matrix_first };
+    let shown: Vec<(usize, &str)> = groups.iter().enumerate().map(|(gi, group)| (gi, group.as_str())).collect();
+    let strips: Vec<(&str, usize)> =
+        shown.iter().filter(|(_, group)| synth_strip::is_strip(group)).map(|&(gi, group)| (group, gi)).collect();
+    let scope = shown.iter().any(|(_, group)| *group == "scope");
+    let mut oscillators = (!strips.is_empty()).then(|| oscillators_block(&source, &strips, scope));
+    let scope_inside = oscillators.as_ref().is_some_and(|block| block.cards.iter().any(|c| c.group == "scope"));
     let mut flow = Flow::new(layout.area, s);
-    for (gi, group) in groups.iter().enumerate() {
-        if SynthTab::ALL.get(model::group_tab(group)) != Some(&tab) {
-            continue;
-        }
-        // Built from (0, 0), then moved to its place.
-        let mut items = Vec::new();
-        let origin = (PAD_X * s, PAD_Y * s);
-        let is_strip = synth_strip::is_strip(group);
-        let (right, bottom, plot) = if is_strip {
-            let right = synth_strip::push_strip(&mut items, draft, (group, gi), &fields, origin, s, lfo);
-            (right, origin.1 + KNOB_H * s, None)
+    for &(gi, group) in &shown {
+        let block = if synth_strip::is_strip(group) {
+            // The oscillators' card, in the place of the first one.
+            let Some(block) = oscillators.take() else { continue };
+            block
+        } else if group == "scope" {
+            if scope_inside {
+                continue;
+            }
+            scope_block(&source, (group, gi))
         } else {
-            push_card(&mut items, draft, (group, gi), &fields, origin, s, lfo)
+            card_block(&source, (group, gi))
         };
-        let (w, h) = (right + PAD_X * s, bottom + PAD_Y * s);
-        let (x, y) = flow.place(w, h, is_strip);
-        built.items.extend(items.into_iter().map(|item| Item { rect: item.rect.moved(x, y), ..item }));
-        built.cards.push(Card {
-            group: group.clone(),
-            rect: Rect::new(x, y, w, h),
-            bypassed: model::has_power(group) && model::bypassed(draft, group),
-            plot: plot.map(|(plot, rect): (Plot, Rect)| (plot, rect.moved(x, y))),
-        });
+        built.place(&mut flow, block);
     }
     built
 }
@@ -263,60 +313,116 @@ impl Flow {
         Self { area, gap: CARD_GAP * s, x: area.x, top: area.y, row_h: 0 }
     }
 
-    /// The place of a `w` × `h` card; `alone`: on a row of its own.
-    fn place(&mut self, w: i32, h: i32, alone: bool) -> (i32, i32) {
-        if self.x > self.area.x && (alone || self.x + w > self.area.x + self.area.w) {
-            self.next_row();
+    /// The place of a `w` × `h` card.
+    fn place(&mut self, w: i32, h: i32) -> (i32, i32) {
+        if self.x > self.area.x && self.x + w > self.area.x + self.area.w {
+            self.top += self.row_h + self.gap;
+            self.x = self.area.x;
+            self.row_h = 0;
         }
         let at = (self.x, self.top);
         self.row_h = self.row_h.max(h);
         self.x += w + self.gap;
-        if alone {
-            self.next_row();
-        }
         at
     }
-
-    fn next_row(&mut self) {
-        self.top += self.row_h + self.gap;
-        self.x = self.area.x;
-        self.row_h = 0;
-    }
 }
 
-/// Card `group` (index `gi` of the groups) from `(x, y)`: its head, its
-/// plot, its controls in a row (the matrix: its lines). The x right of what
-/// it holds, the y under it, and its plot.
-fn push_card(
-    items: &mut Vec<Item>,
-    draft: &Object,
-    (group, gi): (&str, usize),
-    fields: &[String],
-    (x, y): (i32, i32),
-    s: Scale,
-    lfo: &dyn Fn(&str) -> Option<f64>,
-) -> (i32, i32, Option<(Plot, Rect)>) {
-    let head_right = push_head(items, draft, (group, gi), (x, y), s);
-    let plot_top = y + HEAD_H * s;
-    let plot_h = card_plot(group).map_or(0, |(_, h)| (h + 6) * s);
-    let top = plot_top + plot_h;
-    let (right, bottom) = if group == "matrix" {
-        crate::synth_matrix::push_lines(items, draft, fields, (x, top), s)
-    } else {
-        let cells = field_cells(draft, group, fields, lfo);
-        let bottom = if cells.is_empty() { top } else { top + KNOB_H * s };
-        (push_row(items, cells, x, top, s), bottom)
-    };
-    let plot = card_plot(group).map(|(plot, h)| {
-        let w = (right - x).max(PLOT_MIN_W * s);
-        (plot, Rect::new(x, plot_top, w, h * s))
+/// Whether the card of `group` is bypassed.
+fn is_bypassed(draft: &Object, group: &str) -> bool {
+    model::has_power(group) && model::bypassed(draft, group)
+}
+
+/// The oscillators' strips one under the other in one card, each strip a
+/// band of it; with `scope`, the scope's plot right of the first strip's
+/// controls, when it leaves room for it.
+fn oscillators_block(source: &Source, strips: &[(&str, usize)], scope: bool) -> Block {
+    let s = source.s;
+    let mut items = Vec::new();
+    let origin = (PAD_X * s, PAD_Y * s);
+    let rows = synth_strip::push_strips(&mut items, source.draft, strips, source.fields, origin, s, source.lfo);
+    let right = rows.iter().map(|&(_, right)| right).max().unwrap_or(origin.0);
+    let (w, h) = (right + PAD_X * s, rows.last().map_or(origin.1, |(top, _)| top + QUIET_H * s) + PAD_Y * s);
+    let half_gap = synth_strip::STRIP_GAP * s / 2;
+    let frame =
+        Card { group: OSCILLATORS.into(), rect: Rect::new(0, 0, w, h), bypassed: false, plot: None, framed: true };
+    let bands = strips.iter().zip(&rows).map(|(&(group, _), &(top, _))| Card {
+        group: group.into(),
+        rect: Rect::new(s.px(), top - half_gap, w - 2 * s.px(), QUIET_H * s + 2 * half_gap),
+        bypassed: is_bypassed(source.draft, group),
+        plot: None,
+        framed: false,
     });
-    let right = plot.map_or(right, |(_, r)| right.max(r.x + r.w)).max(head_right);
-    (right, bottom.max(plot_top), plot)
+    let scope = rows
+        .first()
+        .filter(|_| scope)
+        .map(|&(top, first_right)| {
+            let x = first_right + PLOT_GAP * s;
+            Rect::new(x, top, right - x, QUIET_H * s)
+        })
+        .filter(|plot| plot.w >= SCOPE_MIN_W * s)
+        .map(|plot| Card {
+            group: "scope".into(),
+            rect: plot,
+            bypassed: false,
+            plot: Some((Plot::Scope, plot)),
+            framed: false,
+        });
+    let cards = std::iter::once(frame).chain(bands).chain(scope).collect();
+    Block { items, size: (w, h), cards, matrix: None }
 }
 
-/// The preset's select, the buttons and the tabs, above the cards.
-fn push_header(items: &mut Vec<Item>, presets: &[String], current: &str, tab: SynthTab, layout: &SynthLayout) {
+/// The scope's card of its own, when the oscillators' card has no room for it.
+fn scope_block(source: &Source, (group, gi): (&str, usize)) -> Block {
+    let s = source.s;
+    let mut items = Vec::new();
+    let (x, y) = (PAD_X * s, PAD_Y * s);
+    let head_right = push_head(&mut items, source.draft, (group, gi), (x, y), s);
+    let (w, h) = ((PLOT_W * s + 2 * x).max(head_right + x), (HEAD_H + SCOPE_H) * s + 2 * y);
+    let plot = Rect::new(x, y + HEAD_H * s, w - 2 * x, SCOPE_H * s);
+    let card = Card {
+        group: group.into(),
+        rect: Rect::new(0, 0, w, h),
+        bypassed: is_bypassed(source.draft, group),
+        plot: Some((Plot::Scope, plot)),
+        framed: true,
+    };
+    Block { items, size: (w, h), cards: vec![card], matrix: None }
+}
+
+/// Card `group` (index `gi` of the groups): its head, then its plot left of
+/// its controls in a row (the matrix: its lines).
+fn card_block(source: &Source, (group, gi): (&str, usize)) -> Block {
+    let s = source.s;
+    let mut items = Vec::new();
+    let (x, y) = (PAD_X * s, PAD_Y * s);
+    let head_right = push_head(&mut items, source.draft, (group, gi), (x, y), s);
+    let top = y + HEAD_H * s;
+    let mut matrix = None;
+    let plot = card_plot(group).map(|plot| (plot, Rect::new(x, top, PLOT_W * s, KNOB_H * s)));
+    let (right, bottom) = if group == "matrix" {
+        let (right, bottom, list) =
+            crate::synth_matrix::push_lines(&mut items, source.draft, source.fields, (x, top, source.matrix_first), s);
+        matrix = Some(list);
+        (right, bottom)
+    } else {
+        let left = plot.map_or(x, |(_, r)| r.x + r.w + PLOT_GAP * s);
+        let cells = field_cells(source.draft, group, source.fields, source.lfo);
+        let bottom = if cells.is_empty() && plot.is_none() { top } else { top + KNOB_H * s };
+        (push_row(&mut items, cells, (left, top), KNOB_H, s), bottom)
+    };
+    let (w, h) = (right.max(head_right) + PAD_X * s, bottom + PAD_Y * s);
+    let card = Card {
+        group: group.into(),
+        rect: Rect::new(0, 0, w, h),
+        bypassed: is_bypassed(source.draft, group),
+        plot,
+        framed: true,
+    };
+    Block { items, size: (w, h), cards: vec![card], matrix }
+}
+
+/// The preset's select and the buttons, above the cards.
+fn push_header(items: &mut Vec<Item>, presets: &[String], current: &str, layout: &SynthLayout) {
     let values = presets.to_vec();
     let selected = presets.iter().position(|p| p == current).unwrap_or(0);
     items.push(Item::new(
@@ -327,17 +433,14 @@ fn push_header(items: &mut Vec<Item>, presets: &[String], current: &str, tab: Sy
     for ((id, label, _), rect) in BUTTONS.iter().zip(layout.buttons) {
         items.push(Item::new(Some(Id::SynthButton(id)), rect, Kind::Button { label: (*label).into(), on: false }));
     }
-    for ((rect, label), each) in layout.tabs.iter().zip(TABS).zip(SynthTab::ALL) {
-        items.push(Item::new(Some(Id::SynthTab(each)), *rect, Kind::Tab { label: label.into(), active: tab == each }));
-    }
 }
 
-/// The plot a card shows under its title, and its height (unscaled).
-fn card_plot(group: &str) -> Option<(Plot, i32)> {
+/// The plot a card shows left of its controls, as high as a knob (the
+/// scope has a card of its own: [`scope_block`]).
+fn card_plot(group: &str) -> Option<Plot> {
     match group {
-        "scope" => Some((Plot::Scope, 60)),
-        "filter" => Some((Plot::Filter, 50)),
-        "envelope" => Some((Plot::Envelope, 40)),
+        "filter" => Some(Plot::Filter),
+        "envelope" => Some(Plot::Envelope),
         _ => None,
     }
 }
@@ -366,15 +469,26 @@ fn steps_kind(draft: &Object, path: &str, options: Vec<(String, String)>) -> Kin
     Kind::Value { spec, value: selected as f64, label: None, text, lfo: false }
 }
 
-/// The controls of `group`, in its fields' order, as cells of a row.
+/// The fields whose control goes under another's, in its column: the
+/// field, the one it goes under.
+const STACKED: [(&str, &str); 1] = [("filter.slope", "filter.type")];
+
+/// The controls of `group`, in its fields' order, as cells of a row; a
+/// field of [`STACKED`] right after the one it goes under.
 fn field_cells(draft: &Object, group: &str, fields: &[String], lfo: &dyn Fn(&str) -> Option<f64>) -> Vec<Cell> {
     let mut cells = Vec::new();
     for path in model::fields(draft, group) {
         let Some(fi) = fields.iter().position(|f| *f == path) else { continue };
         let key = path.rsplit('.').next().unwrap_or(&path);
-        let label = model::find_meta(&path).and_then(|m| m.label).unwrap_or(key).to_owned();
+        let mut label = model::find_meta(&path).and_then(|m| m.label).unwrap_or(key).to_owned();
         let kind = match field_kind(&path, model::get(draft, &path)) {
-            Field::Knob => knob_kind(draft, &path, lfo),
+            Field::Knob => match synth_faders::letter(&path) {
+                Some(letter) => {
+                    letter.clone_into(&mut label);
+                    synth_faders::fader_kind(draft, &path, lfo)
+                }
+                None => knob_kind(draft, &path, lfo),
+            },
             Field::Wave => synth_strip::wave_spin(draft, &path),
             Field::Steps(options) => steps_kind(draft, &path, options),
             Field::List(options) => {
@@ -385,7 +499,13 @@ fn field_cells(draft: &Object, group: &str, fields: &[String], lfo: &dyn Fn(&str
             Field::Led => Kind::Led { on: model::is_osc2_synced(draft) },
             Field::None => continue,
         };
-        cells.push(Cell { id: Id::SynthField(fi as u16), kind, label });
+        let id = Id::SynthField(fi as u16);
+        let above = STACKED.iter().find(|(field, _)| *field == path).map(|(_, above)| *above);
+        let above = above.and_then(|above| fields.iter().position(|f| f == above));
+        match above.and_then(|fa| cells.iter().position(|c: &Cell| c.id == Id::SynthField(fa as u16))) {
+            Some(at) => cells.insert(at + 1, Cell { id, kind, label, place: Place::Under }),
+            None => cells.push(Cell { id, kind, label, place: Place::Beside }),
+        }
     }
     cells
 }
@@ -395,14 +515,13 @@ pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLa
     let s = layout.scale;
     for card in &built.cards {
         let r = card.rect;
-        canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
-        canvas.fill_rect(
-            r.x + s.px(),
-            r.y + s.px(),
-            r.w - 2 * s,
-            r.h - 2 * s,
-            if card.bypassed { card_off_color() } else { card_color() },
-        );
+        let fill = if card.bypassed { card_off_color() } else { card_color() };
+        if card.framed {
+            canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
+            canvas.fill_rect(r.x + s.px(), r.y + s.px(), r.w - 2 * s, r.h - 2 * s, fill);
+        } else if card.bypassed {
+            canvas.fill_rect(r.x, r.y, r.w, r.h, fill);
+        }
         if let Some((plot, rect)) = card.plot {
             canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, surface_color());
             match plot {
@@ -411,6 +530,9 @@ pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLa
                 Plot::Filter => draw_filter(canvas, draft, rect, s, time, bpm),
             }
         }
+    }
+    if let Some(list) = built.matrix.filter(MatrixList::scrolls) {
+        scroll_thumb::draw(canvas, list.bar, list.thumb(), s);
     }
     // The modules in use, under the cards.
     let mut x = layout.area.x;
@@ -494,64 +616,157 @@ mod tests {
     }
 
     #[test]
-    fn builds_every_tab_and_names_fields_by_index() {
+    fn builds_every_card_and_names_fields_by_index() {
         let d = draft();
         let layout = SynthLayout::new(740, 680, Scale::ONE, 0);
         let fields = all_fields(&d);
+        let names = ["a".to_owned(), "b".to_owned()];
         let mut knobs = 0;
-        for tab in SynthTab::ALL {
-            let built = build(&d, &["a".into(), "b".into()], "b", tab, &layout, &|_| None);
-            for item in &built.items {
-                if let (Some(Id::SynthField(fi)), Kind::Value { .. }) = (item.id, &item.kind) {
-                    let path = &fields[usize::from(fi)];
-                    // A knob is a numeric control, or a list on notches (the LFOs' sync).
-                    if model::choices(path).is_none() {
-                        assert!(model::find_meta(path).is_some(), "{path}");
-                        knobs += 1;
-                    }
+        let built = build(&d, (&names, "b"), &layout, 0, &|_| None);
+        for item in &built.items {
+            if let (Some(Id::SynthField(fi)), Kind::Value { .. }) = (item.id, &item.kind) {
+                let path = &fields[usize::from(fi)];
+                // A knob is a numeric control, or a list on notches (the LFOs' sync).
+                if model::choices(path).is_none() {
+                    assert!(model::find_meta(path).is_some(), "{path}");
+                    knobs += 1;
                 }
-                assert!(item.rect.x + item.rect.w <= layout.area.x + layout.area.w + 1, "{item:?}");
             }
-            assert!(!built.cards.is_empty());
+            assert!(item.rect.x + item.rect.w <= layout.area.x + layout.area.w + 1, "{item:?}");
         }
-        // Every numeric control but the algorithm (a spin) is a knob.
-        assert_eq!(knobs, model::metas().count() - 1);
-        let built = build(&d, &["a".into(), "b".into()], "b", SynthTab::Oscillators, &layout, &|_| None);
+        // Every numeric control but the algorithm and the three octaves
+        // (spins) is a knob or a fader; the matrix lists its free line only.
+        assert_eq!(knobs, model::metas().count() - 4 - (ordrumbox_engine::MATRIX_SIZE - 1));
         assert!(matches!(built.items[0].kind, Kind::Select { selected: 1, .. }));
-        // OSC: the scope, the oscillators (vco2, vco3 off: gain 0), the unison, FM (its flag unset).
+        // The oscillators' card, its strips (vco2, vco3 off: gain 0) and the
+        // scope, the unison, FM (its flag unset), the noise, the filter and
+        // its envelope, the envelopes and the master, then the LFOs, the mod
+        // envelope and the matrix.
         let groups: Vec<_> = built.cards.iter().map(|c| (c.group.as_str(), c.bypassed)).collect();
         assert_eq!(
             groups,
-            [("scope", false), ("vco1", false), ("vco2", true), ("vco3", true), ("unison", false), ("fm", false)]
+            [
+                (OSCILLATORS, false),
+                ("vco1", false),
+                ("vco2", true),
+                ("vco3", true),
+                ("scope", false),
+                ("unison", false),
+                ("fm", false),
+                ("noise", false),
+                ("filter", false),
+                ("filterEnv", false),
+                ("envelope", false),
+                ("pitchEnv", false),
+                ("master", false),
+                ("lfo", false),
+                ("lfo2", false),
+                ("modEnvelope", false),
+                ("matrix", false)
+            ]
         );
+        // The scope, with no title, in VCO1's band right of its controls; the
+        // filter's and the envelope's plots left of their controls.
+        let [oscillators, vco1, scope] = [&built.cards[0], &built.cards[1], &built.cards[4]].map(|c| c.rect);
+        assert!(!scope_card_has_title(&built), "no title");
+        assert!(scope.y >= vco1.y && scope.y + scope.h <= vco1.y + vco1.h, "in VCO1's band");
+        assert!(scope.x + scope.w <= oscillators.x + oscillators.w);
+        let vco1_controls = built.items.iter().filter(|i| i.rect.y >= vco1.y && i.rect.y < vco1.y + vco1.h);
+        assert!(vco1_controls.into_iter().all(|i| i.rect.x + i.rect.w <= scope.x), "right of VCO1's controls");
+        for group in ["filter", "envelope"] {
+            let card = built.cards.iter().find(|c| c.group == group).unwrap();
+            let (_, plot) = card.plot.unwrap();
+            assert_eq!(card.rect.h, (HEAD_H + KNOB_H + 2 * PAD_Y) * Scale::ONE, "{group}: one row");
+            let inside = |r: Rect| {
+                r.x >= card.rect.x
+                    && r.x < card.rect.x + card.rect.w
+                    && r.y >= plot.y
+                    && r.y < card.rect.y + card.rect.h
+            };
+            let controls = built.items.iter().filter(|i| matches!(i.id, Some(Id::SynthField(_))) && inside(i.rect));
+            assert!(controls.into_iter().all(|i| i.rect.x > plot.x + plot.w), "{group}");
+        }
+    }
+
+    /// Whether an item says "Scope".
+    fn scope_card_has_title(built: &Built) -> bool {
+        built.items.iter().any(|i| matches!(&i.kind, Kind::Text { text, .. } if text == "Scope"))
     }
 
     #[test]
-    fn the_matrix_card_has_a_line_per_route_and_it_stays_put() {
+    fn the_filters_slope_is_under_its_type_and_its_knobs_are_faders() {
+        let d = draft();
         let layout = SynthLayout::new(740, 680, Scale::ONE, 0);
+        let built = build(&d, (&[], ""), &layout, 0, &|_| None);
+        let fields = all_fields(&d);
+        let rect = |path: &str| {
+            let fi = fields.iter().position(|f| f == path).unwrap() as u16;
+            built.items.iter().find(|i| i.id == Some(Id::SynthField(fi))).unwrap()
+        };
+        let (kind, slope) = (rect("filter.type").rect, rect("filter.slope").rect);
+        assert_eq!(kind.x, slope.x, "one column");
+        assert!(slope.y >= kind.y + kind.h, "the slope under the type");
+        let card = built.cards.iter().find(|c| c.group == "filter").unwrap().rect;
+        assert!(slope.y + slope.h <= card.y + card.h);
+        for (path, letter) in [("filter.freq", "F"), ("filter.Q", "Q"), ("filter.drive", "D")] {
+            let item = rect(path);
+            assert!(
+                matches!(&item.kind, Kind::Value { spec, label: Some(l), .. }
+                    if spec.style == crate::control::Style::Fader && l == letter),
+                "{path}: {:?}",
+                item.kind
+            );
+            assert!(item.rect.x > slope.x + slope.w, "{path}: right of the spins");
+        }
+    }
+
+    #[test]
+    fn the_matrix_lists_its_routes_and_a_free_line_and_scrolls_and_stays_put() {
+        // As wide as the smallest window leaves the editor: every card on one screen.
+        let layout = SynthLayout::new(912, 680, Scale::ONE, 0);
         let names = ["presets".to_owned()];
-        let rects = |d: &Object| {
-            let built = build(d, &names, "presets", SynthTab::Modulation, &layout, &|_| None);
-            let card = built.cards.iter().find(|c| c.group == "matrix").expect("the matrix card").rect;
-            let fields: Vec<_> = built
+        let built = |d: &Object, first: usize| build(d, (&names, "presets"), &layout, first, &|_| None);
+        let lines = |d: &Object, built: &Built| {
+            let fields = all_fields(d);
+            let paths: Vec<_> = built
                 .items
                 .iter()
-                .filter(|i| matches!(i.id, Some(Id::SynthField(fi)) if all_fields(d)[usize::from(fi)].starts_with("matrix.")))
-                .map(|i| i.rect)
+                .filter_map(|i| match i.id {
+                    Some(Id::SynthField(fi)) => {
+                        fields[usize::from(fi)].strip_prefix("matrix.source").map(str::to_owned)
+                    }
+                    _ => None,
+                })
                 .collect();
-            (card, fields)
+            paths
         };
+        let card = |built: &Built| built.cards.iter().find(|c| c.group == "matrix").expect("the matrix card").rect;
         let plain = draft();
-        let (card, fields) = rects(&plain);
-        assert_eq!(fields.len(), 3 * ordrumbox_engine::MATRIX_SIZE);
-        assert!(card.y + card.h <= layout.area.y + layout.area.h, "{card:?} below {:?}", layout.area);
-        assert!(fields.iter().all(|r| r.x >= card.x && r.x + r.w <= card.x + card.w && r.y + r.h <= card.y + card.h));
-        // A line set changes no place.
+        let few = built(&plain, 0);
+        assert_eq!(lines(&plain, &few), ["1"], "the free line only");
+        let list = few.matrix.unwrap();
+        assert!(!list.scrolls());
+        assert!(card(&few).y + card(&few).h <= layout.area.y + layout.area.h);
         let mut set = draft();
-        model::set(&mut set, "matrix.source1", Value::from("lfo1"));
-        model::set(&mut set, "matrix.target1", Value::from("filter.freq"));
-        model::set(&mut set, "matrix.amount1", Value::from(-0.7));
-        assert_eq!(rects(&set), (card, fields));
+        for n in [2, 3, 4, 5, 7, 8, 9] {
+            model::set(&mut set, &format!("matrix.source{n}"), Value::from("lfo1"));
+        }
+        let many = built(&set, 0);
+        assert_eq!(lines(&set, &many), ["2", "3", "4", "5", "7", "8"]);
+        assert_eq!(card(&many), card(&few), "the card stays put");
+        assert_eq!(many.matrix.unwrap().bar, list.bar, "and so does its bar");
+        assert!(many.matrix.unwrap().scrolls());
+        // Scrolled to the end, held there: the last routes and the free line.
+        let end = built(&set, 99);
+        assert_eq!(lines(&set, &end), ["4", "5", "7", "8", "9", "1"]);
+        assert_eq!(end.matrix.unwrap().first, 2);
+        let fields = all_fields(&set);
+        let is_matrix =
+            |i: &&Item| matches!(i.id, Some(Id::SynthField(fi)) if fields[usize::from(fi)].starts_with("matrix."));
+        for item in end.items.iter().filter(is_matrix) {
+            let (r, c) = (item.rect, card(&end));
+            assert!(r.x >= c.x && r.x + r.w <= c.x + c.w && r.y + r.h <= c.y + c.h, "{item:?}");
+        }
     }
 
     #[test]
@@ -561,10 +776,8 @@ mod tests {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
             let layout = SynthLayout::new(w as i32, h as i32, Scale::ONE, 0);
-            for tab in SynthTab::ALL {
-                let built = build(&d, &[], "", tab, &layout, &|_| None);
-                draw(&mut canvas, &d, &built, &layout, 0.3, 120.0);
-            }
+            let built = build(&d, (&[], ""), &layout, 0, &|_| None);
+            draw(&mut canvas, &d, &built, &layout, 0.3, 120.0);
         }
     }
 }

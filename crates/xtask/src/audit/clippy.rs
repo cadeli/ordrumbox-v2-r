@@ -31,7 +31,8 @@ pub(super) fn check(root: &Path) -> io::Result<Vec<Finding>> {
         // `path:line:col: warning: message`
         let Some((place, message)) = line.split_once(": warning: ") else { continue };
         let Some(&(_, _, rule)) = LINTS.iter().find(|(_, phrase, _)| message.contains(phrase)) else { continue };
-        findings.push(Finding::new(Level::Warning, rule, place, message));
+        // The sources' paths use `/` on every system (`shown`), so `exempt` can match them.
+        findings.push(Finding::new(Level::Warning, rule, place.replace('\\', "/"), message));
     }
     if !output.status.success() {
         let message = "clippy did not build: its report is incomplete (run `cargo clippy --workspace`)";

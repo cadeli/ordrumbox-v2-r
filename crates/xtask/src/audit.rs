@@ -86,9 +86,12 @@ fn workspace_root() -> io::Result<PathBuf> {
     }
 }
 
-/// `path` as the report shows it: from the workspace root.
+/// `path` as the report shows it: from the workspace root, its parts joined
+/// by `/` on every system, since the rules match on that separator.
 fn shown(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root).unwrap_or(path).display().to_string()
+    let relative = path.strip_prefix(root).unwrap_or(path);
+    let parts: Vec<_> = relative.components().map(|part| part.as_os_str().to_string_lossy()).collect();
+    parts.join("/")
 }
 
 /// Print the findings by rule, then the totals.

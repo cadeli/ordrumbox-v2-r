@@ -1,12 +1,14 @@
 //! The parts every card of the synth editor shares: its head (the power LED
 //! on the left, then the title) and its controls in one row, each over its
-//! label — the knobs, the spins (four characters wide), the switches and
-//! the LEDs. The oscillator strips and the other cards are built from them.
+//! label — the knobs, the faders (`synth_faders.rs`), the spins (four characters wide), the switches and
+//! the LEDs; spins stacked in a column take their label on their left. The
+//! oscillator strips and the other cards are built from them.
 
 use ordrumbox_core::json::Object;
 use ordrumbox_engine::synth_model as model;
 
 use crate::canvas::text_width;
+use crate::control::{Format, Style};
 use crate::panel::{Id, Item, Kind, Rect, SPIN_SCREEN_H, spin_width};
 use crate::scale::Scale;
 use crate::theme;
@@ -14,12 +16,23 @@ use crate::theme;
 /// A knob's place in a row (at scale 1).
 pub(crate) const KNOB_W: i32 = 64;
 pub(crate) const KNOB_H: i32 = 56;
+/// The height of a row whose knobs say their value in their tooltip only:
+/// a knob over its label (at scale 1). Tall enough for a knob drawn over
+/// its label, not beside it.
+pub(crate) const QUIET_H: i32 = 40;
+/// A fader's place in a row (at scale 1): as high as a knob, narrow.
+const FADER_W: i32 = 20;
 /// The space between two controls (at scale 1).
 const GAP: i32 = 8;
 /// How far a screen sits below the top of a knob, so that their labels line up.
 const SCREEN_TOP: i32 = 5;
 /// The characters a spin's screen holds.
 const SPIN_CHARS: i32 = 4;
+/// The space between two screens stacked in a column, and between a stacked
+/// screen's label and it (at scale 1).
+const STACK_GAP: i32 = 6;
+/// The height of a line of text (at scale 1).
+const TEXT_H: i32 = 8;
 /// The width of a switch or a LED (at scale 1).
 const SWITCH_W: i32 = 40;
 /// The power LED's size, and where the title starts right of it (at scale 1).
@@ -27,13 +40,29 @@ const POWER_W: i32 = 14;
 const POWER_H: i32 = 13;
 const TITLE_X: i32 = 18;
 
-/// A control of a row: its id, what it is, the label under it.
+/// A control of a row: its id, what it is, its label, where it goes.
 #[derive(Debug)]
 pub(crate) struct Cell {
     pub id: Id,
     pub kind: Kind,
     pub label: String,
+    pub place: Place,
 }
+
+/// Where a cell goes in its row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Place {
+    /// Right of the cell before, its label under it.
+    Beside,
+    /// Under the cell before, in one column, each label on the left of its
+    /// control: for spins and switches, two of which fit in a row's height.
+    Under,
+}
+
+// Two stacked screens fit in a row.
+const _: () = assert!(SCREEN_TOP + 2 * SPIN_SCREEN_H + STACK_GAP <= KNOB_H);
+// A screen and its label fit in a quiet row.
+const _: () = assert!(SCREEN_TOP + SPIN_SCREEN_H + 4 + TEXT_H <= QUIET_H);
 
 /// The head of card `group` (index `gi` of the groups) at `(x, y)`: its
 /// power LED, when it has one, then its title, in the same place on every
@@ -56,33 +85,87 @@ pub(crate) fn push_head(
     right
 }
 
-/// Push `cells` side by side from `x`, their tops at `top`; the x right of
-/// the last one (`x` itself when there is none). A row is [`KNOB_H`] high.
+/// Push `cells` side by side from `x`, their tops at `top`, in a row
+/// `row_h` high at scale 1 ([`KNOB_H`], or [`QUIET_H`]); the x right of
+/// the last one (`x` itself when there is none).
 pub(crate) fn push_row(
     items: &mut Vec<Item>,
     cells: impl IntoIterator<Item = Cell>,
-    x: i32,
-    top: i32,
+    (x, top): (i32, i32),
+    row_h: i32,
     s: Scale,
 ) -> i32 {
+    let mut columns: Vec<Vec<Cell>> = Vec::new();
+    for cell in cells {
+        match (cell.place, columns.last_mut()) {
+            (Place::Under, Some(column)) => column.push(cell),
+            _ => columns.push(vec![cell]),
+        }
+    }
     let mut right = x;
     let mut next = x;
-    for Cell { id, kind, label } in cells {
-        let w = if let Kind::Value { spec, value, text, lfo, .. } = kind {
-            let kind = Kind::Value { spec, value, label: Some(label), text, lfo };
-            items.push(Item::new(Some(id), Rect::new(next, top, KNOB_W * s, KNOB_H * s), kind));
-            KNOB_W * s
-        } else {
-            let control_w = if matches!(kind, Kind::Spin { .. }) { spin_width(SPIN_CHARS, s) } else { SWITCH_W * s };
-            let label_w = text_width(&label, s);
-            let w = control_w.max(label_w);
-            let screen = Rect::new(next + (w - control_w) / 2, top + SCREEN_TOP * s, control_w, SPIN_SCREEN_H * s);
-            items.push(Item::new(Some(id), screen, kind));
-            items.push(Item::text(next + (w - label_w) / 2, screen.y + screen.h + 4 * s, label, theme::muted(), s));
-            w
+    for column in columns {
+        let w = match <[Cell; 1]>::try_from(column) {
+            Ok([cell]) => push_cell(items, cell, (next, top), row_h, s),
+            Err(column) => push_stack(items, column, next, top, s),
         };
         right = next + w;
         next = right + GAP * s;
     }
     right
+}
+
+/// The width of the screen of `kind`, a spin or a switch.
+fn screen_width(kind: &Kind, s: Scale) -> i32 {
+    if matches!(kind, Kind::Spin { .. }) { spin_width(SPIN_CHARS, s) } else { SWITCH_W * s }
+}
+
+/// Push `cell` alone in its column at `next`, its label under it; its width.
+fn push_cell(
+    items: &mut Vec<Item>,
+    Cell { id, kind, label, .. }: Cell,
+    (next, top): (i32, i32),
+    row_h: i32,
+    s: Scale,
+) -> i32 {
+    if let Kind::Value { spec, value, text, lfo, .. } = kind {
+        let w = if spec.style == Style::Fader { FADER_W * s } else { KNOB_W * s };
+        let kind = Kind::Value { spec, value, label: Some(label), text, lfo };
+        items.push(Item::new(Some(id), Rect::new(next, top, w, row_h * s), kind));
+        return w;
+    }
+    let control_w = screen_width(&kind, s);
+    let label_w = text_width(&label, s);
+    let w = control_w.max(label_w);
+    let screen = Rect::new(next + (w - control_w) / 2, top + SCREEN_TOP * s, control_w, SPIN_SCREEN_H * s);
+    items.push(Item::new(Some(id), screen, kind));
+    items.push(Item::text(next + (w - label_w) / 2, screen.y + screen.h + 4 * s, label, theme::muted(), s));
+    w
+}
+
+/// The tooltip of a control of `draft` that does not write its value
+/// (field `path`, called `name` on card `group`): the card and the name,
+/// then the value.
+#[must_use]
+pub(crate) fn value_tip(draft: &Object, (group, path): (&str, &str), name: &str) -> Option<[String; 2]> {
+    let meta = model::find_meta(path);
+    let value = model::number(draft, path).or_else(|| meta.map(|m| m.default))?;
+    let unit = meta.map_or("", |m| m.unit);
+    Some([format!("{} {name}", model::group_label(group)), Format::Fmt.value(value, unit)])
+}
+
+/// Push `column`, spins or switches one under the other at `next`, each
+/// label on the left of its screen; its width.
+fn push_stack(items: &mut Vec<Item>, column: Vec<Cell>, next: i32, top: i32, s: Scale) -> i32 {
+    let label_w = column.iter().map(|c| text_width(&c.label, s)).max().unwrap_or(0);
+    let control_w = column.iter().map(|c| screen_width(&c.kind, s)).max().unwrap_or(0);
+    let screen_x = next + label_w + STACK_GAP * s;
+    let mut y = top + SCREEN_TOP * s;
+    for Cell { id, kind, label, .. } in column {
+        let screen = Rect::new(screen_x, y, screen_width(&kind, s), SPIN_SCREEN_H * s);
+        items.push(Item::new(Some(id), screen, kind));
+        items.push(Item::text(next, y + (SPIN_SCREEN_H - TEXT_H) * s / 2, label, theme::muted(), s));
+        y += (SPIN_SCREEN_H + STACK_GAP) * s;
+    }
+    label_w + STACK_GAP * s + control_w
 }

@@ -151,7 +151,7 @@ fn draw_value_item(
             let room = StepperRoom { down: value > spec.min, up: value < spec.max };
             draw_stepper_item(canvas, r, room, label, text, scale);
         }
-        Style::Fader => draw_fader_item(canvas, r, fraction, color, text, scale),
+        Style::Fader => draw_fader_item(canvas, r, fraction, color, (label, text), scale),
     }
 }
 
@@ -231,8 +231,15 @@ fn draw_slider_item(
 }
 
 /// A fader: a groove lit from the foot up to the value, a wide handle, the
-/// value text under it.
-fn draw_fader_item(canvas: &mut Canvas, r: Rect, fraction: f64, color: Rgb, text: &str, scale: Scale) {
+/// value text under it (with none, its label).
+fn draw_fader_item(
+    canvas: &mut Canvas,
+    r: Rect,
+    fraction: f64,
+    color: Rgb,
+    (label, text): (Option<&str>, &str),
+    scale: Scale,
+) {
     let t = scale.px();
     let (top, height) = fader_bar(r, scale);
     let cx = r.x + r.w / 2;
@@ -241,8 +248,12 @@ fn draw_fader_item(canvas: &mut Canvas, r: Rect, fraction: f64, color: Rgb, text
     canvas.fill_rect(cx - t, top + height - filled, 2 * t, filled, color);
     let (handle_w, handle_h) = ((r.w - 4 * scale).min(24 * scale), 8 * scale);
     canvas.fill_rect(cx - handle_w / 2, top + height - filled - handle_h / 2, handle_w, handle_h, handle_color());
+    let (text, text_color) = match label {
+        Some(label) if text.is_empty() => (label, dim()),
+        _ => (text, value_color()),
+    };
     let text = fit(text, r.w, scale);
-    canvas.text(cx - text_width(&text, scale) / 2, top + height + 8 * scale, &text, scale, value_color());
+    canvas.text(cx - text_width(&text, scale) / 2, top + height + 8 * scale, &text, scale, text_color);
 }
 
 /// Which buttons of a stepper can still move its value: the minus, the plus.

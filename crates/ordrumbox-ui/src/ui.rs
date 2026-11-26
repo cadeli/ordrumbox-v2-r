@@ -241,7 +241,7 @@ impl Ui {
         if s.piano_roll_open() {
             return if shift { s.roll_shift_press(size, x, y) } else { s.roll_click(size, x, y, Button::Left) };
         }
-        if s.mixer_bar_press(size, x, y) {
+        if s.mixer_bar_press(size, x, y) || s.synth_matrix_bar_press(size, x, y) {
             return true;
         }
         if let Some((_, count)) = s.kit_list() {

@@ -14,7 +14,7 @@ use super::session_types::Workspace;
 use crate::canvas::Canvas;
 use crate::control::{Spec, Style};
 use crate::menu_action::ControlAction;
-use crate::panel::{self, Item, Kind};
+use crate::panel::{self, Item, Kind, Rect};
 use crate::panel::{Dropdown, Id};
 use crate::ui_input::Button;
 use crate::view;
@@ -260,6 +260,9 @@ impl Session {
         if self.is_mixer_bar_held() {
             return self.mixer_bar_to(size, x);
         }
+        if self.is_synth_matrix_bar_held() {
+            return self.synth_matrix_bar_to(size, y);
+        }
         if let Some(drag) = self.song_panel.held_bar() {
             return self.song_bar_held(size, drag, x, y);
         }
@@ -355,12 +358,28 @@ impl Session {
 
     /// What a control is, said in its tooltip.
     pub(super) fn control_tip(&self, id: Id) -> Option<[Cow<'static, str>; 2]> {
+        if let Id::SynthField(fi) = id {
+            return self.synth_field_tip(fi).map(|lines| lines.map(Into::into));
+        }
         control_help::help(id).map(|lines| lines.map(Into::into))
+    }
+
+    /// The control held whose tooltip says its value (a fader, a knob of an oscillator):
+    /// its tooltip stays while it is dragged.
+    fn held_control_tip(&self, scale: Scale, size: (i32, i32)) -> Option<([Cow<'static, str>; 2], Rect)> {
+        let id = self.chrome.widgets.drag?.id;
+        let Id::SynthField(fi) = id else { return None };
+        let lines = self.synth_field_tip(fi)?.map(Into::into);
+        let layout = self.panel_layout(size.0, size.1, scale);
+        Some((lines, panel::find(&layout.items, id)?.rect))
     }
 
     /// The tooltip of the note under the mouse (the first of its step), as
     /// `PointerSection.onMouseOver` shows it; over a control, what it is.
     pub(super) fn draw_tooltip(&self, canvas: &mut Canvas, scale: Scale) {
+        if let Some((lines, rect)) = self.held_control_tip(scale, (canvas.width(), canvas.height())) {
+            return view::draw_tooltip_lines(canvas, &lines, rect, scale);
+        }
         if let Some((id, rect)) = self.chrome.control_hover.filter(|_| !self.chrome.covered())
             && let Some(lines) = self.control_tip(id)
         {
@@ -414,6 +433,7 @@ impl Session {
         self.song_panel.release_bar();
         self.kit_editor.list.release_bar();
         self.release_mixer_bar();
+        self.release_synth_matrix_bar();
         self.chrome.grid_hold = None;
         self.roll_release();
         self.release_wave_handle();
@@ -481,7 +501,7 @@ impl Session {
         let (width, height, scale) = size;
         let layout = self.panel_layout(width, height, scale);
         let Some(item) = panel::item_at(&layout.items, x, y).cloned() else {
-            return self.mixer_wheel(size, x, y, lines);
+            return self.mixer_wheel(size, x, y, lines) || self.synth_matrix_wheel(size, x, y, lines);
         };
         let Some(id) = item.id else { return false };
         match item.kind {

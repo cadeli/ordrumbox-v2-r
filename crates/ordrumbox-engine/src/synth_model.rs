@@ -16,6 +16,8 @@ use crate::synth_preset::{PITCH_ENV_AMOUNT_RANGE, PITCH_ENV_DECAY_DEFAULT, PITCH
 
 mod choices;
 pub use choices::*;
+mod matrix_lines;
+pub use matrix_lines::*;
 mod preview;
 pub use preview::*;
 /// A group's defaults (`SYNTH_GROUP_DEFAULTS`), in order.
@@ -238,30 +240,18 @@ pub const GROUP_ORDER: [&str; 16] = [
     "vco3",
     "unison",
     "fm",
+    "noise",
     "filter",
     "filterEnv",
-    "lfo",
-    "lfo2",
-    "matrix",
-    "noise",
-    "master",
     "envelope",
     "pitchEnv",
+    "master",
+    "lfo",
+    "lfo2",
     "modEnvelope",
+    "matrix",
 ];
 pub const MASTER_KEYS: [&str; 3] = ["masterVolume", "subGain", "pitchPunch"];
-
-/// The tabs and which cards each shows (`TAB_DEFS`, `GROUP_TAB`).
-pub const TABS: [&str; 4] = ["OSC", "FLT", "MOD", "ENV"];
-
-pub fn group_tab(group: &str) -> usize {
-    match group {
-        "filter" | "filterEnv" | "modEnvelope" => 1,
-        "lfo" | "lfo2" | "matrix" | "noise" => 2,
-        "envelope" | "pitchEnv" | "master" => 3,
-        _ => 0,
-    }
-}
 
 /// A card's title (`SYNTH_GROUP_LABELS`).
 pub fn group_label(group: &str) -> String {

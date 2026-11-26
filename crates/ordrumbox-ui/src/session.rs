@@ -190,6 +190,8 @@ mod session_song_mouse;
 mod session_song_zoom;
 #[path = "session_synth.rs"]
 mod session_synth;
+#[path = "session_synth_matrix.rs"]
+mod session_synth_matrix;
 #[path = "session_synth_tags.rs"]
 mod session_synth_tags;
 #[path = "session_transport.rs"]

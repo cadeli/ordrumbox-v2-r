@@ -325,7 +325,7 @@ brighter with the velocity, drifting with LFO1. Added last, it is the second `SY
 were rewritten.
 
 The synth editor has a `matrix` group (`source1`..`source8`, `target1`..`target8`,
-`amount1`..`amount8`) in its defaults, so a hydrated preset holds it and the MOD tab has a
+`amount1`..`amount8`) in its defaults, so a hydrated preset holds it and the editor has a
 Matrix card. This rewrote `synth_editor_rust.txt` (engine); the audio renders are unchanged,
 a preset whose lines are all `off` adds nothing to any control.
 
@@ -661,3 +661,9 @@ to play as a lowpass, unsaid, and was saved back as it was), an unknown `delayTy
 now said, and saved as `tape`). An MCP `updateTrack` with an unknown name is refused as of the wrong type. The strip's
 switches and modes stay `f32`, as the doc of `audio_params!` says why. `mapping_rust.txt` (engine) rewrote one line,
 edge track `N` (its `weird` filter now skipped: cutoff 20000), and `tests/mapping.rs` expects its two issues.
+
+The synth editor has no tabs: every card is on one screen, what makes the sound (the oscillators, the unison, FM, the
+noise, the filter and its envelope, the envelope, the pitch envelope, the master) then what moves it (the two LFOs,
+the mod envelope, the matrix), 8 px apart (was 10) so that they fit the smallest window. The line of the track
+edited is under the preset bar, where the tabs were. The cards follow that order in `synth_model::GROUP_ORDER`, and the scope sits in VCO1's strip, right of its controls (it
+was VCO3's). This rewrote the card lines of `synth_editor_rust.txt` (engine), only their order; no sound changed.

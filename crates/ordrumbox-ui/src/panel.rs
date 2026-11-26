@@ -277,7 +277,6 @@ pub enum Id {
     /// The preset edited's tags (their entry).
     SynthTags,
     SynthButton(&'static str),
-    SynthTab(SynthTab),
     /// A card's power button: by the card's index in
     /// `ordrumbox_engine::synth_model::groups`.
     SynthPower(u8),
@@ -594,7 +593,7 @@ mod tabs;
 pub use draw::draw;
 pub use dropdown::{Choices, Dropdown, MENU_MARK, SUBMENU_MARK};
 pub use entry::Entry;
-pub use tabs::{EditorTab, GenerationTab, SynthTab, ViewButton};
+pub use tabs::{EditorTab, GenerationTab, ViewButton};
 
 #[cfg(test)]
 mod tests {

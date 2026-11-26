@@ -15,11 +15,12 @@ use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
 
 use super::session_files::NO_SYNTHS;
+use super::session_synth_matrix::MatrixScroll;
 use super::session_types::Workspace;
 use super::{Session, session_panel};
 use crate::canvas::{Canvas, text_width};
 use crate::frame;
-use crate::panel::{Id, SynthTab};
+use crate::panel::Id;
 use crate::panel::{Item, Kind, Rect, dim};
 use crate::picker::{Export, Purpose};
 use crate::store;
@@ -51,18 +52,18 @@ pub(super) struct Synths {
     pub(super) revision: Option<u64>,
 }
 
-/// The synth editor: the preset edited, the tab, and when the session
-/// started (the LFO clock).
+/// The synth editor: the preset edited, when the session
+/// started (the LFO clock), and where the matrix list is scrolled to.
 #[derive(Debug)]
 pub(super) struct SynthEditor {
     edit: Option<SynthEdit>,
-    tab: SynthTab,
     started: Instant,
+    pub(super) matrix: MatrixScroll,
 }
 
 impl SynthEditor {
     pub(super) fn new() -> Self {
-        Self { edit: None, tab: SynthTab::default(), started: Instant::now() }
+        Self { edit: None, started: Instant::now(), matrix: MatrixScroll::default() }
     }
 
     /// Preset `key` is the one edited.
@@ -138,24 +139,24 @@ impl Session {
         Some((track.name.clone(), plays))
     }
 
-    /// The line under the preset bar, right of the tabs: what the track
+    /// The line under the preset bar: what the track
     /// plays, and when it is not the preset shown, a button that puts it on it.
     fn track_line(&self, layout: &SynthLayout, scale: Scale, items: &mut Vec<Item>) {
         let Some((name, plays)) = self.track_plays() else { return };
-        let tab = layout.tabs[layout.tabs.len() - 1];
-        let mut x = tab.x + tab.w + 16 * scale;
+        let line = layout.track_line;
+        let mut x = line.x;
         let text = match plays {
             None => format!("{name} plays this preset"),
             Some(plays) => {
                 let label = format!("USE ON {name}");
                 let w = text_width(&label, scale) + 12 * scale;
-                let rect = Rect::new(x, tab.y, w, tab.h);
+                let rect = Rect::new(x, line.y, w, line.h);
                 items.push(Item::new(Some(Id::SynthButton(USE_BUTTON)), rect, Kind::Button { label, on: false }));
                 x += w + 8 * scale;
                 format!("{name} {plays}")
             }
         };
-        items.push(Item::text(x, tab.y + 3 * scale, text, dim(), scale));
+        items.push(Item::text(x, line.y + 3 * scale, text, dim(), scale));
     }
 
     /// The presets' keys, sorted.
@@ -316,7 +317,9 @@ impl Session {
             let modulation = model::lfo_mod_on(&edit.draft, path, time, bpm);
             (modulation != 0.0).then(|| model::number(&edit.draft, path).unwrap_or(0.0) + modulation)
         };
-        let built = synth_view::build(&edit.draft, &self.synth_keys(), &edit.key, self.synth_editor.tab, &layout, &lfo);
+        let keys = self.synth_keys();
+        let first = self.synth_editor.matrix.first;
+        let built = synth_view::build(&edit.draft, (&keys, &edit.key), &layout, first, &lfo);
         Some((built, layout))
     }
 
@@ -354,6 +357,14 @@ impl Session {
         synth_view::all_fields(&self.synth_editor.edit.as_ref()?.draft).into_iter().nth(usize::from(fi))
     }
 
+    /// The tooltip of field `fi` when it says its value (a fader of an envelope or the filter,
+    /// a knob of an oscillator).
+    pub(super) fn synth_field_tip(&self, fi: u16) -> Option<[String; 2]> {
+        let path = self.synth_field(fi)?;
+        let draft = &self.synth_editor.edit.as_ref()?.draft;
+        crate::synth_faders::tip(draft, &path).or_else(|| crate::synth_strip::tip(draft, &path))
+    }
+
     /// A knob of the editor turned; a stepped knob of a list (the LFOs'
     /// sync) sets the option at its notch.
     pub(super) fn synth_value(&mut self, fi: u16, value: f64) {
@@ -387,10 +398,9 @@ impl Session {
         }
     }
 
-    /// A tab, a power button, a switch or a preset button pressed.
+    /// A power button, a switch or a preset button pressed.
     pub(super) fn synth_activate(&mut self, id: Id) {
         match id {
-            Id::SynthTab(tab) => self.synth_editor.tab = tab,
             Id::SynthButton(button) => self.synth_button(button),
             Id::SynthPower(gi) => {
                 let Some(edit) = &mut self.synth_editor.edit else { return };
@@ -605,18 +615,15 @@ mod tests {
         let scale = Scale::ONE;
         let (w, h) = crate::view::min_window_size(scale, crate::view::Shown::all());
         s.set_size((w, h, scale));
-        for tab in SynthTab::ALL {
-            s.synth_editor.tab = tab;
-            let (built, layout) = s.synth_built((w, h, scale)).expect("the editor");
-            let bottom = layout.area.y + layout.area.h;
-            for card in &built.cards {
-                assert!(
-                    card.rect.y + card.rect.h <= bottom,
-                    "{tab:?}: {} ends at {} under {bottom}",
-                    card.group,
-                    card.rect.y + card.rect.h
-                );
-            }
+        let (built, layout) = s.synth_built((w, h, scale)).expect("the editor");
+        let bottom = layout.area.y + layout.area.h;
+        for card in &built.cards {
+            assert!(
+                card.rect.y + card.rect.h <= bottom,
+                "{} ends at {} under {bottom}",
+                card.group,
+                card.rect.y + card.rect.h
+            );
         }
     }
 
@@ -624,7 +631,6 @@ mod tests {
     fn the_lfo_sync_is_a_stepped_knob() {
         let mut s = session();
         s.toggle_synth();
-        s.synth_editor.tab = SynthTab::Modulation;
         let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
         let fi = fields.iter().position(|f| f == "lfo2.sync").unwrap() as u16;
         let knob = item(&s, |i| i.id == Some(Id::SynthField(fi)));
@@ -642,7 +648,6 @@ mod tests {
     fn an_lfo_wave_is_a_spin_that_draws_it() {
         let mut s = session();
         s.toggle_synth();
-        s.synth_editor.tab = SynthTab::Modulation;
         let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
         let fi = fields.iter().position(|f| f == "lfo.wave").unwrap() as u16;
         let spin = item(&s, |i| i.id == Some(Id::SynthField(fi)));
@@ -658,7 +663,6 @@ mod tests {
     fn the_filter_slope_is_a_spin() {
         let mut s = session();
         s.toggle_synth();
-        s.synth_editor.tab = SynthTab::Filter;
         let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
         let fi = fields.iter().position(|f| f == "filter.slope").unwrap() as u16;
         let spin = item(&s, |i| i.id == Some(Id::SynthField(fi)));
@@ -726,8 +730,7 @@ mod tests {
         assert_eq!(s.synth_editor.edit.as_ref().unwrap().key, "new_preset");
         s.undo();
         assert_eq!(s.synth_keys(), ["a", "b", "new_preset", "new_preset_copy"]);
-        // The power button of the envelope (ENV tab).
-        s.synth_activate(Id::SynthTab(SynthTab::Envelopes));
+        // The power button of the envelope.
         let groups = model::groups(&s.synth_editor.edit.as_ref().unwrap().draft);
         let env = groups.iter().position(|g| g == "envelope").unwrap() as u8;
         s.synth_activate(Id::SynthPower(env));

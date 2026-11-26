@@ -45,21 +45,6 @@ impl GenerationTab {
     pub const ALL: [Self; 3] = [Self::Groove, Self::Engine, Self::Compose];
 }
 
-/// A tab of the synth editor, in the order of `synth_model::TABS`.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum SynthTab {
-    #[default]
-    Oscillators,
-    Filter,
-    Modulation,
-    Envelopes,
-}
-
-impl SynthTab {
-    /// The tabs, left to right, as `synth_model::TABS` labels them.
-    pub const ALL: [Self; 4] = [Self::Oscillators, Self::Filter, Self::Modulation, Self::Envelopes];
-}
-
 /// A view button of the header: a view of the main editor, or the kit
 /// editor, which it toggles over the main editor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
