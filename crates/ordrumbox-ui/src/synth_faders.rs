@@ -12,7 +12,7 @@ use crate::synth_cells::value_tip;
 use crate::synth_view::knob_kind;
 
 /// Each fader: its card, its key, its letter, its name.
-const FADERS: [(&str, &str, &str, &str); 17] = [
+const FADERS: [(&str, &str, &str, &str); 18] = [
     ("envelope", "attack", "A", "Attack"),
     ("envelope", "decay", "D", "Decay"),
     ("envelope", "sustain", "S", "Sustain"),
@@ -30,6 +30,7 @@ const FADERS: [(&str, &str, &str, &str); 17] = [
     ("filterEnv", "release", "R", "Release"),
     ("filter2", "freq", "F", "Frequency"),
     ("filter2", "Q", "Q", "Resonance"),
+    ("filter2", "balance", "B", "Balance"),
 ];
 
 /// The fader field `path` is, if it is one: its letter and its name.
@@ -51,6 +52,9 @@ pub(crate) fn fader_kind(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Optio
         Kind::Value { mut spec, value, label, text, lfo } => {
             spec.style = Style::Fader;
             Kind::Value { spec, value, label, text, lfo }
+        }
+        Kind::Disabled { .. } => {
+            Kind::Disabled { label: letter(path).unwrap_or_default().to_owned(), style: Style::Fader }
         }
         other => other,
     }

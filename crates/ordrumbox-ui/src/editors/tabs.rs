@@ -9,7 +9,7 @@ use super::values::{
     EditorState, flag, fx_on, has_lfo, index_of, lfo_wave_choice, loop_steps, number, select_choice, text_of,
 };
 use super::{Choice, ComposeView, TrackView};
-use crate::control::{Format, Spec};
+use crate::control::{Format, Spec, Style};
 use crate::panel::{GenerationTab, Id, Item, Kind, LfoParam, Rect, dim, label_width};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
@@ -75,7 +75,13 @@ fn fx_knob_row(rows: &mut Rows, view: &TrackView, state: &EditorState, fx: &FxDe
         slot += 1;
         // A slap is one echo: no feedback to set, its knob kept greyed out.
         if p.key == "delayFeedback" && track.delay_type == DelayType::Slap {
-            rows.slot_choice(rect, p.label, Some(p.key), None, Kind::Disabled { label: "one echo".into() });
+            rows.slot_choice(
+                rect,
+                p.label,
+                Some(p.key),
+                None,
+                Kind::Disabled { label: "one echo".into(), style: Style::Knob },
+            );
             continue;
         }
         let value = view.lfo.iter().find(|(k, _)| *k == p.key).map_or_else(|| number(track, p.key), |&(_, v)| v);

@@ -11,8 +11,8 @@ use ordrumbox_dsp::SynthPatch;
 use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;
 use ordrumbox_dsp::synth::patch::{
-    Adsr, Filter2, FilterEnv, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, NoiseMode, PitchEnv, SynthBypass,
-    SynthLfo, VoiceMode,
+    Adsr, Filter2, Filter2Routing, FilterEnv, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, NoiseMode, PitchEnv,
+    SynthBypass, SynthLfo, VoiceMode,
 };
 use ordrumbox_dsp::synth::{MAX_PITCH_ENV_SEMITONES, MAX_UNISON};
 
@@ -59,6 +59,10 @@ const ACCENT_LEVEL: f64 = 0.5;
 pub const FILTER2_TYPE_DEFAULT: &str = "highpass";
 pub const FILTER2_FREQ_DEFAULT: f64 = 100.0;
 pub const FILTER2_Q_DEFAULT: f64 = 0.7;
+/// Where the second filter sits (`filter2.routing`), by code: after the first, or beside it.
+pub const FILTER2_ROUTINGS: [&str; 2] = ["serial", "parallel"];
+/// The balance of the two filters in parallel a preset that does not set it plays with: both at full level.
+pub const FILTER2_BALANCE_DEFAULT: f64 = 0.5;
 /// The stages of the filter envelope's own ADSR (`filterEnv.<stage>`).
 pub const FILTER_ENV_STAGES: [&str; 4] = ["attack", "decay", "sustain", "release"];
 /// The semitones an oscillator is tuned by, on top of its octave.
@@ -69,7 +73,7 @@ pub const PITCH_ENV_DECAY_DEFAULT: f64 = 0.05;
 pub const MATRIX_SOURCES: [&str; 8] = ["off", "lfo1", "lfo2", "env", "modEnv", "velocity", "key", "random"];
 /// The LFO targets by their name in a preset (two names for the filter envelope amount;
 /// older names: [`legacy_modulation`]).
-const LFO_TARGETS: [(&str, LfoTarget); 42] = [
+const LFO_TARGETS: [(&str, LfoTarget); 43] = [
     ("NOT", LfoTarget::Off),
     ("masterVolume", LfoTarget::Volume),
     ("vco1.gain", LfoTarget::Osc1Gain),
@@ -112,6 +116,7 @@ const LFO_TARGETS: [(&str, LfoTarget); 42] = [
     ("fm.boost", LfoTarget::FmBoost),
     ("shape", LfoTarget::Shape),
     ("filter2.freq", LfoTarget::Filter2Freq),
+    ("filter2.balance", LfoTarget::Filter2Balance),
 ];
 
 /// The targets that are no control of the editor but an effect on several:
@@ -408,6 +413,8 @@ fn filter2(group: Option<&Value>, is_bypassed: bool) -> Option<Filter2> {
         mode: choice(Some(&Value::from(mode)), &FILTER_TYPES, &FilterMode::ALL),
         freq: finite(get(group, "freq"), FILTER2_FREQ_DEFAULT),
         q: finite(get(group, "Q"), FILTER2_Q_DEFAULT),
+        routing: choice(get(group, "routing"), &FILTER2_ROUTINGS, &Filter2Routing::ALL),
+        balance: clamp(finite(get(group, "balance"), FILTER2_BALANCE_DEFAULT), 0.0, 1.0),
     })
 }
 
@@ -674,7 +681,16 @@ mod tests {
         let adsr = Adsr { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.4 };
         assert_eq!(own.filter_env, FilterEnv { adsr: Some(adsr), is_inverted: true });
         let second = read(r#"{"filter2":{"freq":2000},"voice":{"mode":"legato","glide":9}}"#);
-        assert_eq!(second.filter2, Some(Filter2 { mode: FilterMode::Highpass, freq: 2000.0, q: FILTER2_Q_DEFAULT }));
+        let serial = Filter2 {
+            mode: FilterMode::Highpass,
+            freq: 2000.0,
+            q: FILTER2_Q_DEFAULT,
+            routing: Filter2Routing::Serial,
+            balance: FILTER2_BALANCE_DEFAULT,
+        };
+        assert_eq!(second.filter2, Some(serial));
+        let beside = read(r#"{"filter2":{"routing":"parallel","balance":3}}"#).filter2;
+        assert_eq!(beside.map(|f| (f.routing, f.balance)), Some((Filter2Routing::Parallel, 1.0)));
         assert_eq!((second.voice_mode, second.glide_seconds), (VoiceMode::Legato, GLIDE_MAX));
         assert_eq!(read(r#"{"filter2":{},"bypassFilter2":true}"#).filter2, None);
         let lfo = read(r#"{"lfo":{"delay":0.5,"retrigger":true}}"#).lfo1;

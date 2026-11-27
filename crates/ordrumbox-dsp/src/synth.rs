@@ -24,6 +24,7 @@ use crate::svf::{Svf, tap, tap_weights};
 mod cross_mod;
 mod envelope;
 mod filter;
+mod filter2;
 mod modulation;
 mod oscillator;
 pub mod patch;
@@ -36,6 +37,8 @@ pub use cross_mod::ring;
 use cross_mod::{Moved, cycle_starts, restart};
 use envelope::{Envelope, FilterEnvelope, Segment};
 use filter::{coefficients, cutoff_coefficient};
+use filter2::Filter2Stage;
+pub use filter2::balance_gains;
 pub use modulation::lfo_swing;
 use modulation::{
     DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, Late, LateMods, MOD_ENV_SLOTS, Matrix, Mods, Slot, SourceValues, WIDTH_SLOTS,
@@ -46,7 +49,7 @@ use oscillator::{
     LFSR_SEED, NOISE_SEED, WIDTH_MAX, WIDTH_MIN, WaveTables, fm_frequencies, lfsr_sample, lfsr_step, noise_sample,
     noise_seed, oscillator, phase_step, sin_lookup, sine_table, xorshift32,
 };
-use patch::{Adsr, Filter2, LfoTarget, MatrixSource, NoiseMode, SynthLfo, SynthPatch};
+use patch::{Adsr, Filter2Routing, LfoTarget, MatrixSource, NoiseMode, SynthLfo, SynthPatch};
 pub use pitch_env::MAX_PITCH_ENV_SEMITONES;
 use pitch_env::{PitchFall, fall_per_sample};
 pub use retrigger::Retrigger;
@@ -68,27 +71,6 @@ fn clamp(x: f64, lo: f64, hi: f64) -> f64 {
 #[inline]
 fn cents_ratio(cents: f64) -> f64 {
     if cents == 0.0 { 1.0 } else { (cents * LN2_OVER_1200).exp() }
-}
-
-/// The second filter as a block runs it: its taps, its cutoff and the
-/// coefficient and damping while nothing moves it.
-#[derive(Debug, Clone, Copy)]
-struct Filter2Stage {
-    weights: [f64; 3],
-    freq: f64,
-    g: f64,
-    k: f64,
-}
-
-impl Filter2Stage {
-    fn new(filter: &Filter2, sample_rate: f64) -> Self {
-        Self {
-            weights: tap_weights(filter.mode),
-            freq: filter.freq,
-            g: cutoff_coefficient(filter.freq, sample_rate),
-            k: 1.0 / clamp(filter.q, 0.1, 20.0),
-        }
-    }
 }
 
 /// What a block of a note is rendered with: everything of the patch that no
@@ -456,7 +438,7 @@ impl SynthVoice {
         let is_swept = (filter_env_amount > SILENT && self.is_filter_env_running(p)) || filter_open.abs() > SILENT;
         let filtered = if p.bypass.filter { dry } else { self.filter(b, mods, dry, cutoff, is_swept) };
         let filtered = match &b.filter2 {
-            Some(stage) => self.filter_2nd(b, mods, stage, filtered),
+            Some(stage) => self.filter_2nd(b, mods, stage, filtered, dry),
             None => filtered,
         };
 
@@ -538,19 +520,33 @@ impl SynthVoice {
         if p.filter_env.adsr.is_some() { !self.filter_adsr.is_idle() } else { !self.filter_env.is_idle() }
     }
 
-    /// `x` (left, right) through the second filter: at the block's
-    /// coefficient unless the matrix moves its cutoff.
+    /// The second filter's output (left, right): in series, `first` (the
+    /// first filter's output) through it; in parallel, `dry` (the first
+    /// filter's input) through it, mixed with `first` at the balance. At the
+    /// block's coefficient and gains unless the matrix moves them.
     #[inline]
-    fn filter_2nd(&mut self, b: &Block, mods: &Mods, stage: &Filter2Stage, x: [f64; 2]) -> [f64; 2] {
+    fn filter_2nd(&mut self, b: &Block, mods: &Mods, stage: &Filter2Stage, first: [f64; 2], dry: [f64; 2]) -> [f64; 2] {
         let g = if is_moved(mods, Slot::Filter2) {
             cutoff_coefficient(modulated(mods, stage.freq, Slot::Filter2), b.sample_rate)
         } else {
             stage.g
         };
         let coefficients = coefficients(g, stage.k);
+        let x = match stage.routing {
+            Filter2Routing::Serial => first,
+            Filter2Routing::Parallel => dry,
+        };
         let left = tap(self.filter2.step(x[0], &coefficients), stage.weights);
         let right = if b.is_stereo { tap(self.filter2_right.step(x[1], &coefficients), stage.weights) } else { left };
-        [left, right]
+        if stage.routing == Filter2Routing::Serial {
+            return [left, right];
+        }
+        let [first_gain, second_gain] = if is_moved(mods, Slot::Filter2Balance) {
+            balance_gains(modulated(mods, stage.balance, Slot::Filter2Balance))
+        } else {
+            stage.gains
+        };
+        [first[0] * first_gain + left * second_gain, first[1] * first_gain + right * second_gain]
     }
 
     /// `x` (left, right) through the main filter at `cutoff` Hz. The
@@ -945,9 +941,35 @@ mod tests {
             [200.0, 3_000.0].map(|f| tone_level(&out[12_000..], f))
         };
         let open = saw(None);
-        let cut = saw(Some(Filter2 { mode: crate::slope::FilterMode::Lowpass, freq: 500.0, q: 0.7 }));
+        let cut = saw(Some(lowpass_500(Filter2Routing::Serial, 0.5)));
         assert!((cut[0] - open[0]).abs() < 0.2 * open[0], "{open:?} {cut:?}");
         assert!(cut[1] < 0.05 * open[1], "{open:?} {cut:?}");
+    }
+
+    /// A second filter: a lowpass at 500 Hz, `routing` with the first at `balance`.
+    fn lowpass_500(routing: Filter2Routing, balance: f64) -> patch::Filter2 {
+        patch::Filter2 { mode: FilterMode::Lowpass, freq: 500.0, q: 0.7, routing, balance }
+    }
+
+    #[test]
+    fn the_second_filter_in_parallel_is_mixed_with_the_first_at_the_balance() {
+        // The first filter is bypassed: in parallel, its side is the dry sound.
+        let saw = |balance| {
+            let patch = SynthPatch {
+                osc_gain: [1.0, 0.0, 0.0],
+                osc_wave: [Wave::Sawtooth; 3],
+                filter2: Some(lowpass_500(Filter2Routing::Parallel, balance)),
+                ..SynthPatch::default()
+            };
+            let out = held(patch, 24_000);
+            [200.0, 3_000.0].map(|f| tone_level(&out[12_000..], f))
+        };
+        let [first, both, second] = [saw(0.0), saw(0.5), saw(1.0)];
+        // The first alone: the dry sound; the second alone: the lowpass.
+        assert!(second[1] < 0.05 * first[1], "{first:?} {second:?}");
+        // Both at full level: the lows of the two add up, the highs of the first stay.
+        assert!((both[0] - 2.0 * first[0]).abs() < 0.3 * first[0], "{first:?} {both:?}");
+        assert!((both[1] - first[1]).abs() < 0.1 * first[1], "{first:?} {both:?}");
     }
 
     #[test]

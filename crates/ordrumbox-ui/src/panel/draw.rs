@@ -128,7 +128,7 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
             let color = if *on { background_color() } else { theme::text() };
             centered_label(canvas, r, label, scale, color);
         }
-        Kind::Disabled { label } => {
+        Kind::Disabled { label, .. } => {
             canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
             centered_label(canvas, r, label, scale, theme::disabled());
         }

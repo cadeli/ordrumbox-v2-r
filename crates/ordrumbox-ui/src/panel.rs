@@ -377,9 +377,11 @@ pub enum Kind {
         label: String,
         on: bool,
     },
-    /// A control greyed out: shown, not used (a slap's echo feedback).
+    /// A control greyed out: shown, not used (a slap's echo feedback), in
+    /// the style of the control it stands for (a knob or a fader).
     Disabled {
         label: String,
+        style: Style,
     },
     Text {
         text: String,

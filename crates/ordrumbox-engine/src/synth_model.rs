@@ -19,13 +19,15 @@ mod choices;
 pub use choices::*;
 mod matrix_lines;
 pub use matrix_lines::*;
+mod filter_curve;
+pub use filter_curve::*;
 mod preview;
 pub use preview::*;
 mod power;
 pub use power::*;
 mod extras;
 use extras::{EXTRA_FIELDS, EXTRA_GROUPS, implicit_enable_extra, is_extra};
-pub use extras::{EXTRA_METAS, SWITCH_LABELS, SWITCHES, extra_default, extra_value};
+pub use extras::{EXTRA_METAS, SHORT_LABELS, SWITCHES, extra_default, extra_value};
 /// A group's defaults (`SYNTH_GROUP_DEFAULTS`), in order.
 const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,
     "vco1":{"gain":1,"octave":0,"detune":0,"wave":"sine"},
@@ -168,13 +170,13 @@ pub fn find_meta(path: &str) -> Option<&'static Meta> {
     metas().find(|m| m.path == path)
 }
 
-/// The name under the control of field `path`: its label, a switch's short
-/// name ([`SWITCH_LABELS`]), else its key.
+/// The name under the control of field `path`: its label, a short name
+/// ([`SHORT_LABELS`]), else its key.
 #[must_use]
 pub fn field_label(path: &str) -> &str {
-    let switch = || SWITCH_LABELS.iter().find(|(p, _)| *p == path).map(|(_, label)| *label);
+    let short = || SHORT_LABELS.iter().find(|(p, _)| *p == path).map(|(_, label)| *label);
     let key = path.rsplit('.').next().unwrap_or(path);
-    find_meta(path).and_then(|m| m.label).or_else(switch).unwrap_or(key)
+    find_meta(path).and_then(|m| m.label).or_else(short).unwrap_or(key)
 }
 
 /// What a line of the matrix can modulate (`SYNTH_LFO_TARGETS`): off, every control that is
@@ -648,13 +650,5 @@ mod tests {
         let (filter_env, _) = envelope(&d, "filterEnv");
         let attack = extra_value(&d, "filterEnv.attack").expect("a stage");
         assert_eq!(filter_env[1], (attack, 1.0), "unset, a stage of the filter envelope plays as its default");
-        let low = filter_response("lowpass", 1000.0, 1.0, 12.0, 200);
-        assert!(low[0] > -1.0 && low[200] == -30.0);
-        let high = filter_response("highpass", 1000.0, 1.0, 12.0, 200);
-        assert!(high[0] == -30.0 && high[200] > -1.0);
-        // The point of frequency `f`: 200 points span 3 decades from 20 Hz.
-        let at = |f: f64| (200.0 * (f / 20.0f64).log10() / 3.0).round() as usize;
-        let steep = filter_response("lowpass", 1000.0, std::f64::consts::FRAC_1_SQRT_2, 24.0, 200);
-        assert!((steep[at(1000.0)] + 3.0).abs() < 0.5 && steep[at(2000.0)] < -23.0, "{}", steep[at(2000.0)]);
     }
 }

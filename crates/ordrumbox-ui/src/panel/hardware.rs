@@ -149,7 +149,10 @@ pub(super) fn draw_item(canvas: &mut Canvas, item: &Item, s: Scale) -> bool {
                 Style::Slider | Style::Stepper => return false,
             }
         }
-        Kind::Disabled { label } if r.h >= 40 * s => draw_knob_off(canvas, r, label, s),
+        Kind::Disabled { label, style } if r.h >= 40 * s => match style {
+            Style::Fader => draw_fader_off(canvas, r, label, s),
+            _ => draw_knob_off(canvas, r, label, s),
+        },
         Kind::Spin { labels, selected, curve, .. } => draw_spin(canvas, r, (labels, *selected), curve, s),
         Kind::Toggle { on } => draw_button(canvas, r, if *on { "ON" } else { "OFF" }, *on, s),
         Kind::Button { label, on } => draw_button(canvas, r, label, *on, s),
@@ -204,6 +207,15 @@ fn draw_knob_off(canvas: &mut Canvas, r: Rect, label: &str, s: Scale) {
     let centre = (f64::from(r.x) + f64::from(r.w) / 2.0, f64::from(r.y) + f64::from(size) / 2.0);
     canvas.fill_disc(centre, f64::from(size) / 2.0 - f64::from(4 * s), cards.knob_off);
     label_under(canvas, r, r.y + size + 3 * s, label, cards.label_dim, s);
+}
+
+/// A fader greyed out: its slot, dim and without a cap, its label dim under it.
+fn draw_fader_off(canvas: &mut Canvas, r: Rect, label: &str, s: Scale) {
+    let ((top, height), cards) = (fader_bar(r, s), Cards::current());
+    let slot_w = 4 * s;
+    let x = r.x + r.w / 2 - slot_w / 2;
+    canvas.fill_rounded_gradient(x, top - 2 * s, slot_w, height + 4 * s, cards.knob_off, slot_w / 2);
+    label_under(canvas, r, top + height + 8 * s, label, cards.label_dim, s);
 }
 
 /// `label` centred across `r` at `y`, cut to its width.

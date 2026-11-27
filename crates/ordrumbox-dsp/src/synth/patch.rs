@@ -58,11 +58,13 @@ pub enum LfoTarget {
     Shape,
     /// The second filter's cutoff.
     Filter2Freq,
+    /// The balance of the two filters in parallel, from the first (−) to the second (+).
+    Filter2Balance,
 }
 
 impl LfoTarget {
     /// Every target, each at its code.
-    pub const ALL: [Self; 41] = [
+    pub const ALL: [Self; 42] = [
         Self::Off,
         Self::Volume,
         Self::Osc1Gain,
@@ -104,6 +106,7 @@ impl LfoTarget {
         Self::FmBoost,
         Self::Shape,
         Self::Filter2Freq,
+        Self::Filter2Balance,
     ];
 
     /// Its code: its place in [`Self::ALL`].
@@ -237,12 +240,32 @@ pub struct FilterEnv {
     pub is_inverted: bool,
 }
 
-/// The second filter, after the first: a 12 dB/oct stage of its own.
+/// The second filter: a 12 dB/oct stage of its own, after the first or beside it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Filter2 {
     pub mode: FilterMode,
     pub freq: f64,
     pub q: f64,
+    pub routing: Filter2Routing,
+    /// In parallel, how the two filters are mixed: 0 the first alone, 1 the
+    /// second alone, ½ both at full level. In series it does nothing.
+    pub balance: f64,
+}
+
+/// Where the second filter takes its input from, and where its output goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Filter2Routing {
+    /// After the first filter: the slopes add up.
+    #[default]
+    Serial,
+    /// Beside it, on the same input, the two outputs mixed by the balance:
+    /// two bands at once (formants), or a notch between a lowpass and a highpass.
+    Parallel,
+}
+
+impl Filter2Routing {
+    /// Every routing, each at its code.
+    pub const ALL: [Self; 2] = [Self::Serial, Self::Parallel];
 }
 
 /// How a track's notes share a voice.

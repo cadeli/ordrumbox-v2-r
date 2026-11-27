@@ -6,6 +6,7 @@
 use ordrumbox_core::json::{Object, Value};
 
 use super::{LFOS, NOISE_MODES, OSC_BYPASS_FLAGS, WAVES, number, set, text};
+use crate::synth_preset::FILTER2_ROUTINGS;
 
 /// The cards' bypass flags (`CARD_BYPASS_FLAGS`).
 pub const BYPASS_FLAGS: [(&str, &str); 13] = [
@@ -103,7 +104,7 @@ fn is_fm_modulator(draft: &Object, n: usize) -> bool {
 
 /// Whether control `path` does nothing as `draft` stands: an oscillator's
 /// pulse width under a wave other than the square, the noise's clock in
-/// white noise.
+/// white noise, the balance of the two filters in series.
 #[must_use]
 pub fn is_inert(draft: &Object, path: &str) -> bool {
     match path.split_once('.') {
@@ -111,6 +112,9 @@ pub fn is_inert(draft: &Object, path: &str) -> bool {
             text(draft, &format!("{group}.wave")).unwrap_or(WAVES[0]) != SQUARE
         }
         Some(("noise", "rate")) => text(draft, "noise.mode").unwrap_or(NOISE_MODES[0]) == NOISE_MODES[0],
+        Some(("filter2", "balance")) => {
+            text(draft, "filter2.routing").unwrap_or(FILTER2_ROUTINGS[0]) == FILTER2_ROUTINGS[0]
+        }
         _ => false,
     }
 }
@@ -132,5 +136,13 @@ mod tests {
         assert!(!is_inert(&d, "vco2.width") && !is_inert(&d, "noise.rate"));
         assert!(is_inert(&d, "vco1.width"));
         assert!(!is_inert(&d, "vco2.gain"));
+    }
+
+    #[test]
+    fn the_balance_does_nothing_with_the_filters_in_series() {
+        let mut d = defaults();
+        assert!(is_inert(&d, "filter2.balance"));
+        set(&mut d, "filter2.routing", Value::from(FILTER2_ROUTINGS[1]));
+        assert!(!is_inert(&d, "filter2.balance"));
     }
 }

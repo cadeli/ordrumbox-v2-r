@@ -1,18 +1,17 @@
-//! What the synth editor plots and animates: what the LFOs add through the matrix, the scope,
-//! the envelope and the filter curve.
+//! What the synth editor plots and animates: what the LFOs add through the matrix, the scope
+//! and the envelope (the filter curve: `filter_curve.rs`).
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::lfo;
-use ordrumbox_core::num::gain_to_db;
 use ordrumbox_dsp::synth::ring;
 
 use super::{
     EXTRA_METAS, FM_DEVIATION, LFOS, OSC_BYPASS_FLAGS, WAVES, defaults, extra_value, is_osc2_synced, lfo_scale, number,
-    routes_of, slope, text,
+    routes_of, text,
 };
 
 /// The LFOs playing (not bypassed), each with the matrix source it is.
-fn playing_lfos(draft: &Object) -> impl Iterator<Item = (&Object, &'static str)> {
+pub(super) fn playing_lfos(draft: &Object) -> impl Iterator<Item = (&Object, &'static str)> {
     LFOS.iter().filter(|lfo| !draft.get(lfo.bypass_flag).is_some_and(Value::is_true)).filter_map(|lfo| {
         let group = draft.get(lfo.group)?.as_object()?;
         Some((group, lfo.source))
@@ -219,63 +218,4 @@ pub fn envelope(draft: &Object, group: &str) -> (Vec<(f64, f64)>, f64) {
     let (a, d, s, r) = (v("attack"), v("decay"), v("sustain"), v("release"));
     let total = (a + d + 0.3 + r).max(0.5);
     (vec![(0.0, 0.0), (a, 1.0), (a + d, s), (total - r, s), (total, 0.0)], total)
-}
-
-/// The filter's response, dB at `points + 1` frequencies from 20 Hz to
-/// 20 kHz (log), centred on `fc`; a
-/// slope of 24 dB/oct is the product of its two stages.
-pub fn filter_response(kind: &str, fc: f64, q: f64, slope_db: f64, points: usize) -> Vec<f64> {
-    let magnitude = |f: f64, q: f64| {
-        let d = fc * fc - f * f;
-        let denom = (d * d + (fc * f / q) * (fc * f / q)).sqrt();
-        match kind {
-            "highpass" => f * f / denom,
-            "bandpass" => fc * f / q / denom,
-            _ => fc * fc / denom,
-        }
-    };
-    let mode = match kind {
-        "highpass" => slope::FilterMode::Highpass,
-        "bandpass" => slope::FilterMode::Bandpass,
-        _ => slope::FilterMode::Lowpass,
-    };
-    let (k1, k2, _) = slope::stages(1.0 / q, mode);
-    (0..=points)
-        .map(|i| {
-            let f = 20.0 * 1000f64.powf(i as f64 / points as f64);
-            // The bandpass curve is drawn normalized: both stages peak at 1.
-            let mag = if slope::is_steep(slope_db) {
-                magnitude(f, 1.0 / k1) * magnitude(f, 1.0 / k2)
-            } else {
-                magnitude(f, q)
-            };
-            gain_to_db(mag.max(1e-10)).clamp(-30.0, 12.0)
-        })
-        .collect()
-}
-
-/// The filter curve's type, centre, Q with the LFOs at `time` and slope, and
-/// the band an LFO on the frequency sweeps.
-pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, f64, Option<(f64, f64)>) {
-    let kind = text(draft, "filter.type").unwrap_or("lowpass").to_owned();
-    let slope_db = number(draft, "filter.slope").unwrap_or(12.0);
-    let fc = number(draft, "filter.freq")
-        .unwrap_or(400.0)
-        .clamp(ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ);
-    let q = number(draft, "filter.Q").unwrap_or(1.0).clamp(0.1, 24.0);
-    let fc = (fc + lfo_mod_on(draft, "filter.freq", time, bpm))
-        .clamp(ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ);
-    let q = (q + lfo_mod_on(draft, "filter.Q", time, bpm)).clamp(0.1, 24.0);
-    let depth = playing_lfos(draft)
-        .flat_map(|(_, source)| routes_of(draft, source))
-        .filter(|(target, _)| *target == "filter.freq")
-        .map(|(_, amount)| amount.abs())
-        .fold(0.0f64, f64::max);
-    let band = (depth > 0.0).then(|| {
-        (
-            (fc - depth * 1000.0).max(ordrumbox_dsp::MIN_FILTER_FREQ),
-            (fc + depth * 1000.0).min(ordrumbox_dsp::MAX_FILTER_FREQ),
-        )
-    });
-    (kind, fc, q, slope_db, band)
 }

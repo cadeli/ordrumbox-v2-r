@@ -24,10 +24,12 @@
 
 use crate::scale::Scale;
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS, VOICE_MODE_LABELS};
-use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES, VOICE_MODES};
+use ordrumbox_engine::synth_model::{
+    self as model, FILTER_SLOPES, FILTER2_ROUTING_LABELS, LFO_SYNCS, VOICE_MODE_LABELS,
+};
+use ordrumbox_engine::synth_preset::{FILTER_TYPES, FILTER2_ROUTINGS, NOISE_MODES, VOICE_MODES};
 
-use crate::control::Spec;
+use crate::control::{Spec, Style};
 use crate::editors::FILTER_ICONS;
 use crate::frame;
 use crate::panel::{Id, Item, Kind, Rect, Skin};
@@ -108,6 +110,10 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     if path == "voice.mode" {
         let modes = VOICE_MODES.iter().zip(VOICE_MODE_LABELS);
         return Field::List(modes.map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect());
+    }
+    if path == "filter2.routing" {
+        let routings = FILTER2_ROUTINGS.iter().zip(FILTER2_ROUTING_LABELS);
+        return Field::List(routings.map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect());
     }
     if matches!(path, "filter.type" | "noise.filterType" | "filter2.type") {
         return Field::List(
@@ -517,7 +523,7 @@ pub(crate) fn knob_kind(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option
     let meta = model::find_meta(path);
     let label = model::field_label(path).to_owned();
     if model::is_inert(draft, path) {
-        return Kind::Disabled { label };
+        return Kind::Disabled { label, style: Style::Knob };
     }
     let base = model::number(draft, path).or_else(|| model::extra_value(draft, path)).unwrap_or(0.0);
     let spec = meta.map_or_else(|| Spec::knob(0.0, 1.0, 0.01, 0.0), knob_spec);
@@ -610,10 +616,10 @@ mod tests {
         }
         // Every numeric control but the algorithm, the unison's layers and the
         // three octaves (spins) is a knob or a fader, greyed out where it does nothing (the
-        // widths of sine waves, the clock of white noise); the matrix lists
-        // its free line only.
+        // widths of sine waves, the clock of white noise, the balance of the
+        // filters in series); the matrix lists its free line only.
         let inert = fields.iter().filter(|path| model::is_inert(&d, path)).count();
-        assert_eq!(inert, 4);
+        assert_eq!(inert, 5);
         // The bar has no knob.
         assert_eq!(knobs, model::metas().count() - 5 - inert - (ordrumbox_engine::MATRIX_SIZE - 1));
         assert!(matches!(built.items[0].kind, Kind::Select { selected: 1, .. }));

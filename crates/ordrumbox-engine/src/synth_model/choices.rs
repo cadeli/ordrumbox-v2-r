@@ -4,7 +4,7 @@
 use ordrumbox_core::json::Value;
 
 use super::{FILTER_TYPES, MATRIX_SIZE, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES, lfo_targets};
-use crate::synth_preset::VOICE_MODES;
+use crate::synth_preset::{FILTER2_ROUTINGS, VOICE_MODES};
 
 /// The labels of the noise's modes, in the order of [`NOISE_MODES`].
 pub const NOISE_MODE_LABELS: [&str; 3] = ["Wht", "Long", "Shrt"];
@@ -24,8 +24,11 @@ pub const LFO_SYNCS: [(&str, &str); 8] = [
 /// The labels of the voice's modes, in the order of [`VOICE_MODES`].
 pub const VOICE_MODE_LABELS: [&str; 3] = ["Poly", "Mono", "Leg"];
 
+/// The labels of the second filter's routings, in the order of [`FILTER2_ROUTINGS`].
+pub const FILTER2_ROUTING_LABELS: [&str; 2] = ["Ser", "Par"];
+
 /// The controls set from a list (`filter.slope` holds numbers).
-pub const CHOICE_PATHS: [&str; 14 + 2 * MATRIX_SIZE] = [
+pub const CHOICE_PATHS: [&str; 15 + 2 * MATRIX_SIZE] = [
     "vco1.wave",
     "vco2.wave",
     "vco3.wave",
@@ -39,6 +42,7 @@ pub const CHOICE_PATHS: [&str; 14 + 2 * MATRIX_SIZE] = [
     "lfo.sync",
     "lfo2.sync",
     "filter2.type",
+    "filter2.routing",
     "voice.mode",
     "matrix.source1",
     "matrix.target1",
@@ -78,6 +82,7 @@ pub fn choices(path: &str) -> Option<Vec<&'static str>> {
         "vco1.wave" | "vco2.wave" | "vco3.wave" | "lfo.wave" | "lfo2.wave" => WAVES.to_vec(),
         "filter.type" | "noise.filterType" | "filter2.type" => FILTER_TYPES.to_vec(),
         "voice.mode" => VOICE_MODES.to_vec(),
+        "filter2.routing" => FILTER2_ROUTINGS.to_vec(),
         "filter.slope" => values(&FILTER_SLOPES),
         "noise.mode" => NOISE_MODES.to_vec(),
         "vco2.sync" => OSC2_SYNCS.to_vec(),

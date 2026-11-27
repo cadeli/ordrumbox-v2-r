@@ -1,16 +1,20 @@
 //! The synth editor's filter card: Filter and Filter 2 side by side, each
 //! with its head over its controls, Filter 1's response curve under its head
-//! and left of its faders. Filter 2 has no card of its own. The faders and the
-//! curve take the height of the card's row.
+//! and left of its faders. Filter 2 has no card of its own; its routing (in
+//! series or in parallel) is a spin in its head. The faders and the curve
+//! take the height of the card's row.
 
+use crate::panel::Id;
 use crate::panel::Rect;
-use crate::synth_cells::{KNOB_H, push_head, push_row};
+use crate::synth_cells::{GAP, KNOB_H, push_head, push_head_spin, push_row};
 use crate::synth_family::BESIDE_GAP;
 use crate::synth_strip::STRIP_GAP;
 use crate::synth_view::{Block, Card, HEAD_H, PAD_X, PAD_Y, PLOT_GAP, PLOT_W, Plot, Source, field_cells, is_bypassed};
 
 /// The group merged into Filter's card; [`crate::synth_view::build`] skips its own.
 pub(crate) const MERGED_GROUP: &str = "filter2";
+/// The field of Filter 2 whose spin stands in its head, not in its row.
+const HEAD_FIELD: &str = "filter2.routing";
 
 /// The card of Filter (`fi` in the groups) with Filter 2 (`f2i`) beside it.
 pub(crate) fn filter_block(source: &Source, (fi, f2i): (usize, usize)) -> Block {
@@ -24,15 +28,15 @@ pub(crate) fn filter_block(source: &Source, (fi, f2i): (usize, usize)) -> Block 
     let first_right =
         push_row(&mut items, field_cells(source.draft, "filter", source.fields, source.lfo), (left, top), KNOB_H, s);
     let beside = first_right.max(head_right) + BESIDE_GAP * s;
-    let second_head = push_head(&mut items, source.draft, (MERGED_GROUP, f2i), (beside, y), s);
-    let second_right = push_row(
-        &mut items,
-        field_cells(source.draft, MERGED_GROUP, source.fields, source.lfo),
-        (beside, top),
-        KNOB_H,
-        s,
-    )
-    .max(second_head);
+    let mut second_head = push_head(&mut items, source.draft, (MERGED_GROUP, f2i), (beside, y), s);
+    let head_id = source.fields.iter().position(|f| f == HEAD_FIELD).map(|fi| Id::SynthField(fi as u16));
+    let (in_head, row): (Vec<_>, Vec<_>) = field_cells(source.draft, MERGED_GROUP, source.fields, source.lfo)
+        .into_iter()
+        .partition(|c| Some(c.id) == head_id);
+    for cell in in_head {
+        second_head = push_head_spin(&mut items, cell, (second_head + GAP * s, y), s);
+    }
+    let second_right = push_row(&mut items, row, (beside, top), KNOB_H, s).max(second_head);
     let (w, h) = (second_right + PAD_X * s, top + KNOB_H * s + PAD_Y * s);
     let strip_h = (HEAD_H + KNOB_H) * s;
     let half_gap = STRIP_GAP * s / 2;
@@ -58,7 +62,6 @@ pub(crate) fn filter_block(source: &Source, (fi, f2i): (usize, usize)) -> Block 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::panel::Id;
     use crate::scale::Scale;
     use crate::synth_view::{SynthLayout, all_fields, build};
     use ordrumbox_engine::synth_model as model;
@@ -83,9 +86,13 @@ mod tests {
         assert!(rect("filter2.type").x > rect("filter.drive").x + rect("filter.drive").w, "beside Filter 1");
         assert_eq!(rect("filter2.type").y, rect("filter.type").y, "same row");
         assert!(curve.x + curve.w < rect("filter.type").x, "left of the controls");
-        for path in ["filter2.freq", "filter2.Q"] {
+        for path in ["filter2.freq", "filter2.Q", "filter2.balance"] {
             assert!(rect(path).x >= merged.x, "{path}: in its strip");
         }
+        // The routing in Filter 2's head, over its controls, inside its strip.
+        let routing = rect(HEAD_FIELD);
+        assert!(routing.y + routing.h <= rect("filter2.type").y, "in the head: {routing:?}");
+        assert!(routing.x > merged.x && routing.x + routing.w <= merged.x + merged.w, "{routing:?} {merged:?}");
         // The row is as tall as the noise card: the faders and the curve take its height.
         let foot = frame.y + frame.h - PAD_Y;
         assert!(curve.h > KNOB_H, "{curve:?}");

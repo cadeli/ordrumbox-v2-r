@@ -795,3 +795,41 @@ is at 3.6 kHz (was 5.4), and at the same −3 dB peak the RMS is 2.9 dB lower (`
 `909_like/snare.wav` was rendered again with the recipe of "Kits rendered by the synth", cut to its former 232 ms.
 The other `TR909_*` presets are unchanged: on the clap and the hi-hats, whose sound is made by the noise's own
 filter, the filter envelope moved the brightness by under 0.15 octave. No snapshot changed.
+
+Seven more snares use the filter envelope's own stages, all with amount 0.9, attack 1 ms, decay 120 ms, no sustain
+and a release of 50 ms, which open their lowpass on the hit: `TR808_SNARE` (lowpass at 6.3 kHz, was 9), `SR601_SNARE`
+(1.75, was 5), `PUNCH_SNARE` (1.4, was 4), `SDS_SNARE` (4, was 8), `CR78_SNARE` (3, was 6), `TR606_SNARE` (6, was 12)
+and `TRAP_SNARE` (4.2, was 12). Their brightness now moves 1 to 1.8 octaves (was under 0.3), their centroid stays
+within 3 % (`808_like`, `vintage60`, `punch_synth`, `cr78_like`) or drops by 18 to 24 % (`606_like`, `trap_808`,
+`simmons_like`), and at the same −3 dB peak their RMS is 0.3 to 1.3 dB lower. Their `snare.wav` were rendered again
+with the recipe of "Kits rendered by the synth", cut to their former length. The other drum presets with a lowpass
+were tried the same way and left as they are: on the kicks, toms, congas, bongos, claves, cowbells and `MIN_SNARE`,
+the filter envelope moved the brightness by under 0.15 octave.
+
+Five basses and leads that had no filter envelope stages of their own now have them, over a lower lowpass:
+`BASS_SQUARE` (250 Hz, Q 2, was 650 and 0.9; amount 0.15, decay 180 ms, sustain 0.15), `SYNTHLEAD_SQUARE` (900 Hz,
+Q 1.4, was 4000 and 0.8; amount 0.3, decay 350 ms, sustain 0.25), `SYNTHLEAD_SUPERSAW` (1500 Hz, Q 1, was 7000 and
+0.8; amount 0.3, attack 30 ms, decay 600 ms, sustain 0.35), `SYNTHLEAD_SYNC` (1800 Hz, Q 1.2, was 5000 and 1; amount
+0.35, decay 300 ms, sustain 0.25) and `SR601_LEAD` (900 Hz, Q 1, was 3200 and 0.8; amount 0.25, decay 300 ms,
+sustain 0.3). Their brightness now moves 0.5 to 0.8 octave on a note (was 0.01 to 0.43; the supersaw's, already 2,
+stays). `vintage60/lead-c4.wav` was rendered again from `SR601_LEAD` with the recipe of "Kits rendered by the synth",
+at its former 682 ms; its RMS is 1.1 dB lower at the same −3 dB peak. `BASS_TOUCH` was tried and left: its velocity
+already opens its filter. The sine basses (`BASS_SUB`, `BASS_FM`, `SR601_BASS`, `TRAP_BASS`) have nothing for a
+filter envelope to open.
+
+The second filter can stand beside the first instead of after it: `filter2.routing` (`serial`, the default, or
+`parallel`) and `filter2.balance` (0–1, default 0.5). In parallel, Filter 2 takes Filter 1's input, and the two
+outputs are mixed by the balance, each at full level from the middle to its own side, then down to silence at the
+other end (`balance_gains`, `ordrumbox-dsp/src/synth/filter2.rs`): two bandpasses make a vowel, a lowpass and a
+bandpass keep a bass's body and its bite apart, a lowpass and a highpass leave a notch between them. The balance is
+a target of the matrix (`filter2.balance`, a new `LfoTarget` at the end of the list), so the `lfo targets` line of
+`synth_editor_rust.txt` gains it. A preset without the keys plays in series as before: no audio snapshot changed. In
+the editor, the routing is a spin in Filter 2's head (so that the filter card keeps its width) and the balance a
+fader `B`, greyed out in series (`Kind::Disabled` now has the style of the control it stands for). The filter curve
+(`synth_model/filter_curve.rs`, moved out of `preview.rs`) now draws both filters, multiplied in series and added in
+parallel with their phases, as the synth plays them: a bandpass peaks at its Q (it was drawn normalized to 1), and a
+notch is drawn as one (it was drawn as a lowpass). Three presets use it: `SYNTHPAD_CHOIR` (bandpasses at 750 and
+1150 Hz, the "a" of a choir, with a delayed vibrato), `SYNTHLEAD_VOX` (bandpasses at 650 and 1500 Hz, the second
+swept by LFO 1 at a half note, legato) and `BASS_BITE` (a lowpass at 220 Hz that its envelope opens, a bandpass at
+900 Hz and Q 4 beside it at balance 0.3, mono). Being last of their instrument in the file, they are the last pick of
+the auto-assignment for BASS, SYNTHPAD and SYNTHLEAD tracks: 71 rows of `assign_tests/data.rs` changed that way.

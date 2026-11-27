@@ -7,8 +7,8 @@ use ordrumbox_core::json::{Object, Value};
 
 use super::{Meta, TIME_MIN, meta, number, set, time};
 use crate::synth_preset::{
-    self, ATTACK_MAX, DECAY_MAX, FILTER_ENV_STAGES, FILTER2_FREQ_DEFAULT, FILTER2_Q_DEFAULT, FILTER2_TYPE_DEFAULT,
-    GLIDE_MAX, LFO_DELAY_MAX, NOISE_RATE_RANGE, RELEASE_MAX,
+    self, ATTACK_MAX, DECAY_MAX, FILTER_ENV_STAGES, FILTER2_BALANCE_DEFAULT, FILTER2_FREQ_DEFAULT, FILTER2_Q_DEFAULT,
+    FILTER2_TYPE_DEFAULT, GLIDE_MAX, LFO_DELAY_MAX, NOISE_RATE_RANGE, RELEASE_MAX,
 };
 
 /// Fields added since the first presets, shown last in their card and written
@@ -16,7 +16,7 @@ use crate::synth_preset::{
 /// [`super::DEFAULTS`] so a hydrated preset keeps the keys it was written
 /// with. The groups `filter2` and `voice` are made of them alone: a preset
 /// holds them only once one of their controls is set.
-pub(super) const EXTRA_FIELDS: [(&str, &str); 26] = [
+pub(super) const EXTRA_FIELDS: [(&str, &str); 28] = [
     ("filter", "slope"),
     ("vco1", "semitone"),
     ("vco2", "semitone"),
@@ -36,6 +36,8 @@ pub(super) const EXTRA_FIELDS: [(&str, &str); 26] = [
     ("filter2", "type"),
     ("filter2", "freq"),
     ("filter2", "Q"),
+    ("filter2", "routing"),
+    ("filter2", "balance"),
     ("lfo", "delay"),
     ("lfo", "retrigger"),
     ("lfo2", "delay"),
@@ -48,8 +50,8 @@ pub(super) const EXTRA_FIELDS: [(&str, &str); 26] = [
 /// The controls of [`EXTRA_FIELDS`] that are knobs: the pulse width of each
 /// oscillator, how far oscillator 1 ring-modulates oscillator 2, the clock
 /// of the console noise, the filter envelope's stages, the second filter's
-/// cutoff and resonance, the LFOs' fade-in, the glide and the accent.
-pub const EXTRA_METAS: [Meta; 15] = [
+/// cutoff, resonance and balance, the LFOs' fade-in, the glide and the accent.
+pub const EXTRA_METAS: [Meta; 16] = [
     Meta { default: 0.5, label: Some("Width"), ..meta("vco1.width", 0.02, 0.98, 0.01, "") },
     Meta { default: 0.5, label: Some("Width"), ..meta("vco2.width", 0.02, 0.98, 0.01, "") },
     Meta { default: 0.5, label: Some("Width"), ..meta("vco3.width", 0.02, 0.98, 0.01, "") },
@@ -70,6 +72,7 @@ pub const EXTRA_METAS: [Meta; 15] = [
         ..meta("filter2.freq", ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ, 1.0, "Hz")
     },
     Meta { default: FILTER2_Q_DEFAULT, ..meta("filter2.Q", 0.1, 24.0, 0.1, "") },
+    Meta { default: FILTER2_BALANCE_DEFAULT, ..meta("filter2.balance", 0.0, 1.0, 0.01, "") },
     Meta { label: Some("Delay"), ..meta("lfo.delay", 0.0, LFO_DELAY_MAX, 0.01, "s") },
     Meta { label: Some("Delay"), ..meta("lfo2.delay", 0.0, LFO_DELAY_MAX, 0.01, "s") },
     Meta { label: Some("Glide"), ..meta("voice.glide", 0.0, GLIDE_MAX, 0.001, "s") },
@@ -82,8 +85,10 @@ const _: () = assert!(EXTRA_METAS[5].min == TIME_MIN);
 /// The controls of [`EXTRA_FIELDS`] that are switches, off while absent.
 pub const SWITCHES: [&str; 3] = ["filterEnv.invert", "lfo.retrigger", "lfo2.retrigger"];
 
-/// The switches named shorter than their key under them, for the LFOs' strips to fit.
-pub const SWITCH_LABELS: [(&str, &str); 2] = [("lfo.retrigger", "Retrig"), ("lfo2.retrigger", "Retrig")];
+/// The controls named shorter than their key, for their strips to fit: the
+/// LFOs' restart, the second filter's routing.
+pub const SHORT_LABELS: [(&str, &str); 3] =
+    [("lfo.retrigger", "Retrig"), ("lfo2.retrigger", "Retrig"), ("filter2.routing", "route")];
 
 /// The value of an extra control `draft` has not set, if `path` is one.
 pub fn extra_default(path: &str) -> Option<f64> {
@@ -197,7 +202,10 @@ mod tests {
         hydrate(&mut d);
         implicit_enable(&mut d, "filter2.freq");
         assert!(set(&mut d, "voice.glide", Value::from(0.1)));
-        assert_eq!(fields(&d, "filter2"), ["filter2.type", "filter2.freq", "filter2.Q"]);
+        assert_eq!(
+            fields(&d, "filter2"),
+            ["filter2.type", "filter2.freq", "filter2.Q", "filter2.routing", "filter2.balance"]
+        );
         assert_eq!(fields(&d, "voice"), ["voice.mode", "voice.glide", "voice.accent"]);
     }
 }

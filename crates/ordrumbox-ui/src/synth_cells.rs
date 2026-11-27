@@ -46,6 +46,8 @@ const SWITCH_W: i32 = 40;
 const POWER_W: i32 = 14;
 const POWER_H: i32 = 13;
 const TITLE_X: i32 = 18;
+/// The height of a spin in a card's head (at scale 1): inside the head's 18.
+const HEAD_SPIN_H: i32 = 16;
 
 /// A control of a row: its id, what it is, its label, where it goes.
 #[derive(Debug, Clone)]
@@ -90,6 +92,14 @@ pub(crate) fn push_head(
     let right = title_x + text_width(&title, s);
     items.push(Item::text(title_x, y + 3 * s, title, theme::text(), s));
     right
+}
+
+/// Push the spin of `cell` into a card's head at `x`, `y` the head's top:
+/// as high as the head, with no label (its tooltip names it). The x right of it.
+pub(crate) fn push_head_spin(items: &mut Vec<Item>, Cell { id, kind, .. }: Cell, (x, y): (i32, i32), s: Scale) -> i32 {
+    let w = screen_width(&kind, s);
+    items.push(Item::new(Some(id), Rect::new(x, y, w, HEAD_SPIN_H * s), kind));
+    x + w
 }
 
 /// The width of the head of card `group`: its power LED and its title.
@@ -162,9 +172,9 @@ fn push_cell(
         items.push(Item::new(Some(id), Rect::new(next, top, w, row_h * s), kind));
         return w;
     }
-    // A knob greyed out keeps the knob's place, its label on it.
-    if let Kind::Disabled { .. } = kind {
-        let w = knob_width(row_h, s);
+    // A knob or a fader greyed out keeps its place, its label on it.
+    if let Kind::Disabled { style, .. } = kind {
+        let w = if style == Style::Fader { FADER_W * s } else { knob_width(row_h, s) };
         items.push(Item::new(Some(id), Rect::new(next, top, w, row_h * s), kind));
         return w;
     }

@@ -106,7 +106,7 @@ fn draw_envelope(canvas: &mut Canvas, draft: &Object, group: &str, r: Rect, s: S
     canvas.polyline(points.into_iter().map(point), (s * 3 / 2).max(1), LCD_TEXT);
 }
 
-/// The filter's response, 20 Hz to 20 kHz across, -30 to +12 dB, and the
+/// The response of the filters (the second with the first), 20 Hz to 20 kHz across, -30 to +12 dB, and the
 /// band an LFO on the frequency sweeps, at `time` and `bpm`.
 fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: Scale, (time, bpm): (f64, f64)) {
     let to_x = |f: f64| r.x + (((f.log10() - 20f64.log10()) / 3.0) * f64::from(r.w)) as i32;
@@ -120,7 +120,7 @@ fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: Scale, (time, bp
     const N: usize = 200;
     let (kind, fc, q, slope_db, band) = model::filter_now(draft, time, bpm);
     let curve = |canvas: &mut Canvas, fc: f64, color: Rgb, t: i32| {
-        let response = model::filter_response(&kind, fc, q, slope_db, N);
+        let response = model::filters_response(draft, (&kind, q, slope_db), fc, (time, bpm), N);
         canvas.polyline(
             response.iter().enumerate().map(|(i, db)| (r.x + (i as i32 * (r.w - 1)) / N as i32, to_y(*db))),
             t,
