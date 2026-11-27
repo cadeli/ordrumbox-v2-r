@@ -10,52 +10,14 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// What to do with an image's background.
-#[derive(Debug, Clone, Copy)]
-enum Background {
-    /// Keep it: the PNG is transparent where it should be.
-    Keep,
-    /// Make transparent the light grey paper around the drawing, reached from
-    /// the edges (the PNG has its checkerboard painted in).
-    Clear,
-}
-
-/// The images built into the program: the PNG, from the crate's folder, its
-/// size in pixels (which `image.rs` repeats), the file of its pixels in
-/// `$OUT_DIR`, its background. The logo of Help > About and of the synth
+/// The images built into the program, transparent where they should be: the
+/// PNG, from the crate's folder, its size in pixels (which `image.rs` repeats),
+/// the file of its pixels in `$OUT_DIR`. The logo of Help > About and of the synth
 /// editor's head, the emblem of the synth editor's last card.
-const IMAGES: [(&str, (u32, u32), &str, Background); 2] = [
-    ("../../assets/images/logo2.png", (320, 64), "logo.rgba", Background::Keep),
-    ("../../assets/images/logo.png", (192, 192), "emblem.rgba", Background::Clear),
+const IMAGES: [(&str, (u32, u32), &str); 2] = [
+    ("../../assets/images/logo2.png", (320, 64), "logo.rgba"),
+    ("../../assets/images/logo.png", (192, 192), "emblem.rgba"),
 ];
-
-/// Whether RGBA pixel `p` is paper: light and grey.
-fn is_paper(p: &[u8]) -> bool {
-    let [r, g, b, ..] = *p else { return false };
-    let (low, high) = (r.min(g).min(b), r.max(g).max(b));
-    low >= 120 && high - low <= 40
-}
-
-/// Make transparent the paper of `pixels` (RGBA, `width` wide) that the
-/// edges reach through paper.
-fn clear_paper(pixels: &mut [u8], width: usize) {
-    let height = pixels.len() / 4 / width;
-    let mut stack: Vec<(usize, usize)> = (0..width).flat_map(|x| [(x, 0), (x, height - 1)]).collect();
-    stack.extend((0..height).flat_map(|y| [(0, y), (width - 1, y)]));
-    while let Some((x, y)) = stack.pop() {
-        let at = (y * width + x) * 4;
-        let Some(p) = pixels.get_mut(at..at + 4) else { continue };
-        if p[3] == 0 || !is_paper(p) {
-            continue;
-        }
-        p[3] = 0;
-        stack.extend(
-            [(x.wrapping_sub(1), y), (x + 1, y), (x, y.wrapping_sub(1)), (x, y + 1)]
-                .into_iter()
-                .filter(|&(x, y)| x < width && y < height),
-        );
-    }
-}
 
 /// The output of `git <args>` run in the workspace, trimmed, if it succeeded.
 fn git(root: &Path, args: &[&str]) -> Option<String> {
@@ -80,8 +42,8 @@ fn build_suffix(root: &Path, version: &str) -> String {
 }
 
 /// Decodes `png` (RGBA, 8 or 16 bits, as 8) of `size` into `$OUT_DIR/<out>`,
-/// which `image.rs` includes, its `background` cleared or kept.
-fn image_pixels((png, size, out, background): (&str, (u32, u32), &str, Background)) -> Result<(), Box<dyn Error>> {
+/// which `image.rs` includes.
+fn image_pixels((png, size, out): (&str, (u32, u32), &str)) -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={png}");
     let mut decoder = png::Decoder::new(BufReader::new(File::open(png)?));
     decoder.set_transformations(png::Transformations::STRIP_16);
@@ -95,9 +57,6 @@ fn image_pixels((png, size, out, background): (&str, (u32, u32), &str, Backgroun
         return Err(format!("{png} must be {} x {}, RGBA", size.0, size.1).into());
     }
     pixels.truncate(info.buffer_size());
-    if let Background::Clear = background {
-        clear_paper(&mut pixels, usize::try_from(size.0)?);
-    }
     fs::write(PathBuf::from(std::env::var("OUT_DIR")?).join(out), pixels)?;
     Ok(())
 }

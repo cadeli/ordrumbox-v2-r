@@ -782,7 +782,7 @@ A synth preset's key makes a card of the synth editor only when its value is an 
 (`synth_model::groups`): a stray text or number (a `"profile": "bass"` left in a preset) is kept in the file but no
 longer shows as an empty card. `synth_editor_rust.txt` changed for it (the `partial` preset's `"zeta": 3` is no longer
 a card). The last card, at the right edge, as wide as FM, shows the orDrumbox emblem (`assets/images/logo.png`,
-decoded by `build.rs`, its painted checkerboard made transparent); the master takes its own width left of it.
+192 × 192, transparent around the emblem, decoded by `build.rs`); the master takes its own width left of it.
 
 The filters' faders and Filter 1's curve take the height of their card's row when it is taller than they need (beside the
 noise card, about twice a knob's height at scale 1): `Block::grows_down`, set by `synth_filters.rs` only. The spins,
