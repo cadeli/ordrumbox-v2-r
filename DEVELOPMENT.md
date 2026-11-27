@@ -786,3 +786,11 @@ decoded by `build.rs`, its painted checkerboard made transparent); the master ta
 The filters' faders and Filter 1's curve take the height of their card's row when it is taller than they need (beside the
 noise card, about twice a knob's height at scale 1): `Block::grows_down`, set by `synth_filters.rs` only. The spins,
 ids and sound are unchanged. No snapshot changed.
+
+`TR909_SNARE` uses the filter envelope's own stages and the second filter: its lowpass sits at 6 kHz (was 11) and
+its envelope (amount 0.9, decay 90 ms, no sustain) opens it on the hit, and a highpass at 110 Hz clears the lows
+under the body. The crack is as bright, the tail darker: the brightness moves 0.92 octave (was 0.13), the centroid
+is at 3.6 kHz (was 5.4), and at the same −3 dB peak the RMS is 2.9 dB lower (`ordrumbox-probe compare`).
+`909_like/snare.wav` was rendered again with the recipe of "Kits rendered by the synth", cut to its former 232 ms.
+The other `TR909_*` presets are unchanged: on the clap and the hi-hats, whose sound is made by the noise's own
+filter, the filter envelope moved the brightness by under 0.15 octave. No snapshot changed.

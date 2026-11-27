@@ -4482,12 +4482,21 @@
     "pitchPunch": 0.15,
     "filter": {
       "type": "lowpass",
-      "freq": 11000,
+      "freq": 6000,
       "Q": 0.7,
       "drive": 0.25
     },
     "filterEnv": {
-      "filterEnvelopeAmount": 0.0
+      "filterEnvelopeAmount": 0.9,
+      "attack": 0.001,
+      "decay": 0.09,
+      "sustain": 0,
+      "release": 0.05
+    },
+    "filter2": {
+      "type": "highpass",
+      "freq": 110,
+      "Q": 0.7
     },
     "fm": {
       "amount": 0.0,
