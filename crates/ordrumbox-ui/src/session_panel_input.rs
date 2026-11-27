@@ -364,7 +364,7 @@ impl Session {
         control_help::help(id).map(|lines| lines.map(Into::into))
     }
 
-    /// The control held whose tooltip says its value (a fader, a knob of an oscillator):
+    /// The control of the synth editor held, whose tooltip says its value:
     /// its tooltip stays while it is dragged.
     fn held_control_tip(&self, scale: Scale, size: (i32, i32)) -> Option<([Cow<'static, str>; 2], Rect)> {
         let id = self.chrome.widgets.drag?.id;

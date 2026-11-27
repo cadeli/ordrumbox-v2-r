@@ -1,8 +1,8 @@
 //! An oscillator of the synth editor as a strip, the three of them one
-//! under the other in one card: its power LED and title on
+//! under the other in one card (`synth_family.rs`): its power LED and title on
 //! the left, then its controls in one row, each over its label — the wave
 //! on a spin that draws it, the octave and the semitones on spins, the knobs (their values
-//! said in their tooltip, not on the card, for a lower strip), oscillator
+//! said in their tooltip, not on the card), oscillator
 //! 2's sync LED. A control an oscillator lacks leaves no gap.
 
 use ordrumbox_core::json::{Object, Value};
@@ -36,16 +36,15 @@ const CELLS: [(&str, &str, &str); 8] = [
     ("ring", "Ring", "Ring"),
 ];
 
-/// Whether `group` is drawn as a strip: the oscillators.
-#[must_use]
-pub fn is_strip(group: &str) -> bool {
-    matches!(group, "vco1" | "vco2" | "vco3")
+/// Whether `group` is an oscillator, drawn as a strip of its own controls.
+fn is_strip(group: &str) -> bool {
+    crate::synth_family::Family::of(group) == Some(crate::synth_family::Family::Oscillators)
 }
 
 /// The strip of `group` (index `gi` of the groups) from `(x, top)`;
 /// `fields`: every field, as [`crate::synth_view::all_fields`] names them.
 /// The x right of its last control.
-fn push_strip(
+pub(crate) fn push_strip(
     items: &mut Vec<Item>,
     draft: &Object,
     (group, gi): (&str, usize),
@@ -67,25 +66,17 @@ fn push_strip(
             }
             "semitone" => whole_spin(draft, &path, SEMITONE_RANGE),
             "sync" => Kind::Led { on: model::is_osc2_synced(draft) },
-            _ => quiet_knob(draft, &path, lfo),
+            _ => knob_kind(draft, &path, lfo),
         };
         Some(Cell { id, kind, label: (*label).to_owned(), place: Place::Beside })
     });
     // The fields of other groups the strip shows (VCO1's sub-oscillator), last.
     let borrowed = model::borrowed_fields(group).filter_map(|path| {
         let fi = fields.iter().position(|f| f == path)?;
-        let label = model::find_meta(path).and_then(|m| m.label).unwrap_or(path).to_owned();
-        Some(Cell { id: Id::SynthField(fi as u16), kind: quiet_knob(draft, path, lfo), label, place: Place::Beside })
+        let label = model::field_label(path).to_owned();
+        Some(Cell { id: Id::SynthField(fi as u16), kind: knob_kind(draft, path, lfo), label, place: Place::Beside })
     });
     push_row(items, cells.chain(borrowed), (x + TITLE_W * s, top), QUIET_H, s)
-}
-
-/// The knob of field `path`, with no value written under it: its tooltip says it.
-fn quiet_knob(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option<f64>) -> Kind {
-    match knob_kind(draft, path, lfo) {
-        Kind::Value { spec, value, label, lfo, .. } => Kind::Value { spec, value, label, text: String::new(), lfo },
-        other => other,
-    }
 }
 
 /// The whole number at `path` (an octave, semitones) on a spin, ▲▼ through
@@ -99,8 +90,9 @@ fn whole_spin(draft: &Object, path: &str, (min, max): (f64, f64)) -> Kind {
     Kind::spin(values, labels, usize::try_from(current - low).unwrap_or(0))
 }
 
-/// The tooltip of the knob of field `path` of a strip: its card and its
-/// name, then its value; none for a control that shows its value.
+/// The tooltip of a knob or a spin of numbers of field `path` of a strip:
+/// its card and its full name, then its value (the wave and the sync: the
+/// tooltip of every control, [`crate::synth_cells::field_tip`]).
 #[must_use]
 pub fn tip(draft: &Object, path: &str) -> Option<[String; 2]> {
     if let Some(card) = model::borrowing_card(path) {
@@ -108,30 +100,11 @@ pub fn tip(draft: &Object, path: &str) -> Option<[String; 2]> {
         return is_strip(card).then(|| value_tip(draft, (card, path), name)).flatten();
     }
     let (group, key) = path.split_once('.')?;
-    if !is_strip(group) || matches!(key, "wave" | "octave" | "semitone" | "sync") {
+    if !is_strip(group) || matches!(key, "wave" | "sync") {
         return None;
     }
     let (.., name) = CELLS.iter().find(|(k, ..)| *k == key)?;
     value_tip(draft, (group, path), name)
-}
-
-/// The strips of `strips` (group, index of the groups) one under the other
-/// from `(x, top)`, in one card: the top of each and the x right of its last control.
-pub fn push_strips(
-    items: &mut Vec<Item>,
-    draft: &Object,
-    strips: &[(&str, usize)],
-    fields: &[String],
-    (x, top): (i32, i32),
-    s: Scale,
-    lfo: &dyn Fn(&str) -> Option<f64>,
-) -> Vec<(i32, i32)> {
-    let mut rows = Vec::with_capacity(strips.len());
-    for (i, strip) in strips.iter().enumerate() {
-        let y = top + i as i32 * (QUIET_H + STRIP_GAP) * s;
-        rows.push((y, push_strip(items, draft, *strip, fields, (x, y), s, lfo)));
-    }
-    rows
 }
 
 /// The wave of `path` (an oscillator's or an LFO's) on a spin: its
@@ -172,7 +145,12 @@ mod tests {
         let set = built(&set);
         let rects = |b: &crate::synth_view::Built| b.items.iter().map(|i| i.rect).collect::<Vec<_>>();
         assert_eq!(rects(&plain), rects(&set), "a value or a power changes no place");
-        let card = plain.cards.iter().find(|c| c.group == crate::synth_view::OSCILLATORS).expect("one card").rect;
+        let card = plain
+            .cards
+            .iter()
+            .find(|c| c.group == crate::synth_family::Family::Oscillators.name())
+            .expect("one card")
+            .rect;
         let strips: Vec<_> = plain.cards.iter().filter(|c| is_strip(&c.group)).collect();
         assert_eq!(strips.len(), 3);
         for pair in strips.windows(2) {
@@ -201,11 +179,12 @@ mod tests {
         assert_eq!(labels.last().map(String::as_str), Some("+4"));
         assert_eq!(values[selected], "-2");
         assert_eq!(model::choice_value("vco2.octave", "3"), Value::from(3.0), "a number, as a preset holds it");
-        let kind = quiet_knob(&d, "vco1.detune", &|_| None);
+        let kind = knob_kind(&d, "vco1.detune", &|_| None);
         assert!(matches!(&kind, Kind::Value { text, .. } if text.is_empty()), "{kind:?}");
         let [title, _] = tip(&d, "vco1.detune").expect("a tip");
         assert!(title.ends_with("Detune"), "{title}");
-        assert_eq!(tip(&d, "vco2.octave"), None, "the spin shows its value");
+        assert_eq!(tip(&d, "vco2.octave"), Some(["VCO2 Octave".to_owned(), "-2 oct".to_owned()]));
+        assert_eq!(tip(&d, "vco2.wave"), None, "the tooltip of every control says it");
         assert_eq!(tip(&d, "filter.freq"), None);
     }
 }

@@ -1,9 +1,5 @@
 //! The synth editor's preset bar, above the cards: the preset list, its
-//! buttons (delete, new, duplicate, revert, tags, export, import) and the
-//! preset's profile.
-
-use ordrumbox_core::json::Object;
-use ordrumbox_engine::synth_model as model;
+//! buttons (delete, new, duplicate, revert, tags, export, import).
 
 use crate::panel::{Id, Item, Kind, Rect};
 use crate::scale::Scale;
@@ -19,11 +15,10 @@ pub const BUTTONS: [(&str, &str, i32); 7] = [
     ("import", "Import", 56),
 ];
 
-/// The heights of the bar's controls, the width of the preset list and of
-/// the profile's, and the space between two of them (at scale 1).
+/// The heights of the bar's controls, the width of the preset list, and the
+/// space between two of them (at scale 1).
 const BAR_H: i32 = 14;
 const PRESET_W: i32 = 180;
-const PROFILE_W: i32 = 64;
 const GAP: i32 = 4;
 
 /// Where the bar's controls are.
@@ -31,7 +26,6 @@ const GAP: i32 = 4;
 pub struct Bar {
     pub preset: Rect,
     pub buttons: [Rect; BUTTONS.len()],
-    pub profile: Rect,
 }
 
 impl Bar {
@@ -45,20 +39,12 @@ impl Bar {
             x += (w + GAP) * s;
             r
         });
-        let profile = Rect::new(x + GAP * s, top, PROFILE_W * s, BAR_H * s);
-        Self { preset, buttons, profile }
+        Self { preset, buttons }
     }
 }
 
-/// The values of the profile's list: none (every card), then each profile.
-fn profile_options() -> (Vec<String>, Vec<String>) {
-    std::iter::once((String::new(), model::NO_PROFILE_LABEL.to_owned()))
-        .chain(model::PROFILES.iter().map(|(value, label)| ((*value).to_owned(), (*label).to_owned())))
-        .unzip()
-}
-
-/// The bar's items for preset `current` of `presets` (`draft`, as edited).
-pub fn push_bar(items: &mut Vec<Item>, (presets, current): (&[String], &str), draft: &Object, bar: &Bar) {
+/// The bar's items for preset `current` of `presets`.
+pub fn push_bar(items: &mut Vec<Item>, (presets, current): (&[String], &str), bar: &Bar) {
     let values = presets.to_vec();
     let selected = presets.iter().position(|p| p == current).unwrap_or(0);
     items.push(Item::new(
@@ -68,33 +54,5 @@ pub fn push_bar(items: &mut Vec<Item>, (presets, current): (&[String], &str), dr
     ));
     for ((id, label, _), rect) in BUTTONS.iter().zip(bar.buttons) {
         items.push(Item::new(Some(Id::SynthButton(id)), rect, Kind::Button { label: (*label).into(), on: false }));
-    }
-    let (values, labels) = profile_options();
-    let profile = model::profile(draft).unwrap_or_default();
-    let selected = values.iter().position(|v| v == profile).unwrap_or(0);
-    items.push(Item::new(Some(Id::SynthProfile), bar.profile, Kind::Select { values, labels, selected }));
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_profile_list_shows_the_preset_s() {
-        let mut draft = model::defaults();
-        let bar = Bar::new(0, 0, Scale::ONE);
-        let items = |draft: &Object| {
-            let mut items = Vec::new();
-            push_bar(&mut items, (&["a".to_owned()], "a"), draft, &bar);
-            items
-        };
-        let profile = |items: &[Item]| match &crate::panel::find(items, Id::SynthProfile).unwrap().kind {
-            Kind::Select { labels, selected, .. } => labels[*selected].clone(),
-            other => panic!("{other:?}"),
-        };
-        assert_eq!(profile(&items(&draft)), model::NO_PROFILE_LABEL);
-        model::set_profile(&mut draft, Some("bass"));
-        assert_eq!(profile(&items(&draft)), "Bass");
-        assert!(bar.buttons.iter().all(|b| b.x + b.w < bar.profile.x), "the profile last");
     }
 }

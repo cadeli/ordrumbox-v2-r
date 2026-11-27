@@ -118,7 +118,7 @@ const TOOLS: &str = r#"[
      "from": {"type": "string", "description": "Preset to copy (default: the default preset)"},
      "settings": {"type": "object", "properties": {}, "additionalProperties": false}},
      "required": ["preset"]}},
-  {"name": "updateSynthPreset", "description": "Changes settings of a synth preset by path (\"filter.freq\", \"vco2.wave\"); every track playing it hears it. A group off is switched on when one of its controls is set, as in the synth editor. The modulation matrix is eleven lines, \"matrix.source1\" (off, lfo1, lfo2, env, modEnv, velocity, key, random), \"matrix.target1\" (a synth setting, or filter.open, pitch, fm.boost, shape) and \"matrix.amount1\" (-1 to 1); it is where an LFO or the modulation envelope is aimed (their groups set only their shape and rate). The filter envelope has its own ADSR (\"filterEnv.attack\" ... \"filterEnv.release\"; unset, it follows the envelope's attack and decay) and \"filterEnv.invert\" closes the filter instead; \"filter2\" is a second filter after the first; \"lfo.delay\" fades an LFO in and \"lfo.retrigger\" restarts it with each note; \"voice.mode\" (poly, mono, legato) with \"voice.glide\" (seconds) slides from one note to the next, \"voice.accent\" makes the velocity open the filter envelope and raise the level. \"profile\" (percussion, melodic, bass) only chooses the cards the editor shows first. Its tags are \"instrument\" (an instrument name: BASS, SYNTHLEAD...) and \"style\" (dub, chiptune...). Not an undo step.",
+  {"name": "updateSynthPreset", "description": "Changes settings of a synth preset by path (\"filter.freq\", \"vco2.wave\"); every track playing it hears it. A group off is switched on when one of its controls is set, as in the synth editor. The modulation matrix is eleven lines, \"matrix.source1\" (off, lfo1, lfo2, env, modEnv, velocity, key, random), \"matrix.target1\" (a synth setting, or filter.open, pitch, fm.boost, shape) and \"matrix.amount1\" (-1 to 1); it is where an LFO or the modulation envelope is aimed (their groups set only their shape and rate). The filter envelope has its own ADSR (\"filterEnv.attack\" ... \"filterEnv.release\"; unset, it follows the envelope's attack and decay) and \"filterEnv.invert\" closes the filter instead; \"filter2\" is a second filter after the first; \"lfo.delay\" fades an LFO in and \"lfo.retrigger\" restarts it with each note; \"voice.mode\" (poly, mono, legato) with \"voice.glide\" (seconds) slides from one note to the next, \"voice.accent\" makes the velocity open the filter envelope and raise the level. Its tags are \"instrument\" (an instrument name: BASS, SYNTHLEAD...) and \"style\" (dub, chiptune...). Not an undo step.",
    "inputSchema": {"type": "object", "properties": {
      "preset": {"type": "string", "minLength": 1},
      "settings": {"type": "object", "properties": {}, "additionalProperties": false}},
@@ -374,7 +374,7 @@ fn returns_properties() -> Value {
 }
 
 /// The synth preset settings a tool may set, by path: the knobs with their
-/// ranges, the lists with their values (the profile among them), the bypass
+/// ranges, the lists with their values, the bypass
 /// flags and the switches.
 fn synth_properties() -> Value {
     let knobs = synth_model::metas().map(|meta| {

@@ -733,3 +733,21 @@ across it (`synth_rows.rs`, `synth_spread.rs`). Every card is shown, those of th
 (`synth_model::is_shown_first`); the Advanced button and its view are gone. For them to fit, the smallest window is
 89 pixels taller at scale 1: its main editor is `synth_view::MIN_HEIGHT` high when that is more than the track
 editor's. No snapshot changed.
+
+The synth editor's profiles (Perc, Melodic, Bass, All) are gone, with the preset's `profile` key: every card is
+shown, always in the order of `synth_model::GROUP_ORDER` (the voice after the oscillators, the filter envelope and
+the second filter after the filter). The shipped synth presets lose their `profile`; no sound changed. A preset that
+still holds one shows it as a card of its own. No snapshot changed.
+
+The synth editor's knobs write their value under them only when they are discrete (`synth_model::Meta::is_discrete`:
+whole steps, at most 16, as the unison's layers); the others, as the faders and
+the oscillators' knobs already did, say it in their tooltip. Every control of the editor has a tooltip: its card, its
+name and its value (`synth_cells::field_tip`). The noise card's mode spin is under its filter type. No snapshot changed.
+
+The LFOs' sync is a spin, no longer a stepped knob: a spin of the synth editor is as wide as its longest option
+(`1/16T`) when that is more than four characters. No snapshot changed.
+
+The envelopes' card keeps only the main envelope's curve, right of its A, D, S, R faders; the filter envelope and the
+mod envelope share the band under it, side by side in that card instead of a strip each. Their controls, ids and sound
+are unchanged; the card is one strip shorter. The smallest editor grows by 10 pixels at scale 1
+(`synth_view::CARDS_H`) so that the five rows still fit at every scale. No snapshot changed.

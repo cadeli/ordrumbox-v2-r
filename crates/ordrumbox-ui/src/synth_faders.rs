@@ -45,12 +45,12 @@ pub fn letter(path: &str) -> Option<&'static str> {
 }
 
 /// The fader of field `path`, at the value an LFO gives it now if one moves
-/// it, with no value written on it; logarithmic when its knob would be.
+/// it, with no value written on it (as its knob); logarithmic when its knob would be.
 pub(crate) fn fader_kind(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option<f64>) -> Kind {
     match knob_kind(draft, path, lfo) {
-        Kind::Value { mut spec, value, label, lfo, .. } => {
+        Kind::Value { mut spec, value, label, text, lfo } => {
             spec.style = Style::Fader;
-            Kind::Value { spec, value, label, text: String::new(), lfo }
+            Kind::Value { spec, value, label, text, lfo }
         }
         other => other,
     }

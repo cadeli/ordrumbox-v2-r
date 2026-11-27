@@ -949,29 +949,17 @@ A built-in preset you have not changed plays as the assets hold it.</p>
 <tr><td><strong>Revert</strong></td><td>Back to the preset as it was when opened.</td></tr>
 <tr><td><strong>Export</strong></td><td>Write <code>ordrumbox-synth-sounds.json</code> to a folder you pick.</td></tr>
 <tr><td><strong>Import</strong></td><td>Read presets from a file.</td></tr>
-<tr><td>Profile list</td><td><strong>All</strong>, <strong>Perc</strong>, <strong>Melodic</strong> or <strong>Bass</strong>: which cards come first, below. Kept in the preset; it changes nothing in the sound.</td></tr>
 <tr><td><strong>USE ON &lt;track&gt;</strong></td><td>Shown when the track editor's track plays something else (a sample, another preset): puts the preset shown on it. Beside it, what the track plays.</td></tr>
 </table>
 <p>The built-in presets include one per base sound of the kits: <code>KICK_SYNTH</code>, <code>SNARE_SYNTH</code>,
 <code>TOM_SYNTH</code>, <code>CLAP_SYNTH</code>, <code>COWBELL_SYNTH</code>, <code>CHH_SYNTH</code>, <code>OHH_SYNTH</code>,
 <code>CRASH_SYNTH</code>. Auto-assign plays them on a track whose instrument the kit lacks.</p>
 
-<h3>Profiles</h3>
-<p>Every card is always on screen. A preset's profile puts the cards that matter for its kind of sound first, the
-others after them.</p>
-<table>
-<tr><th>Profile</th><th>Cards shown first</th></tr>
-<tr><td><strong>All</strong> (no profile)</td><td>Every card but the Voice, Filter Env and Filter 2 cards, which come last.</td></tr>
-<tr><td><strong>Perc</strong></td><td>Oscillators, FM, noise, filter, envelope (a short decay), pitch envelope, master.</td></tr>
-<tr><td><strong>Melodic</strong></td><td>Oscillators, unison, filter and its envelope, envelope (ADSR), LFOs (with their delay), matrix, master.</td></tr>
-<tr><td><strong>Bass</strong></td><td>Oscillators (VCO1's sub), voice (mono, glide, accent), filter (its drive) and its envelope, envelope, master.</td></tr>
-</table>
-
 <h3>Cards</h3>
-<p>Every card of the view on one screen: first what makes the sound (oscillators, noise, filter, envelopes), then what moves it (LFOs, mod envelope, matrix), then the master. Each card has a power button; touching a control of a card that is off switches it on
+<p>Every card on one screen, always in the same order: first what makes the sound (oscillators, noise, filter, envelopes), then what moves it (LFOs, mod envelope, matrix), then the master. Each card has a power button; touching a control of a card that is off switches it on
 (an oscillator to 0.5, also when its ring or sync is touched, FM to 0.3, the noise to 0.15, an LFO onto the filter on a free line of the matrix, the mod envelope opening the filter on a free line, the filter envelope's stages giving it an amount of 0.5, a control of Filter 2 turning it on).
 An oscillator also shows off when it is silent (gain 0) and modulates nothing, and an LFO at 0 Hz: turning it on gives it a gain, or a rate of 1 Hz. An oscillator switched off is not heard and modulates nothing either (FM, VCO2's ring, VCO1's sub-oscillator). A knob that does nothing as the sound stands (a pulse width under another wave than the square, the noise's rate in White) is greyed out, in its place.
-A knob an LFO moves is purple and follows it. VCO1 to VCO3 share one card, a strip each, the scope's curve right of VCO1's knobs: the octave and the semitones are spins, and the other knobs of a strip show their value in their tooltip; the filter and the envelope draw their curve left of their knobs. The attack, decay, sustain and release of the envelope, of the filter envelope and of the mod envelope are faders marked A, D, S, R, and the filters' frequency, resonance and drive are faders marked F, Q, D, the slope under the type: their value shows in their tooltip.</p>
+A knob an LFO moves is purple and follows it. VCO1 to VCO3 share one card, a strip each, the scope's curve right of VCO1's knobs: the octave and the semitones are spins. The filter draws its curve left of its faders; the main envelope draws its curve right of its own, and the filter envelope and the mod envelope sit side by side in the band under it, in the same card. Their attack, decay, sustain and release are faders marked A, D, S, R, and the filters' frequency, resonance and drive are faders marked F, Q, D, the slope under the type, and the noise's mode under its filter type. A knob writes its value under it only when it takes a few whole values (the unison's layers); every other knob and fader says its value in its tooltip, and every control of the synth editor has one: its card, its name and its value.</p>
 
 <h4>Sound cards</h4>
 <table>
@@ -1004,7 +992,7 @@ A knob an LFO moves is purple and follows it. VCO1 to VCO3 share one card, a str
 <table>
 <tr><th>Card</th><th>Control</th><th>Range</th><th>What it does</th></tr>
 <tr><td rowspan="6"><strong>noise</strong></td><td>mix</td><td>0–1</td><td>Noise level.</td></tr>
-<tr><td>mode</td><td>White, Long, Short</td><td>White is a new random value every sample. Long and Short are a console's shift register (15 and 7 bits): a grainy rumble, and a short loop that buzzes at a pitch.</td></tr>
+<tr><td>mode</td><td>White, Long, Short</td><td>Under the filter type. White is a new random value every sample. Long and Short are a console's shift register (15 and 7 bits): a grainy rumble, and a short loop that buzzes at a pitch.</td></tr>
 <tr><td>rate</td><td>100 Hz – 32 kHz</td><td>How fast the shift register steps: low is a rumble, high a hiss. Long and Short only.</td></tr>
 <tr><td>filterType</td><td>LP, HP, BP, NT</td><td>The noise's filter (default highpass).</td></tr>
 <tr><td>filterFreq</td><td>20 Hz – 20 kHz</td><td>Its cutoff.</td></tr>
@@ -1033,7 +1021,7 @@ A knob an LFO moves is purple and follows it. VCO1 to VCO3 share one card, a str
 <tr><th>Card</th><th>Control</th><th>Range</th><th>What it does</th></tr>
 <tr><td rowspan="5"><strong>LFO1</strong>, <strong>LFO2</strong></td><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform. The triangle stays between the LFO's ends, starting at the lower one, like the sine.</td></tr>
 <tr><td>freq</td><td>0.01–100 Hz</td><td>Rate (when not synced): slow sweeps, vibrato and tremolo, up to the buzz of an audio-rate modulation.</td></tr>
-<tr><td>sync</td><td>free, 1/1, 1/2, 1/4, 1/8, 1/16, 1/8T, 1/16T</td><td>Lock the rate to the tempo (T = triplet). What an LFO moves, and how far, is set in the matrix: a line with the source lfo1 or lfo2.</td></tr>
+<tr><td>sync</td><td>free, 1/1, 1/2, 1/4, 1/8, 1/16, 1/8T, 1/16T</td><td>A spin: lock the rate to the tempo (T = triplet). What an LFO moves, and how far, is set in the matrix: a line with the source lfo1 or lfo2.</td></tr>
 <tr><td>Delay</td><td>0–4 s</td><td>The LFO fades in over this time from each note's start: a vibrato that comes in once the note is held.</td></tr>
 <tr><td>retrigger</td><td>on, off</td><td>On: the LFO starts its cycle with each note, so every note sweeps the same way. Off: it runs on the song's clock.</td></tr>
 <tr><td><strong>ModEnv</strong></td><td>attack, decay, sustain, release</td><td>0–2 s, 0–4 s, 0–1, 0–4 s</td><td>A second envelope. What it moves, and how far, is set in the matrix: a line with the source modEnv.</td></tr>

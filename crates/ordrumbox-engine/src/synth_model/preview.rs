@@ -7,7 +7,8 @@ use ordrumbox_core::num::gain_to_db;
 use ordrumbox_dsp::synth::ring;
 
 use super::{
-    EXTRA_METAS, FM_DEVIATION, LFOS, OSC_BYPASS_FLAGS, WAVES, is_osc2_synced, lfo_scale, number, routes_of, slope, text,
+    EXTRA_METAS, FM_DEVIATION, LFOS, OSC_BYPASS_FLAGS, WAVES, defaults, extra_value, is_osc2_synced, lfo_scale, number,
+    routes_of, slope, text,
 };
 
 /// The LFOs playing (not bypassed), each with the matrix source it is.
@@ -205,10 +206,17 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     out
 }
 
-/// The envelope's corners as (time, level), over its plotted length.
-pub fn envelope(draft: &Object) -> (Vec<(f64, f64)>, f64) {
-    let v = |key: &str, default: f64| number(draft, &format!("envelope.{key}")).unwrap_or(default);
-    let (a, d, s, r) = (v("attack", 0.0), v("decay", 0.12), v("sustain", 1.0), v("release", 0.05));
+/// The corners of envelope `group` (`envelope`, `filterEnv`, `modEnvelope`)
+/// as (time, level), over its plotted length: a stage unset plays as its
+/// default (the filter envelope's, as the envelope's: [`extra_value`]).
+#[must_use]
+pub fn envelope(draft: &Object, group: &str) -> (Vec<(f64, f64)>, f64) {
+    let defaults = defaults();
+    let v = |key: &str| {
+        let path = format!("{group}.{key}");
+        number(draft, &path).or_else(|| extra_value(draft, &path)).or_else(|| number(&defaults, &path)).unwrap_or(0.0)
+    };
+    let (a, d, s, r) = (v("attack"), v("decay"), v("sustain"), v("release"));
     let total = (a + d + 0.3 + r).max(0.5);
     (vec![(0.0, 0.0), (a, 1.0), (a + d, s), (total - r, s), (total, 0.0)], total)
 }

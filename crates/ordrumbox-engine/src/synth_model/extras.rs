@@ -82,6 +82,9 @@ const _: () = assert!(EXTRA_METAS[5].min == TIME_MIN);
 /// The controls of [`EXTRA_FIELDS`] that are switches, off while absent.
 pub const SWITCHES: [&str; 3] = ["filterEnv.invert", "lfo.retrigger", "lfo2.retrigger"];
 
+/// The switches named shorter than their key under them, for the LFOs' strips to fit.
+pub const SWITCH_LABELS: [(&str, &str); 2] = [("lfo.retrigger", "Retrig"), ("lfo2.retrigger", "Retrig")];
+
 /// The value of an extra control `draft` has not set, if `path` is one.
 pub fn extra_default(path: &str) -> Option<f64> {
     EXTRA_METAS.iter().find(|m| m.path == path).map(|m| m.default)

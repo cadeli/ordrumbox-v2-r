@@ -374,7 +374,7 @@ impl Session {
                     self.select_roll_track(t);
                 }
             }
-            Id::SynthPreset | Id::SynthField(_) | Id::SynthProfile => self.synth_select(id, value),
+            Id::SynthPreset | Id::SynthField(_) => self.synth_select(id, value),
             Id::KitKit => {
                 let target = self.kits.kits().iter().position(|k| k.name == value);
                 if let (Some(sample), Some(target)) = (self.kit_editor.sample, target)

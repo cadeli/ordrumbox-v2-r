@@ -53,7 +53,6 @@ pub fn help(id: Id) -> Option<Help> {
         Id::Sample => ["Sample", "the audio file the track plays"],
         Id::Synth => ["Synth preset", "the soft-synth sound the track plays instead of a sample"],
         Id::SynthOn => ["Synth", "on: the track plays its synth preset instead of its sample"],
-        Id::SynthProfile => ["Profile", "the cards shown first (no change to the sound)"],
         Id::SynthStep(Step::Previous) => ["Previous synth preset", "the preset before the one shown"],
         Id::SynthStep(Step::Next) => ["Next synth preset", "the preset after the one shown"],
         Id::TrackSelectStep(_, Step::Previous) => ["Previous type", "the effect's type before the one shown"],

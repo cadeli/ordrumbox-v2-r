@@ -4,7 +4,7 @@
 //! the LEDs; spins stacked in a column take their label on their left. The
 //! oscillator strips and the other cards are built from them.
 
-use ordrumbox_core::json::Object;
+use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
 
 use crate::canvas::text_width;
@@ -88,6 +88,18 @@ pub(crate) fn push_head(
     right
 }
 
+/// The width of the head of card `group`: its power LED and its title.
+#[must_use]
+pub(crate) fn head_width(group: &str, s: Scale) -> i32 {
+    TITLE_X * s + text_width(&model::group_label(group), s)
+}
+
+/// Whether `cell` is a fader (a stage of an envelope, a filter's frequency).
+#[must_use]
+pub(crate) fn is_fader(cell: &Cell) -> bool {
+    matches!(&cell.kind, Kind::Value { spec, .. } if spec.style == Style::Fader)
+}
+
 /// Push `cells` side by side from `x`, their tops at `top`, in a row
 /// `row_h` high at scale 1 ([`KNOB_H`], or [`QUIET_H`]); the x right of
 /// the last one (`x` itself when there is none).
@@ -123,9 +135,13 @@ fn knob_width(row_h: i32, s: Scale) -> i32 {
     if row_h == QUIET_H { QUIET_KNOB_W * s } else { KNOB_W * s }
 }
 
-/// The width of the screen of `kind`, a spin or a switch.
+/// The width of the screen of `kind`, a spin or a switch: a spin holds
+/// [`SPIN_CHARS`], or its longest option (the LFOs' `1/16T`), whichever it
+/// shows, so that its width does not change with it.
 fn screen_width(kind: &Kind, s: Scale) -> i32 {
-    if matches!(kind, Kind::Spin { .. }) { spin_width(SPIN_CHARS, s) } else { SWITCH_W * s }
+    let Kind::Spin { labels, .. } = kind else { return SWITCH_W * s };
+    let longest = labels.iter().map(|l| l.chars().count()).max().unwrap_or(0);
+    spin_width(i32::try_from(longest).unwrap_or(SPIN_CHARS).max(SPIN_CHARS), s)
 }
 
 /// Push `cell` alone in its column at `next`, its label under it; its width.
@@ -167,6 +183,41 @@ pub(crate) fn value_tip(draft: &Object, (group, path): (&str, &str), name: &str)
         model::number(draft, path).or_else(|| model::extra_value(draft, path)).or_else(|| meta.map(|m| m.default))?;
     let unit = meta.map_or("", |m| m.unit);
     Some([format!("{} {name}", model::group_label(group)), Format::Fmt.value(value, unit)])
+}
+
+/// The tooltip of any control of `draft` (field `path`): its card and the
+/// name under it, then its value: a number in its unit, a switch on or off,
+/// an option as the preset writes it.
+#[must_use]
+pub(crate) fn field_tip(draft: &Object, path: &str) -> Option<[String; 2]> {
+    let card = model::borrowing_card(path).or_else(|| path.split_once('.').map(|(group, _)| group)).unwrap_or("master");
+    let key = path.rsplit('.').next().unwrap_or(path);
+    let name = model::find_meta(path).and_then(|m| m.label).unwrap_or(key);
+    let value = match model::get(draft, path) {
+        Some(Value::Bool(on)) => on_off(*on),
+        Some(Value::String(text)) => text.clone(),
+        None if model::SWITCHES.contains(&path) => on_off(false),
+        // A number unset and with no default (the semitones) is 0, as its spin shows.
+        _ => value_tip(draft, (card, path), name).map_or_else(|| Format::Fmt.value(0.0, ""), |[_, value]| value),
+    };
+    Some([tip_title(card, name), value])
+}
+
+/// The first line of a tooltip: the card's title and the control's name
+/// (capitalized), the title alone when the name repeats it (FM's amount).
+fn tip_title(card: &str, name: &str) -> String {
+    let title = model::group_label(card);
+    if title.eq_ignore_ascii_case(name) {
+        return title;
+    }
+    let mut chars = name.chars();
+    let first = chars.next().map(|c| c.to_uppercase().collect::<String>()).unwrap_or_default();
+    format!("{title} {first}{}", chars.as_str())
+}
+
+/// A switch's state, as a tooltip says it.
+fn on_off(on: bool) -> String {
+    if on { "On" } else { "Off" }.to_owned()
 }
 
 /// Push `column`, spins or switches one under the other at `next`, each

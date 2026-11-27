@@ -50,6 +50,7 @@ mod store;
 mod synth_bar;
 mod synth_cells;
 mod synth_faders;
+mod synth_family;
 mod synth_matrix;
 mod synth_rows;
 mod synth_spread;

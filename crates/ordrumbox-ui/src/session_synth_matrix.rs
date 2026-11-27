@@ -147,6 +147,23 @@ mod tests {
     }
 
     #[test]
+    fn every_control_of_the_synth_editor_has_a_tooltip() {
+        let s = session();
+        let mut draft = s.synths.presets.get("b").unwrap().as_object().unwrap().clone();
+        ordrumbox_engine::synth_model::hydrate(&mut draft);
+        let paths = crate::synth_view::all_fields(&draft);
+        let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
+        let fields: Vec<_> =
+            layout.items.iter().filter_map(|i| i.id).filter(|id| matches!(id, Id::SynthField(_))).collect();
+        assert!(fields.len() > 40, "{}", fields.len());
+        for id in fields {
+            let Id::SynthField(fi) = id else { continue };
+            let tip = s.control_tip(id).unwrap_or_else(|| panic!("{}: no tooltip", paths[usize::from(fi)]));
+            assert!(tip.iter().all(|line| !line.is_empty()), "{id:?}: {tip:?}");
+        }
+    }
+
+    #[test]
     fn an_envelope_fader_says_its_value_in_its_tooltip() {
         let mut s = session();
         let mut draft = s.synths.presets.get("b").unwrap().as_object().unwrap().clone();
@@ -156,7 +173,8 @@ mod tests {
         let tip = s.control_tip(Id::SynthField(fi)).expect("a tooltip");
         assert_eq!(tip.map(|line| line.into_owned()), ["Envelope Attack".to_owned(), "0 s".to_owned()]);
         let knob = fields.iter().position(|f| f == "fm.amount").unwrap() as u16;
-        assert!(s.control_tip(Id::SynthField(knob)).is_none(), "a knob shows its value");
+        let tip = s.control_tip(Id::SynthField(knob)).expect("a knob says its value in its tooltip");
+        assert_eq!(tip.map(|line| line.into_owned()), ["FM".to_owned(), "0".to_owned()]);
         let gain = fields.iter().position(|f| f == "vco1.gain").unwrap() as u16;
         let tip = s.control_tip(Id::SynthField(gain)).expect("an oscillator's knob says it in its tooltip");
         assert_eq!(tip[0], "VCO1 Gain");

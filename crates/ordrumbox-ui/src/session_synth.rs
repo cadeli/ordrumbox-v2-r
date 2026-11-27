@@ -357,30 +357,22 @@ impl Session {
         synth_view::all_fields(&self.synth_editor.edit.as_ref()?.draft).into_iter().nth(usize::from(fi))
     }
 
-    /// The tooltip of field `fi` when it says its value (a fader of an envelope or the filter,
-    /// a knob of an oscillator, the FM algorithm's routing).
+    /// The tooltip of field `fi`: what it is and its value (a fader or an
+    /// oscillator's knob by its full name, the FM algorithm by its routing).
     pub(super) fn synth_field_tip(&self, fi: u16) -> Option<[String; 2]> {
         let path = self.synth_field(fi)?;
         let draft = &self.synth_editor.edit.as_ref()?.draft;
         crate::synth_faders::tip(draft, &path)
             .or_else(|| crate::synth_strip::tip(draft, &path))
             .or_else(|| synth_view::fm_tip(draft, &path))
+            .or_else(|| crate::synth_cells::field_tip(draft, &path))
     }
 
-    /// A knob of the editor turned; a stepped knob of a list (the LFOs'
-    /// sync) sets the option at its notch.
+    /// A knob, a fader or a slider of the editor moved.
     pub(super) fn synth_value(&mut self, fi: u16, value: f64) {
         let Some(path) = self.synth_field(fi) else { return };
         let value = if value.is_nan() { 0.0 } else { value };
-        let value = match model::choices(&path) {
-            Some(options) => {
-                // Saturating: a notch below the first is the first.
-                let Some(option) = options.get(value.round().max(0.0) as usize) else { return };
-                model::choice_value(&path, option)
-            }
-            None => Value::from(value),
-        };
-        self.edit_synth(&path, value);
+        self.edit_synth(&path, Value::from(value));
     }
 
     /// A list of the editor set: the preset, or a field.
@@ -394,13 +386,6 @@ impl Session {
             Id::SynthField(fi) => {
                 if let Some(path) = self.synth_field(fi) {
                     self.edit_synth(&path, model::choice_value(&path, value));
-                }
-            }
-            Id::SynthProfile => {
-                let Some(edit) = &mut self.synth_editor.edit else { return };
-                // "" is no profile: every card of before.
-                if model::set_profile(&mut edit.draft, Some(value).filter(|v| !v.is_empty())) {
-                    self.commit_synth();
                 }
             }
             _ => {}
@@ -622,66 +607,62 @@ mod tests {
     }
 
     #[test]
-    fn every_card_fits_the_smallest_window_in_each_profile() {
+    fn every_card_fits_the_smallest_window() {
         let mut s = session();
         s.toggle_synth();
         for quarters in 4..=Scale::MAX.quarters() {
             let scale = Scale::from_quarters(quarters);
             let (w, h) = crate::view::min_window_size(scale, crate::view::Shown::all());
             s.set_size((w, h, scale));
-            for profile in std::iter::once("").chain(model::PROFILES.iter().map(|(p, _)| *p)) {
-                s.synth_select(Id::SynthProfile, profile);
-                let (built, layout) = s.synth_built((w, h, scale)).expect("the editor");
-                let (bottom, right) = (layout.area.y + layout.area.h, layout.area.x + layout.area.w);
-                assert_eq!(built.cards.len(), model::groups(&s.synth_editor.edit.as_ref().unwrap().draft).len() + 1);
-                for card in &built.cards {
-                    let (end, side) = (card.rect.y + card.rect.h, card.rect.x + card.rect.w);
-                    let at = format!("scale {scale}, {profile:?}: {} ends at {end}, {side}", card.group);
-                    assert!(end <= bottom && side <= right, "{at}");
-                }
-                let profile_list = crate::panel::find(&built.items, Id::SynthProfile).expect("the profile").rect;
-                assert!(profile_list.x + profile_list.w <= w, "the bar fits");
+            let (built, layout) = s.synth_built((w, h, scale)).expect("the editor");
+            let (bottom, right) = (layout.area.y + layout.area.h, layout.area.x + layout.area.w);
+            for group in model::groups(&s.synth_editor.edit.as_ref().unwrap().draft) {
+                assert!(built.cards.iter().any(|c| c.group == group), "scale {scale}: {group} shown");
             }
+            for card in &built.cards {
+                let (end, side) = (card.rect.y + card.rect.h, card.rect.x + card.rect.w);
+                let at = format!("scale {scale}: {} ends at {end}, {side}", card.group);
+                assert!(end <= bottom && side <= right, "{at}");
+            }
+            let last = built.items.iter().rfind(|i| matches!(i.id, Some(Id::SynthButton(_)))).expect("the buttons");
+            assert!(last.rect.x + last.rect.w <= w, "the bar fits");
         }
     }
 
     #[test]
-    fn a_profile_is_kept_in_the_preset_and_a_switch_absent_is_off() {
+    fn a_switch_absent_is_off() {
         let mut s = session();
         s.toggle_synth();
-        s.synth_select(Id::SynthProfile, "bass");
         let preset = |s: &Session| s.synths.presets.get("b").unwrap().as_object().unwrap().clone();
-        assert_eq!(preset(&s).get(model::PROFILE_KEY), Some(&Value::from("bass")));
-        // The voice's card is among the bass profile's, before the LFOs.
-        let shown = |s: &Session| -> Vec<String> {
-            s.synth_built(SIZE).expect("the editor").0.cards.into_iter().map(|c| c.group).collect()
-        };
-        let at = |group: &str| shown(&s).iter().position(|g| g == group).expect("every card");
-        assert!(at("voice") < at("lfo"));
-        assert!(at("master") < at("lfo"), "the profile's cards first");
         let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
         let fi = fields.iter().position(|f| f == "lfo.retrigger").unwrap() as u16;
+        assert_eq!(model::get(&preset(&s), "lfo.retrigger"), None);
         s.synth_activate(Id::SynthField(fi));
         assert_eq!(model::get(&preset(&s), "lfo.retrigger"), Some(&Value::Bool(true)));
-        s.synth_select(Id::SynthProfile, "");
-        assert_eq!(preset(&s).get(model::PROFILE_KEY), None);
     }
 
     #[test]
-    fn the_lfo_sync_is_a_stepped_knob() {
+    fn the_lfo_sync_is_a_spin_wide_enough_for_its_longest_option() {
         let mut s = session();
         s.toggle_synth();
         let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
+        for lfo in ["lfo", "lfo2"] {
+            let fi = fields.iter().position(|f| *f == format!("{lfo}.sync")).unwrap() as u16;
+            let spin = item(&s, |i| i.id == Some(Id::SynthField(fi)));
+            let Kind::Spin { labels, selected: 0, .. } = &spin.kind else { panic!("{lfo}: {:?}", spin.kind) };
+            assert_eq!(labels[0], "free");
+            let screen = crate::panel::spin_parts(spin.rect, Scale::ONE)[1];
+            assert!(crate::canvas::text_width("1/16T", Scale::ONE) <= screen.w - 2, "{lfo}: {screen:?}");
+        }
+        // Three clicks up: the fourth option, as the preset writes it.
         let fi = fields.iter().position(|f| f == "lfo2.sync").unwrap() as u16;
-        let knob = item(&s, |i| i.id == Some(Id::SynthField(fi)));
-        assert!(matches!(&knob.kind, Kind::Value { value: 0.0, text, .. } if text == "free"), "{:?}", knob.kind);
-        // Three notches up: the fourth option, as the preset writes it.
-        let (x, y) = center(knob.rect);
-        s.wheel(SIZE, x, y, 3, false, false);
+        let spin = item(&s, |i| i.id == Some(Id::SynthField(fi)));
+        let (x, y) = center(crate::panel::spin_parts(spin.rect, Scale::ONE)[2]);
+        for _ in 0..3 {
+            click(&mut s, x, y);
+        }
         let preset = s.synths.presets.get("b").unwrap();
         assert_eq!(model::get(preset.as_object().unwrap(), "lfo2.sync"), Some(&Value::from("1/4")));
-        let knob = item(&s, |i| i.id == Some(Id::SynthField(fi)));
-        assert!(matches!(&knob.kind, Kind::Value { value: 3.0, text, .. } if text == "1/4"), "{:?}", knob.kind);
     }
 
     #[test]

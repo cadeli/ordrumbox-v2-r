@@ -1,8 +1,7 @@
 //! What the synth editor edits: a preset as JSON, filled
 //! with the group defaults; its cards, their bypassed state and what turning
 //! one on or off does; the groups a control quietly switches on; the LFO
-//! modulation; the profile that sorts the cards into two views; and what
-//! the scope, the envelope and the filter curve plot.
+//! modulation; and what the scope, the envelope and the filter curve plot.
 
 use ordrumbox_core::json::{self, Object, Value};
 
@@ -26,9 +25,7 @@ mod power;
 pub use power::*;
 mod extras;
 use extras::{EXTRA_FIELDS, EXTRA_GROUPS, implicit_enable_extra, is_extra};
-pub use extras::{EXTRA_METAS, SWITCHES, extra_default, extra_value};
-mod profile;
-pub use profile::*;
+pub use extras::{EXTRA_METAS, SWITCH_LABELS, SWITCHES, extra_default, extra_value};
 /// A group's defaults (`SYNTH_GROUP_DEFAULTS`), in order.
 const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,
     "vco1":{"gain":1,"octave":0,"detune":0,"wave":"sine"},
@@ -71,6 +68,19 @@ pub struct Meta {
     pub unit: &'static str,
     pub label: Option<&'static str>,
     pub log: bool,
+}
+
+/// The most notches a control may have and still count as discrete (its
+/// value written on its knob): the unison's voices, not a detune in cents.
+const DISCRETE_NOTCHES_MAX: f64 = 16.0;
+
+impl Meta {
+    /// Whether the control takes a few whole values, each worth reading on
+    /// the card (the unison's voices), rather than a continuous range.
+    #[must_use]
+    pub fn is_discrete(&self) -> bool {
+        self.step >= 1.0 && (self.max - self.min) / self.step <= DISCRETE_NOTCHES_MAX
+    }
 }
 
 const fn meta(path: &'static str, min: f64, max: f64, step: f64, unit: &'static str) -> Meta {
@@ -169,6 +179,15 @@ pub fn metas() -> impl Iterator<Item = &'static Meta> {
 
 pub fn find_meta(path: &str) -> Option<&'static Meta> {
     metas().find(|m| m.path == path)
+}
+
+/// The name under the control of field `path`: its label, a switch's short
+/// name ([`SWITCH_LABELS`]), else its key.
+#[must_use]
+pub fn field_label(path: &str) -> &str {
+    let switch = || SWITCH_LABELS.iter().find(|(p, _)| *p == path).map(|(_, label)| *label);
+    let key = path.rsplit('.').next().unwrap_or(path);
+    find_meta(path).and_then(|m| m.label).or_else(switch).unwrap_or(key)
 }
 
 /// What a line of the matrix can modulate (`SYNTH_LFO_TARGETS`): off, every control that is
@@ -344,12 +363,11 @@ pub fn hydrate(draft: &mut Object) {
 }
 
 /// The cards of `draft`, in order: the known ones,
-/// then any other group it has (not a bypass flag, a tag nor the profile), by name.
+/// then any other group it has (not a bypass flag nor a tag), by name.
 pub fn groups(draft: &Object) -> Vec<String> {
     let mut groups: Vec<String> = GROUP_ORDER.iter().map(|g| (*g).to_owned()).collect();
     for (key, _) in draft.iter() {
-        let is_card =
-            !NUMBER_KEYS.contains(&key) && key != PROFILE_KEY && !TAG_KEYS.contains(&key) && !key.starts_with("bypass");
+        let is_card = !NUMBER_KEYS.contains(&key) && !TAG_KEYS.contains(&key) && !key.starts_with("bypass");
         if is_card && !groups.iter().any(|g| g == key) {
             groups.push(key.to_owned());
         }
@@ -627,8 +645,14 @@ mod tests {
         set(&mut d, "fm.amount", Value::from(0.5));
         set(&mut d, "vco2.gain", Value::from(0.5));
         assert_ne!(scope(&d, 0.0, 120.0), wave);
-        let (points, total) = envelope(&d);
+        let (points, total) = envelope(&d, "envelope");
         assert_eq!((points.len(), total), (5, 0.5));
+        assert_eq!(points[2], (0.12, 1.0), "the envelope's decay to its sustain");
+        let (mod_env, _) = envelope(&d, "modEnvelope");
+        assert_eq!(mod_env[2], (0.12, 0.0), "the mod envelope's sustain");
+        let (filter_env, _) = envelope(&d, "filterEnv");
+        let attack = extra_value(&d, "filterEnv.attack").expect("a stage");
+        assert_eq!(filter_env[1], (attack, 1.0), "unset, a stage of the filter envelope plays as its default");
         let low = filter_response("lowpass", 1000.0, 1.0, 12.0, 200);
         assert!(low[0] > -1.0 && low[200] == -30.0);
         let high = filter_response("highpass", 1000.0, 1.0, 12.0, 200);
