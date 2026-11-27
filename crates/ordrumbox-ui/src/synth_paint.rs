@@ -1,9 +1,9 @@
 //! Painting the synth editor under its items, in its hardware look
 //! (`panel/hardware.rs`): the metal over the whole editor, the orDrumbox
 //! logo right of the preset bar, the cards with a title band (a family's
-//! card and the emblem's have none: its strips carry their titles), the
-//! emblem in its card, and the plots on their screens — the scope, the
-//! filter's response, the envelope.
+//! card has none: its strips carry their titles), the emblem on the metal
+//! in the last card's place, and the plots on their screens — the scope,
+//! the filter's response, the envelope.
 
 use ordrumbox_core::json::Object;
 use ordrumbox_engine::synth_model as model;
@@ -21,7 +21,8 @@ use crate::synth_view::{Built, Card, EMBLEM_GROUP, HEAD_H, PAD_X, PAD_Y, Plot, S
 /// The space between the preset bar and the logo, at least (at scale 1).
 const LOGO_GAP: i32 = 16;
 
-/// Paint the metal, the logo, the cards (under their items) and their plots.
+/// Paint the metal, the logo, the cards under their items (but not under the
+/// emblem), and the plots.
 pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLayout, time: f64, bpm: f64) {
     let s = layout.scale();
     hardware::draw_metal(canvas, layout.panel());
@@ -30,7 +31,8 @@ pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLa
     }
     for card in &built.cards {
         let r = card.rect;
-        if card.framed {
+        // The emblem keeps a card's place in the rows, but the metal shows through it.
+        if card.framed && card.group != EMBLEM_GROUP {
             hardware::draw_card(canvas, r, has_head(card).then_some((PAD_Y + HEAD_H - 4) * s), card.bypassed, s);
         } else if card.bypassed {
             hardware::shade_strip(canvas, r);
@@ -162,5 +164,28 @@ mod tests {
         }
         let narrow = SynthLayout::new(600, 680, Scale::ONE, 0);
         assert!(logo_place(&narrow, &LOGO).is_none(), "no room: no logo");
+    }
+
+    #[test]
+    fn the_emblem_sits_on_the_metal_without_a_card() {
+        let mut d = model::defaults();
+        model::hydrate(&mut d);
+        let (w, h) = (912usize, 680usize);
+        let layout = SynthLayout::new(w as i32, h as i32, Scale::ONE, 0);
+        let built = build(&d, (&[], ""), &layout, 0, &|_| None);
+        let card = built.cards.iter().find(|c| c.group == EMBLEM_GROUP).expect("the emblem's place");
+        assert!(card.framed, "still as tall as its row");
+
+        let mut pixels = vec![0; w * h];
+        draw(&mut Canvas::new(&mut pixels, w, h), &d, &built, &layout, 0.3, 120.0);
+        let mut metal = vec![0; w * h];
+        hardware::draw_metal(&mut Canvas::new(&mut metal, w, h), layout.panel());
+        let at = |(x, y): (i32, i32)| y as usize * w + x as usize;
+
+        let corner = (card.rect.x + 1, card.rect.y + 1);
+        assert_eq!(pixels[at(corner)], metal[at(corner)], "no card under the emblem");
+        let (x, y, scale) = emblem_place(card.rect, Scale::ONE).expect("room for the emblem");
+        let center = (x + EMBLEM.width_at(scale) / 2, y + EMBLEM.height_at(scale) / 2);
+        assert_ne!(pixels[at(center)], metal[at(center)], "the emblem is drawn");
     }
 }

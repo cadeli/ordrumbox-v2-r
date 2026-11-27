@@ -237,8 +237,9 @@ impl SynthLayout {
 }
 
 /// A card as built: its place, whether it is bypassed, its plot; `framed`:
-/// drawn with its border (an oscillator's strip is a band of the
-/// oscillators' card, shaded only when bypassed).
+/// as tall as its row, with a border except for the emblem, which is painted
+/// on the metal (an oscillator's strip is a band of the oscillators' card,
+/// shaded only when bypassed).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Card {
     pub group: String,
@@ -428,8 +429,8 @@ fn sizes_of(blocks: &[Block], gap: i32) -> Vec<Size> {
     sizes
 }
 
-/// The emblem's card, last, at the right edge: no controls, as wide as FM
-/// ([`sizes_of`]), as tall as its row, a knob's height at least.
+/// The emblem's place, last, at the right edge: no controls, no painted card,
+/// as wide as FM ([`sizes_of`]), as tall as its row, a knob's height at least.
 fn emblem_block(s: Scale) -> Block {
     let size = (0, (HEAD_H + KNOB_H) * s);
     let card = Card {

@@ -766,9 +766,10 @@ unchanged. No snapshot changed.
 The synth editor is drawn as a hardware panel, in every colour scheme (`panel/hardware.rs`, `synth_paint.rs`): brushed
 metal, cards with a title band (a family's card has none), black knobs ringed with ticks, faders with a light cap,
 round green LEDs, dark buttons (yellow when on) and green-on-black screens; the orDrumbox logo sits right of the
-preset bar, at half size, when it fits. Each `panel::Item` has a `Skin` (`Flat` everywhere else). Gradients and soft
-edges are computed as it draws (`Canvas::fill_disc`). Layout, controls, ids and sound are unchanged. No snapshot
-changed.
+preset bar, at half size, when it fits. The emblem of the last card is drawn on the metal: the card keeps its place in
+the row (and its height), but has no painted background. Each `panel::Item` has a `Skin` (`Flat` everywhere else).
+Gradients and soft edges are computed as it draws (`Canvas::fill_disc`). Layout, controls, ids and sound are unchanged.
+No snapshot changed.
 
 The synth editor's cards take the colour scheme's hue (`hardware::Cards`, from the scheme's line and panel colours);
 the metal, the knobs, the buttons and the screens stay the same in every scheme. The preset bar has 8 pixels of room
