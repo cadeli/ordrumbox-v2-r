@@ -43,7 +43,7 @@ impl Editor {
         }
     }
 
-    /// ⟳ (B): pattern `p` made again in style `style` (else its own, else a
+    /// ♫ (B): pattern `p` made again in style `style` (else its own, else a
     /// drawn one), locked tracks kept, the library at the style's tempo; one
     /// undo step.
     pub fn regenerate_pattern(
@@ -112,7 +112,7 @@ impl Editor {
         self.edit(p, desc, None, generate::toggle_auto)
     }
 
-    /// ↻ Drum on pattern `p` (in style `style`, else the pattern's): whether
+    /// ♫ Drum on pattern `p` (in style `style`, else the pattern's): whether
     /// drum generation is now on.
     pub fn toggle_drums(
         &mut self,
@@ -132,7 +132,7 @@ impl Editor {
         })
     }
 
-    /// ↻ on track `t` of pattern `p`: a new line in the pattern's style, one undo step.
+    /// ♫ on track `t` of pattern `p`: a new line in the pattern's style, one undo step.
     pub fn regenerate_track(
         &mut self,
         p: usize,
@@ -154,7 +154,7 @@ impl Editor {
         .is_some()
     }
 
-    /// ↻ Bass / ↻ Chords on pattern `p`: whether that
+    /// ♫ Bass / ♫ Chords on pattern `p`: whether that
     /// generation is now on.
     pub fn toggle_melodic(
         &mut self,

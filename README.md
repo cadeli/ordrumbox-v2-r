@@ -351,4 +351,5 @@ File > Restore user data puts such a folder back, the files there moved to `back
 
 ## License
 
-MIT: see `LICENSE`.
+MIT: see `LICENSE`. The text font, Pixel Operator Mono 8 by Jayvee Enaguas, is in
+the public domain (CC0): `assets/fonts/LICENSE-PixelOperator.txt`.

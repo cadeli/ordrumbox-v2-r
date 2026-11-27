@@ -88,8 +88,9 @@ cargo run --release -p ordrumbox-engine --example render -- assets song:demo dem
 
 `THIRD-PARTY-LICENSES.txt` lists the licenses of every dependency of the program, for every
 target and feature of the releases (`about.toml`, `about.hbs`). It is generated, committed, and shipped
-in each zip, the setup and the macOS app; CI fails when it is out of date. After a change to
-`Cargo.lock`:
+in each zip, the setup and the macOS app; CI fails when it is out of date. Its last section, written in `about.hbs`,
+lists what the program holds that is not a crate (the text font of `assets/fonts/`). After a change to
+`Cargo.lock` or `about.hbs`:
 
 ```sh
 cargo install --locked cargo-about --features cli   # once
@@ -293,7 +294,7 @@ smallest window is 64 pixels shorter (the strip) and 38 wider (the MIX button). 
 (`Style::Fader`); the master's low and high cut are knobs, no longer sliders. In a plugin the mixer shows the track
 strips only: the host mixes and the returns and the master play at their defaults, as before.
 
-Choosing an effect's type (its screen's list or its ◂ ▸ arrows) switches the effect on, as it already did for
+Choosing an effect's type (its screen's list or its ◄ ► arrows) switches the effect on, as it already did for
 the filter and an LFO's wave: a reverb or a delay without an amount goes on at its `on_value`, one without a
 type (`none`) at the type chosen. The type arrows of a reverb or a delay that was off used to leave it off.
 Scenario tests only (`session_scenarios/cartridges.rs`); no snapshot changed.
@@ -833,3 +834,11 @@ notch is drawn as one (it was drawn as a lowpass). Three presets use it: `SYNTHP
 swept by LFO 1 at a half note, legato) and `BASS_BITE` (a lowpass at 220 Hz that its envelope opens, a bandpass at
 900 Hz and Q 4 beside it at balance 0.3, mono). Being last of their instrument in the file, they are the last pick of
 the auto-assignment for BASS, SYNTHPAD and SYNTHLEAD tracks: 71 rows of `assign_tests/data.rs` changed that way.
+
+The text is drawn in Pixel Operator Mono 8 (`assets/fonts/PixelOperatorMono8.ttf`, CC0), built into the program
+(`ordrumbox-ui/src/font.rs`), in place of the system's monospace font (Consolas, Menlo, DejaVu or Liberation Mono):
+the program no longer stops at start for want of a font, and `$ORDRUMBOX_FONT` still names another one. The font is
+sized from its capital measured at 1000 px (it was 100 px), so a pixel font lands on whole pixels. It has no arrows
+or symbols: `font/symbols.rs` draws →, ←, ↔, ►, ◄, ▼ and ♫ in pixels when the font lacks them. The regenerate buttons
+(the header's and the Generate tab's New line) show ♫ in place of ↻, the arrows of a small screen ◄ and ► in place of
+◂ and ▸, and the Generate tab's Advanced ► or ▼ in place of ▸ or ▾. No snapshot changed.

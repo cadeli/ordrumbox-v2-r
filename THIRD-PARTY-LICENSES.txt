@@ -2,7 +2,7 @@ orDrumbox: third-party licenses
 ===============================
 
 orDrumbox is MIT licensed (LICENSE). It includes the libraries below, each under
-its own license.
+its own license, and the text font of the last section.
 
 Licenses used:
   MIT License (144 crates)
@@ -2809,3 +2809,11 @@ the following restrictions:
 
 3. This notice may not be removed or altered from any source distribution.
 
+
+--------------------------------------------------------------------------------
+Creative Commons Zero v1.0 Universal (public domain)
+
+Used by:
+  Pixel Operator Mono 8, the text font built into the program, by Jayvee
+  Enaguas (HarvettFox96) (https://notabug.org/HarvettFox96/ttf-pixeloperator);
+  the license is in assets/fonts/LICENSE-PixelOperator.txt.

@@ -1,5 +1,5 @@
 //! Whole patterns and auto mode: a pattern generated, its lines drawn again
-//! at each loop start, and the ↻ Drum / Bass / Chords buttons.
+//! at each loop start, and the ♫ Drum / Bass / Chords buttons.
 //!
 //! A pattern remembers its generation in three saved keys: `autoGenre` (its
 //! style, a key of `styles.json` or a tag the library taught), `autoKeyOffset`
@@ -22,11 +22,11 @@ pub const STYLE_KEY: &str = "autoGenre";
 pub const BASS_PRESET: &str = "BASS_SQUARE";
 const KEY_OFFSET: &str = "autoKeyOffset";
 const SCALE: &str = "autoScale";
-/// The seed a pattern's lines are drawn from (⟳ draws a new one, the macros keep it).
+/// The seed a pattern's lines are drawn from (♫ draws a new one, the macros keep it).
 const PATTERN_SEED: &str = "composeSeed";
 /// Seeds are drawn below this (whole numbers a JSON file keeps exactly).
 const SEED_RANGE: f64 = 4_294_967_296.0;
-/// The ↻ buttons' own auto flag: it can stay on while `auto_mode` is off
+/// The ♫ buttons' own auto flag: it can stay on while `auto_mode` is off
 /// (the button lit, the track not regenerating).
 pub(super) const TOOLBAR_AUTO: &str = "_toolbarAuto";
 /// The variant a melodic track plays when its style names none.
@@ -376,7 +376,7 @@ pub fn generate_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, option
     }
 }
 
-/// ⟳: the pattern made again in a style (given, the pattern's, or drawn) —
+/// ♫: the pattern made again in a style (given, the pattern's, or drawn) —
 /// its meter, tempo (in [`AutoGenerator::tempo`]) and tracks: a track the style names is kept with its
 /// sound and settings and gets a new line, the others go; a locked track
 /// stays as it is, its line included.

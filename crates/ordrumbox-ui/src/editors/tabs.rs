@@ -10,6 +10,7 @@ use super::values::{
 };
 use super::{Choice, ComposeView, TrackView};
 use crate::control::{Format, Spec, Style};
+use crate::font;
 use crate::panel::{GenerationTab, Id, Item, Kind, LfoParam, Rect, dim, label_width};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
@@ -292,7 +293,7 @@ pub(super) fn generation_tab(
     generation_toggle(rows, ("composeLock", "Lock"), track.compose_lock, state);
     let r = rows.row();
     rows.label(r, "New line", None, false);
-    let button = Kind::Button { label: "\u{21bb}".into(), on: false };
+    let button = Kind::Button { label: font::REGENERATE.into(), on: false };
     rows.items.push(Item::new(Some(Id::Regenerate), rows.field(r, 36 * s), button));
     let melodic = instrument_family(&track.name).is_melodic();
     // The part above Advanced takes the compose view's height whatever the
@@ -314,8 +315,8 @@ pub(super) fn generation_tab(
     rows.y = rows.y.max(simple_bottom);
     // Everything else, folded.
     let r = rows.row();
-    let label = if state.generation_advanced { "Advanced \u{25be}" } else { "Advanced \u{25b8}" };
-    let button = Kind::Button { label: label.into(), on: state.generation_advanced };
+    let label = format!("Advanced {}", if state.generation_advanced { font::UNFOLDED } else { font::NEXT });
+    let button = Kind::Button { label, on: state.generation_advanced };
     rows.items.push(Item::new(Some(Id::GenerationAdvanced), Rect::new(r.x, r.y + 2 * s, 120 * s, r.h - 4 * s), button));
     if state.generation_advanced {
         advanced_generation(rows, (track, moved), compose, state);

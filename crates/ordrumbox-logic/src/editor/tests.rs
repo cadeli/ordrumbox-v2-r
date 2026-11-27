@@ -359,7 +359,7 @@ fn generation_commands() {
     assert_eq!(e.history().undo_len(), undo + 1);
     assert_eq!(e.history().next_undo(), Some("Generate pattern \"NewPat_1\""));
 
-    // ↻ Drum on: KICK and SNARE in auto mode.
+    // ♫ Drum on: KICK and SNARE in auto mode.
     assert_eq!(e.toggle_drums(0, &scales, &styles, Some("funk"), &mut rnd), Some(true));
     assert!(pattern(&e).tracks.iter().all(|t| t.auto_mode));
     assert_eq!(e.history().next_undo(), Some("Generate drums"));
@@ -368,16 +368,16 @@ fn generation_commands() {
     assert!(e.auto_loop(0, 1, &scales, &styles, &mut rnd));
     assert_eq!(e.history().undo_len(), undo);
     assert_ne!(*pattern(&e), before);
-    // ↻ Drum again: auto off.
+    // ♫ Drum again: auto off.
     assert_eq!(e.toggle_drums(0, &scales, &styles, None, &mut rnd), Some(false));
     assert!(pattern(&e).tracks.iter().all(|t| !t.auto_mode));
     assert!(!e.auto_loop(0, 2, &scales, &styles, &mut rnd));
 
-    // ↻ on one track: a new line, one undo step.
+    // ♫ on one track: a new line, one undo step.
     assert!(e.regenerate_track(0, 1, &scales, &styles, &mut rnd));
     assert_eq!(e.history().next_undo(), Some("Generate SNARE"));
 
-    // ↻ Bass: a synth BASS track with a line, in auto mode.
+    // ♫ Bass: a synth BASS track with a line, in auto mode.
     assert_eq!(e.toggle_melodic(0, MelodicKind::Bass, &scales, &styles, &mut rnd), Some(true));
     let bass = pattern(&e).tracks.last().unwrap();
     assert!(bass.name == "BASS" && bass.use_synth && bass.auto_mode && !bass.notes.is_empty());

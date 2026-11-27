@@ -353,8 +353,12 @@ mod tests {
             |x0: usize, x1: usize| (0..16).any(|y| pixels[y * 32 + x0..y * 32 + x1].iter().any(|&p| p > 0x80_80_80));
         assert!(lit(0, 12) && lit(12, 24), "both cells drawn");
         assert!(!lit(24, 32), "nothing past them");
-        // Coverage blends: some pixels are neither background nor full colour.
-        assert!(pixels.iter().any(|&p| p != 0 && p != 0xff_ff_ff));
+        // The pixel font lands on whole pixels at a whole scale...
+        assert!(pixels.iter().all(|&p| p == 0 || p == 0xff_ff_ff), "sharp");
+        // ...and coverage blends in the small font, three quarters of a cell.
+        let mut small = vec![0; 32 * 16];
+        Canvas::new(&mut small, 32, 16).small_text(0, 0, "Hé", Scale::whole(1), 0xff_ff_ff);
+        assert!(small.iter().any(|&p| p != 0 && p != 0xff_ff_ff), "blended");
         assert_eq!(text_width("abc", Scale::whole(2)), 36);
     }
 }

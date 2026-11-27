@@ -116,7 +116,7 @@ pub struct HeaderControls {
     pub pattern: Rect,
     pub beats: Rect,
     pub kit: Rect,
-    /// The generation: the style list, ⟳, AUTO, and the energy, complexity
+    /// The generation: the style list, ♫, AUTO, and the energy, complexity
     /// and variation macros.
     pub style: Rect,
     pub generate: Rect,
@@ -181,7 +181,7 @@ impl HeaderControls {
     }
 
     /// The frames of the header's groups: mode (pattern or song), transport
-    /// (play, tempo), pattern (pattern, beats, kit), generation (style, ⟳,
+    /// (play, tempo), pattern (pattern, beats, kit), generation (style, ♫,
     /// AUTO, macros) and views. Each covers its controls and their labels
     /// above them.
     #[must_use]

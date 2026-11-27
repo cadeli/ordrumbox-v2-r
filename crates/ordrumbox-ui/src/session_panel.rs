@@ -21,6 +21,7 @@ use crate::editors::{
     self, FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVY, GENERATION_MANUAL,
     GenerationRow, KIT_KNOBS, KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_KNOBS, NoteRow,
 };
+use crate::font;
 use crate::frame;
 use crate::panel::{self, Item, Kind, Rect};
 use crate::panel::{EditorTab, Id, ViewButton};
@@ -29,9 +30,6 @@ use crate::view::Layout;
 use ordrumbox_core::{FilterType, Pattern, Track};
 use ordrumbox_logic::generate;
 use std::time::Duration;
-
-/// The ⟳ button's label: the pattern made again.
-const GENERATE_LABEL: &str = "\u{21bb}";
 
 /// Two clicks on a widget this close are a double-click.
 pub(super) const DOUBLE_CLICK: Duration = Duration::from_millis(400);
@@ -298,7 +296,7 @@ impl Session {
         let (beats, selected) = beat_choices(pattern.beat_count);
         let kind = Kind::Select { values: beats.clone(), labels: beats, selected };
         layout.items.push(Item::new(Some(Id::Beats), controls.beats, kind));
-        // The generation: the pattern's style, ⟳, AUTO, the macros.
+        // The generation: the pattern's style, ♫, AUTO, the macros.
         let styles = self.shown_styles();
         let style = pattern.extra.get(generate::STYLE_KEY).and_then(|g| g.as_str()).unwrap_or_default();
         let values: Vec<String> =
@@ -307,7 +305,7 @@ impl Session {
             std::iter::once("random".to_owned()).chain(styles.list.iter().map(style_label)).collect();
         let selected = styles.get(style).and_then(|st| values.iter().position(|v| *v == st.name)).unwrap_or(0);
         layout.items.push(Item::new(Some(Id::StyleList), controls.style, Kind::Select { values, labels, selected }));
-        let button = Kind::Button { label: GENERATE_LABEL.into(), on: false };
+        let button = Kind::Button { label: font::REGENERATE.into(), on: false };
         layout.items.push(Item::new(Some(Id::GeneratePattern), controls.generate, button));
         let button = Kind::Button { label: "AUTO".into(), on: self.pattern_auto() };
         layout.items.push(Item::new(Some(Id::AutoAll), controls.auto, button));
@@ -735,7 +733,7 @@ mod tests {
         s.set_value(Id::Compose("composeHitsPerMeasure"), 3.0);
         assert_eq!(s.track(0).unwrap().compose_hits_per_measure, Some(3.0));
         assert_eq!(s.editor.history().next_undo(), Some("Measure Hits on KICK"));
-        // ↻: a new line with three kicks, the third beat among them.
+        // ♫: a new line with three kicks, the third beat among them.
         let regenerate = panel::find(&s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items, Id::Regenerate).unwrap().rect;
         let (x, y) = center(regenerate);
         click(&mut s, x, y);
@@ -762,7 +760,7 @@ mod tests {
         s.set_value(Id::Macro(style::ENERGY), 100.0);
         assert_eq!(s.pattern().unwrap().tracks, lines);
 
-        // A locked KICK stays through ⟳; the other tracks get new lines.
+        // A locked KICK stays through ♫; the other tracks get new lines.
         s.run(Command::LockTrack);
         assert!(s.track(0).unwrap().compose_lock);
         let kick = s.track(0).unwrap().clone();

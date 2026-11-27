@@ -1,7 +1,7 @@
 //! The generators on the inputs of `tests/fixtures/generator_cases.json`,
 //! drawing from a seeded stream: every melodic variant on several track
 //! setups, densities and harmonies, random tracks, whole patterns, auto mode
-//! loops and the ↻ buttons, checked against `generators_rust.txt`; the drum
+//! loops and the ♫ buttons, checked against `generators_rust.txt`; the drum
 //! lines come from the styles (`tests/compose.rs`). Properties follow.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
@@ -333,7 +333,7 @@ fn bass_and_chords_hold_through_their_section_with_no_variation() {
     }
 }
 
-// ─── ⟳, the macros, the lock, AUTO ───────────────────────────────────────────
+// ─── ♫, the macros, the lock, AUTO ───────────────────────────────────────────
 
 #[test]
 fn a_pattern_made_again_in_a_style_takes_its_tracks_and_keeps_the_locked_one() {

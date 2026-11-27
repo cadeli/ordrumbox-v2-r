@@ -29,7 +29,7 @@ impl Session {
         self.regenerate_pattern_in(style.as_deref());
     }
 
-    /// B, ⟳: the pattern made again in its style (or the chosen one when it
+    /// B, ♫: the pattern made again in its style (or the chosen one when it
     /// has none); no pattern: a new one.
     pub fn regenerate_pattern(&mut self) {
         let has_style =
@@ -114,7 +114,7 @@ impl Session {
         }
     }
 
-    /// D, S, A: ↻ Drum / Bass / Chords — new lines in auto mode, or auto mode off.
+    /// D, S, A: ♫ Drum / Bass / Chords — new lines in auto mode, or auto mode off.
     pub fn toggle_generation(&mut self, part: Option<MelodicKind>) {
         let p = self.pattern_index;
         let styles = self.generation_styles();
@@ -143,7 +143,7 @@ impl Session {
         };
     }
 
-    /// ↻ in the Generate tab: a new line on the edited track, in the pattern's style.
+    /// ♫ in the Generate tab: a new line on the edited track, in the pattern's style.
     pub fn regenerate_track(&mut self, t: usize) {
         let styles = self.generation_styles();
         let name = self.track(t).map(|tr| tr.name.clone()).unwrap_or_default();

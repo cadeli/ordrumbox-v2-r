@@ -155,7 +155,7 @@ pub enum Id {
     GenerationTab(GenerationTab),
     /// A compose setting of a drum track (its style's value when unset).
     Compose(&'static str),
-    /// ↻: a new line on the edited track.
+    /// ♫: a new line on the edited track.
     Regenerate,
     /// The Generate tab's Advanced settings, shown or folded.
     GenerationAdvanced,
@@ -230,7 +230,7 @@ pub enum Id {
     RecordAutomation,
     Bpm,
     Beats,
-    /// The style list, ⟳ (the pattern made again in it), AUTO (every track in
+    /// The style list, ♫ (the pattern made again in it), AUTO (every track in
     /// auto mode), and a generation macro of the pattern.
     StyleList,
     GeneratePattern,

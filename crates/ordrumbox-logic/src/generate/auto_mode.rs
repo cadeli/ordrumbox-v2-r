@@ -1,5 +1,5 @@
-//! Auto mode: turned on and off (AUTO on a pattern, the ↻ Drum / Bass /
-//! Chords buttons, ↻ on one track, a random line for a track), and played.
+//! Auto mode: turned on and off (AUTO on a pattern, the ♫ Drum / Bass /
+//! Chords buttons, ♫ on one track, a random line for a track), and played.
 //! A track in auto mode (`auto`), or any track of a pattern with `autoGen`,
 //! moves through a section of the song form: a new line at its start, the
 //! drums varying loop after loop and filling at its end.
@@ -25,7 +25,7 @@ pub fn toggle_auto(pattern: &mut Pattern) -> bool {
     on
 }
 
-/// ↻ on one track: a new line for track `t` of `pattern` (in its style; a
+/// ♫ on one track: a new line for track `t` of `pattern` (in its style; a
 /// new seed first when it has one); nothing on a locked track. A melodic
 /// track plays one of its style's variants.
 pub fn regenerate_track(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, t: usize) {
@@ -48,9 +48,9 @@ pub fn regenerate_track(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, t: usi
     }
 }
 
-// ─── The ↻ buttons ───────────────────────────────────────────────────────────
+// ─── The ♫ buttons ───────────────────────────────────────────────────────────
 
-/// Auto mode as the ↻ buttons show it (`auto_mode` or their own flag).
+/// Auto mode as the ♫ buttons show it (`auto_mode` or their own flag).
 pub fn is_auto_on(track: &Track) -> bool {
     track.auto_mode || track.extra.get(TOOLBAR_AUTO).is_some_and(Value::is_true)
 }
@@ -79,7 +79,7 @@ fn toggle(
     }
 }
 
-/// ↻ Drum: new lines over the existing tracks in the style of `options`
+/// ♫ Drum: new lines over the existing tracks in the style of `options`
 /// (else the pattern's, else a drawn one), the drum tracks the style plays
 /// in auto mode, empty melodic tracks removed; or, when drums are in auto
 /// mode, auto mode off. Whether generation is now on.
@@ -95,12 +95,12 @@ pub fn toggle_drums(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &
     })
 }
 
-/// The melodic parts a ↻ button drives.
+/// The melodic parts a ♫ button drives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MelodicKind {
-    /// ↻ Bass.
+    /// ♫ Bass.
     Bass,
-    /// ↻ Chords.
+    /// ♫ Chords.
     Chords,
 }
 
@@ -121,7 +121,7 @@ impl MelodicKind {
     }
 }
 
-/// ↻ Bass / ↻ Chords: the first BASS (PIANO) track in auto mode — created
+/// ♫ Bass / ♫ Chords: the first BASS (PIANO) track in auto mode — created
 /// on the pattern's synth, with a first line in the pattern's style, when
 /// there is none; or auto mode off. Whether generation is now on.
 pub fn toggle_melodic(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, kind: MelodicKind) -> bool {

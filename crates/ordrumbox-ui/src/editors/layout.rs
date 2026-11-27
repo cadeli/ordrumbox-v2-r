@@ -6,6 +6,7 @@ use super::tables::{KNOB_BAR, Prop};
 use super::tabs::{fx_tab, generation_tab, lfo_tab, loop_tab, sound_tab, tallest_tab_bottom};
 use super::values::{EditorState, has_lfo, number};
 use crate::control::{Format, Spec};
+use crate::font;
 use crate::panel::{EditorTab, Id, Item, KNOB_SIZE, Kind, Rect, Step, dim, label_width};
 use crate::scale::Scale;
 use crate::theme;
@@ -89,7 +90,7 @@ impl Rows {
         let arrow = ARROW_W * s;
         let previous = Rect::new(r.x, r.y, arrow, r.h);
         let next = Rect::new(r.x + r.w - arrow, r.y, arrow, r.h);
-        for (direction, rect, glyph) in [(Step::Previous, previous, "\u{25c2}"), (Step::Next, next, "\u{25b8}")] {
+        for (direction, rect, glyph) in [(Step::Previous, previous, font::PREVIOUS), (Step::Next, next, font::NEXT)] {
             let kind = Kind::Button { label: glyph.into(), on: false };
             self.items.push(Item::new(Some(step(direction)), rect, kind));
         }

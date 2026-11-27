@@ -181,7 +181,7 @@ editor, the VU meters and the kit editor shown or hidden as you left them. It is
 <pre class="layout">┌──────────────────────────────────────────────────────────────┐
 │ Menu bar: File Edit View Pattern Generate Play Song Kit Help │ saved
 ├──────────────────────────────────────────────────────────────┤
-│ Header: PLAY REC BPM MODE PATTERN BEATS KIT STYLE ↻ AUTO VIEW │
+│ Header: PLAY REC BPM MODE PATTERN BEATS KIT STYLE ♫ AUTO VIEW │
 │ Status line: last action · undo / redo · song                │
 ├─────────────────────────────────────────────┬────────────────┤
 │  Main editor (one of):                      │  Track editor  │
@@ -366,7 +366,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <h3>Generate</h3>
 <table>
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
-<tr><td>Generate the pattern again</td><td><kbd>Shift</kbd>+<kbd>B</kbd></td><td>Make the pattern again in its style (same as header ↻).</td></tr>
+<tr><td>Generate the pattern again</td><td><kbd>Shift</kbd>+<kbd>B</kbd></td><td>Make the pattern again in its style (same as header ♫).</td></tr>
 <tr><td>New pattern in the style</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Add a new pattern made in the chosen style.</td></tr>
 <tr><td>Auto (every track)</td><td></td><td>Every track in auto mode, or out of it (same as header AUTO).</td></tr>
 <tr><td>Drums (auto)</td><td><kbd>Shift</kbd>+<kbd>D</kbd></td><td>Generate the drum lines in auto mode; again: off.</td></tr>
@@ -454,7 +454,7 @@ slip off the play keys changes nothing; pressed alone, they say so on the status
 <tr><td><strong>BEATS</strong></td><td>List, 1–16 then every 4th up to 64</td><td>The pattern's length in beats.</td></tr>
 <tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from. It is kept with the library and its projects (one undo step), and comes back at the next start and with a project loaded.</td></tr>
 <tr><td><strong>STYLE</strong></td><td>List</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
-<tr><td><strong>↻</strong></td><td>Button (<kbd>Shift</kbd>+<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter and lines, and the session's tempo. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>
+<tr><td><strong>♫</strong></td><td>Button (<kbd>Shift</kbd>+<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter and lines, and the session's tempo. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>
 <tr><td><strong>AUTO</strong></td><td>Button</td><td>Every track of the pattern in auto mode, or out of it.</td></tr>
 <tr><td><strong>ENERGY</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Scales the hits and densities of all lines, ×0.5 to ×1.5.</td></tr>
 <tr><td><strong>COMPLEXITY</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Shifts the complexity and syncopation of every drum part, −100 to +100.</td></tr>
@@ -593,10 +593,10 @@ waveform at the top (see the kit editor). They are the sample's, so every track 
 <h3>FX tab</h3>
 <p>The six effects one under the other, each a cartridge: its LED and its name on the left (the LED switches it on
 or off), then its knobs and lists. Under the name, the reverb, the delay and the saturation show their type on a
-small screen: a click opens the list, ◂ and ▸ step to the type before or after. The filter's type is on its screen
+small screen: a click opens the list, ◄ and ► step to the type before or after. The filter's type is on its screen
 too. The LED switches the effect: a reverb or a delay without a type (<em>none</em>, from an older file
 or an MCP client) stays off, and its LED gives it the type its screen shows (<em>room</em>, <em>tape</em>). Touching a
-control of an effect that is off switches it on, and so does choosing its type, on the screen or with ◂ ▸.</p>
+control of an effect that is off switches it on, and so does choosing its type, on the screen or with ◄ ►.</p>
 <table>
 <tr><th>Effect</th><th>Control</th><th>Values</th><th>Notes</th></tr>
 <tr><td rowspan="2"><strong>Reverb</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
@@ -632,13 +632,13 @@ control of an effect that is off switches it on, and so does choosing its type, 
 <tr><td><strong>auto</strong> (LED)</td><td>Auto-assign: the track's sound follows its name and the selected kit. It takes the kit's sample of its instrument, else of a variant of it (its tom for a HI_TOM track), else the synth preset of its name (<code>CLAP_SYNTH</code>, <code>BASS_FM</code>…), else another kit's sample, else a substitute. Made again at play and on a kit change.</td></tr>
 <tr><td><strong>Instrument</strong></td><td>The instrument (KICK, SNARE, CHH, BASS…).</td></tr>
 <tr><td><strong>Sample</strong></td><td>A specific sample of the kits. <strong>File...</strong> loads a WAV file instead.</td></tr>
-<tr><td><strong>SYNTH</strong> (cartridge)</td><td>A synth preset instead of a sample (edit it in the <a href="#synth">synth editor</a>). Its LED switches the synth on (the track plays the preset shown) or off (back on its sample). The screen shows the preset: a click opens the list, ◂ and ▸ step to the preset before or after. With the LED off they only choose the preset, kept for when it goes on.</td></tr>
+<tr><td><strong>SYNTH</strong> (cartridge)</td><td>A synth preset instead of a sample (edit it in the <a href="#synth">synth editor</a>). Its LED switches the synth on (the track plays the preset shown) or off (back on its sample). The screen shows the preset: a click opens the list, ◄ and ► step to the preset before or after. With the LED off they only choose the preset, kept for when it goes on.</td></tr>
 </table>
 
 <h3>LFO tab</h3>
 <p>One LFO per setting, the five one under the other: <strong>Cutoff</strong>, <strong>Q</strong>, <strong>Volume</strong>,
 <strong>Pan</strong>, <strong>Transpose</strong>. Each is a cartridge, as in the FX tab: its LED switches its LFO on or
-off, and its wave shows on a small screen under its name (a click opens the list, ◂ and ▸ step to the wave before or
+off, and its wave shows on a small screen under its name (a click opens the list, ◄ and ► step to the wave before or
 after). An LFO that is off shows <em>sine</em>, the wave its LED turns it on at; choosing a wave turns it on.</p>
 <table>
 <tr><th>Control</th><th>Values</th><th>What it does</th></tr>
@@ -666,15 +666,15 @@ after). An LFO that is off shows <em>sine</em>, the wave its LED turns it on at;
 <table>
 <tr><th>Control</th><th>What it does</th></tr>
 <tr><td><strong>Auto</strong></td><td>Auto mode: the track's line follows the song form as it plays.</td></tr>
-<tr><td><strong>Lock</strong></td><td>↻, the header knobs and auto mode leave the track as it is.</td></tr>
-<tr><td><strong>New line ↻</strong></td><td>Make a new line for this track alone.</td></tr>
+<tr><td><strong>Lock</strong></td><td>♫, the header knobs and auto mode leave the track as it is.</td></tr>
+<tr><td><strong>New line ♫</strong></td><td>Make a new line for this track alone.</td></tr>
 <tr><td><em>style / part</em></td><td>The pattern's style and the part this track plays in it (<code>*</code> = a value taken from the style).</td></tr>
 <tr><td><strong>Measure Hits</strong>, <strong>Complexity</strong>, <strong>Variation</strong></td><td>Drum track: how many hits per measure, how far from the strong steps, how much the line changes from loop to loop.</td></tr>
 <tr><td><strong>Variant</strong>, <strong>Density</strong></td><td>Bass or chord track: the variant it plays (bass variants on a bass track, chord and melody ones on the others; empty = the style's) and its density (−1 to +1).</td></tr>
 </table>
 <p>A value ending in <code>*</code> is the style's; a double-click gives a value back to the style.
 <code>4→6</code> means the header knobs make it play 6.</p>
-<p><strong>Advanced ▸</strong> unfolds more settings:</p>
+<p><strong>Advanced ►</strong> unfolds more settings:</p>
 <table>
 <tr><th>Sub-tab</th><th>Shown</th><th>Settings</th></tr>
 <tr><td><strong>Manual</strong></td><td>Auto mode off</td><td><strong>Hit Variation</strong> (0–100), <strong>Note Variation</strong> (0–100), <strong>Probability</strong> (the track's note probability)</td></tr>
@@ -717,7 +717,7 @@ cursor, else the track's first note.</p>
 <tr><td>Fade</td><td>0–100 % (default 60 %)</td><td>How far the repeats step down in velocity: at 100 % towards silence, at 0 all at the note's velocity.</td></tr>
 <tr><td rowspan="2"><strong>Euclidean</strong></td><td>Pulses</td><td>0–16</td><td>Evenly spaced extra hits between this note and the next.</td></tr>
 <tr><td>Rotation</td><td>0–15</td><td>Rotation of those pulses.</td></tr>
-<tr><td rowspan="4"><strong>Arpeggio</strong></td><td>Scale</td><td>the scales of <code>scales.json</code></td><td>The scale the arpeggio climbs. On a short screen, as are the cartridges of the track editor: a click opens the list, ◂ and ▸ step to the one before or after. Scale and Direction are lit while the arpeggio plays (a Range above 0).</td></tr>
+<tr><td rowspan="4"><strong>Arpeggio</strong></td><td>Scale</td><td>the scales of <code>scales.json</code></td><td>The scale the arpeggio climbs. On a short screen, as are the cartridges of the track editor: a click opens the list, ◄ and ► step to the one before or after. Scale and Direction are lit while the arpeggio plays (a Range above 0).</td></tr>
 <tr><td>Direction</td><td>up, down, updown, random</td><td>The direction, on a screen as the scale.</td></tr>
 <tr><td>Range</td><td>0–12</td><td>Number of scale notes (0 = off).</td></tr>
 <tr><td>Octaves</td><td>1–4</td><td>How many octaves the arpeggio climbs through: its notes are repeated 12 semitones higher. The Retrigger count sets how many notes play, up to 16.</td></tr>
@@ -1153,7 +1153,7 @@ taken before the master bus, has the track's own sound without the returns.</p>
 
 <h3>Three levels</h3>
 <ol>
-  <li><strong>The header</strong>: STYLE, ↻, AUTO and the ENERGY / COMPLEXITY / VARIATION knobs act on the whole pattern.</li>
+  <li><strong>The header</strong>: STYLE, ♫, AUTO and the ENERGY / COMPLEXITY / VARIATION knobs act on the whole pattern.</li>
   <li><strong>The Generate tab</strong> of a track: Auto, Lock, a new line for the track alone, and its main settings.</li>
   <li><strong>Advanced</strong> in the Generate tab: the Manual, Groovy, Engine and full Compose settings.</li>
 </ol>

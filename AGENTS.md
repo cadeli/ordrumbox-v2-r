@@ -34,7 +34,7 @@ ordrumbox-probe   sound measurements (command line, not shipped)    → core, ds
 ordrumbox-ui      session, views, input, MCP link, update check     → core, logic, engine, fontdue
 ordrumbox-app     window, input translation, audio output, MIDI     → core, engine, ui, winit, softbuffer, cpal, midir, rfd
 xtask             `cargo xtask audit` (rules of this file)          no deps
-assets/           data/*.json and kits/**.wav, read at runtime
+assets/           data/*.json and kits/**.wav, read at runtime; fonts/, built in
 ```
 
 - The four domain crates (`core`, `dsp`, `logic`, `engine`) take **no
@@ -43,12 +43,12 @@ assets/           data/*.json and kits/**.wav, read at runtime
   `ordrumbox-app` opens a window, a sound device, a MIDI port or a file dialog,
   through `winit`, `softbuffer`, `cpal`, `midir` and `rfd` (`dialog.rs`; the
   window's own picker stays for the tests). `ordrumbox-ui` reaches the OS for
-  the rest: files (`store.rs`), the MCP socket, the system font, `curl`.
+  the rest: files (`store.rs`), the MCP socket, `curl`.
 - `ordrumbox-ui` is the whole UI without a window or a sound device:
   `Session`, the views drawn into a pixel buffer, and `Ui`, which takes the
   neutral input of `ui_input.rs` (keys, modifiers, pointer, wheel). Its only
-  third-party dependency is `fontdue` (text in the system's monospace font,
-  read at start: nothing bundled); `png` decodes the About logo at build
+  third-party dependency is `fontdue` (text in the font built into the
+  program, `font.rs`); `png` decodes the About logo at build
   time only (`build.rs`, `image.rs`). The program gives it its sound output
   (`AudioOutput`, started by a `StartOutput`), its MIDI ports (`midi.rs`,
   `midi_out.rs`, `midi_sync.rs`) and its file dialogs (`dialog.rs`), and
@@ -181,6 +181,23 @@ assets/           data/*.json and kits/**.wav, read at runtime
   (down to `MIN_WINDOW`, `scroll.rs`) scrolls; the layout never shrinks.
   A test that changes the state checks that the rects under it stay put
   (`editors/tests.rs`, `the_rows_stay_put_without_a_sample`).
+
+## Text font
+
+- The UI draws all its text in one font, Pixel Operator Mono 8
+  (`assets/fonts/PixelOperatorMono8.ttf`, CC0, `LICENSE-PixelOperator.txt`
+  beside it), a pixel font drawn on whole pixels (a capital is 7 high),
+  built into the program by `font.rs` (`include_bytes!`): the same text on
+  every system, and no font to find at start. `$ORDRUMBOX_FONT` names another
+  file; the system's fonts are never read.
+- A font added to `assets/fonts/` is CC0 or public domain, with its license
+  file beside it, and is listed in `about.hbs` (`THIRD-PARTY-LICENSES.txt`).
+- The font has 241 glyphs (Latin-1, dashes, quotes, `…`, `€`, `™`), no
+  arrows or symbols: `font/symbols.rs` draws those the views use (`→ ← ↔ ► ◄
+  ▼ ♫`) in pixels, on the font's cell. A symbol a view draws is a constant
+  of `font.rs` (`REGENERATE`, `PREVIOUS`, `NEXT`, `UNFOLDED`); a test checks
+  that the font or `symbols.rs` has each one, and the arrows. A new one joins
+  them, drawn in `symbols.rs` if the font lacks it.
 
 ## Files
 
