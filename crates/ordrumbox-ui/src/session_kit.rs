@@ -214,7 +214,7 @@ impl Session {
         }
         let column = layout.played_by_rect();
         let played_by = Rect { w: text_width(PLAYED_BY, scale).min(column.w), ..column };
-        let label = Kind::Text { text: fitted(PLAYED_BY, played_by), color: theme::muted() };
+        let label = Kind::Text { text: fitted(PLAYED_BY, played_by), color: theme::text() };
         items.push(Item::new(Some(Id::KitPlayedBy), played_by, label));
         let first = self.kit_first(layout);
         for (row, (i, s)) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {

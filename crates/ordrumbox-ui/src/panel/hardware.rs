@@ -141,10 +141,10 @@ pub(super) fn draw_item(canvas: &mut Canvas, item: &Item, s: Scale) -> bool {
             let color = if item.skin == Skin::Metal { METAL_TEXT } else { Cards::current().label };
             canvas.text(r.x, r.y, &fit(text, r.w.max(text_width(text, s)), s), s, color);
         }
-        Kind::Value { spec, value, label, lfo, .. } if r.h >= 40 * s => {
+        Kind::Value { spec, value, label, text, lfo } if r.h >= 40 * s => {
             let fraction = spec.fraction(*value);
             match spec.style {
-                Style::Knob => draw_knob(canvas, r, (fraction, *lfo), label.as_deref(), s),
+                Style::Knob => draw_knob(canvas, r, (fraction, *lfo), (label.as_deref(), text), s),
                 Style::Fader => draw_fader(canvas, r, (fraction, *lfo), label.as_deref(), s),
                 Style::Slider | Style::Stepper => return false,
             }
@@ -176,10 +176,17 @@ fn knob_point((cx, cy): (f64, f64), radius: f64, fraction: f64) -> (i32, i32) {
     ((cx + a.cos() * radius).round() as i32, (cy + a.sin() * radius).round() as i32)
 }
 
-/// A knob at the top of `r`, its label under it: ticks around, a black body,
-/// its pointer at `fraction` (in the LFO's colour, with the ticks it has
-/// passed, when `lfo` moves it).
-fn draw_knob(canvas: &mut Canvas, r: Rect, (fraction, lfo): (f64, bool), label: Option<&str>, s: Scale) {
+/// A knob at the top of `r`, its label under it, then its value `text` when
+/// it has one (the kit editor's knobs do, the synth editor's say it in their
+/// tooltip): ticks around, a black body, its pointer at `fraction` (in the
+/// LFO's colour, with the ticks it has passed, when `lfo` moves it).
+fn draw_knob(
+    canvas: &mut Canvas,
+    r: Rect,
+    (fraction, lfo): (f64, bool),
+    (label, text): (Option<&str>, &str),
+    s: Scale,
+) {
     let (size, cards) = (knob_size(r, s), Cards::current());
     let centre = (f64::from(r.x) + f64::from(r.w) / 2.0, f64::from(r.y) + f64::from(size) / 2.0);
     let outer = f64::from(size) / 2.0;
@@ -196,8 +203,13 @@ fn draw_knob(canvas: &mut Canvas, r: Rect, (fraction, lfo): (f64, bool), label: 
     let pointer = if lfo { theme::CHANCE } else { POINTER };
     let (a, b) = (knob_point(centre, body * 0.3, fraction), knob_point(centre, body * 0.85, fraction));
     canvas.line(a, b, (s * 3 / 2).max(1), pointer);
+    let mut y = r.y + size + 3 * s;
     if let Some(label) = label {
-        label_under(canvas, r, r.y + size + 3 * s, label, cards.label, s);
+        label_under(canvas, r, y, label, cards.label, s);
+        y += 10 * s;
+    }
+    if !text.is_empty() {
+        label_under(canvas, r, y, text, cards.label, s);
     }
 }
 

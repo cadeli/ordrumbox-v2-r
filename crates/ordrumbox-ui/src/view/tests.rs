@@ -227,6 +227,16 @@ fn kit_editor_draws_and_finds_samples() {
     assert_eq!(layout.sample_at(0, 40, layout.left + 2, layout.list_top + 1), Some(0));
     assert_eq!(layout.sample_at(0, 1, layout.left + 2, layout.list_top + layout.row + 1), None);
     assert_eq!(layout.sample_at(0, 40, layout.left + 2, layout.detail_y), None);
+    // The cards one under the other, apart; the table's rows inside its
+    // card, the controls, the measurements and the waveform inside the sample's.
+    let (kit_card, table_card, sample_card) = (layout.kit_card(), layout.table_card(), layout.sample_card(400));
+    assert!(kit_card.y + kit_card.h < table_card.y && table_card.y + table_card.h < sample_card.y);
+    assert!(table_card.y + layout.head_h() < layout.list_top);
+    assert!(layout.list_top + layout.list_rows * layout.row <= table_card.y + table_card.h);
+    assert!(sample_card.y + layout.head_h() < layout.detail_y);
+    let (facts, wave) = (layout.facts_screen(), layout.envelope_rect(400));
+    assert!(facts.x + facts.w <= sample_card.x + sample_card.w && facts.y + facts.h < wave.y);
+    assert!(wave.y + wave.h < sample_card.y + sample_card.h && sample_card.y + sample_card.h <= layout.bottom);
 }
 
 #[test]

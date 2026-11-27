@@ -23,7 +23,7 @@ use crate::editors::{
 };
 use crate::font;
 use crate::frame;
-use crate::panel::{self, Item, Kind, Rect};
+use crate::panel::{self, Item, Kind, Rect, Skin};
 use crate::panel::{EditorTab, Id, ViewButton};
 use crate::view;
 use crate::view::Layout;
@@ -222,10 +222,16 @@ impl Session {
         let kit_layout = self.kit_layout(size);
         let area = kit_layout.controls_area();
         layout.details_top = area.y;
-        layout.items.extend(self.kit_items(&kit_layout, scale));
+        // The controls on the cards of the hardware look, as the synth
+        // editor's (`view/kit.rs`); the texts keep their own colours.
+        let on_card = |item: Item| match item.kind {
+            Kind::Text { .. } => item,
+            _ => item.skinned(Skin::Card),
+        };
+        layout.items.extend(self.kit_items(&kit_layout, scale).into_iter().map(on_card));
         if let Some(view) = self.kit_controls() {
             let (items, bottom) = editors::kit_controls(&view, area, scale);
-            layout.items.extend(items);
+            layout.items.extend(items.into_iter().map(on_card));
             layout.details_top = bottom;
         }
     }

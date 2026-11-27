@@ -842,3 +842,12 @@ sized from its capital measured at 1000 px (it was 100 px), so a pixel font land
 or symbols: `font/symbols.rs` draws →, ←, ↔, ►, ◄, ▼ and ♫ in pixels when the font lacks them. The regenerate buttons
 (the header's and the Generate tab's New line) show ♫ in place of ↻, the arrows of a small screen ◄ and ► in place of
 ◂ and ▸, and the Generate tab's Advanced ► or ▼ in place of ▸ or ▾. No snapshot changed.
+
+The kit editor is drawn in the synth editor's hardware look (`panel/hardware.rs`, `view/kit.rs`): brushed metal, and
+three cards with a title band, the kit's (its name and counts in the band), the table's (the column titles in the
+band) and the selected sample's (its number and file in the band). The instrument selects and the kit select are
+green-on-black screens, the AUTO buttons and the switches dark buttons (yellow when on), the knobs black knobs ringed
+with ticks; they keep their value under their label (a knob of the hardware look writes its value when it has one;
+the synth editor's have none). The measurements and the waveform are on screens. The cards' bands and padding
+take some room (`KitLayout`): at a given window size the table may show fewer rows. Controls, ids and sound are unchanged. No snapshot
+changed.
