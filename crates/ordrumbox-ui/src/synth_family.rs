@@ -1,23 +1,29 @@
 //! The cards of the synth editor that hold a family of groups with the same
 //! controls, in bands one under the other so that their controls line up: the
 //! oscillators (the scope right of VCO1's controls), the two LFOs, and the
-//! three envelopes. The main envelope's curve sits right of its faders; the
-//! filter and the mod envelopes share the band below it, side by side. Each
-//! strip has its power LED and its title.
+//! three envelopes. The envelopes share one band, side by side, each title
+//! over its faders, the main envelope's curve right of its own. Each strip
+//! has its power LED and its title.
 
 use crate::panel::{Item, Rect};
 use crate::scale::Scale;
 use crate::synth_cells::{QUIET_H, push_head, push_row};
 use crate::synth_strip::{self, STRIP_GAP, TITLE_W};
-use crate::synth_view::{Block, Card, PAD_X, PAD_Y, PLOT_GAP, Plot, SCOPE_MIN_W, Source, field_cells, is_bypassed};
+use crate::synth_view::{
+    Block, Card, HEAD_H, PAD_X, PAD_Y, PLOT_GAP, Plot, SCOPE_MIN_W, Source, field_cells, is_bypassed,
+};
 
 /// The width a curve takes right of its strip's controls, at least (at scale 1).
-const CURVE_MIN_W: i32 = 90;
+const CURVE_MIN_W: i32 = 60;
+/// The space between two strips side by side in a band (at scale 1).
+pub(crate) const BESIDE_GAP: i32 = 16;
 
 /// A strip of a band, before the rows place its card: its group, left and right edge.
 type PlacedStrip<'a> = (&'a str, i32, i32);
 /// A band: its top and its strips, from left to right.
 type Band<'a> = (i32, Vec<PlacedStrip<'a>>);
+/// A plot: what, its left and top, its width when it does not reach the card's edge.
+type PlotPlace = (Plot, i32, i32, Option<i32>);
 
 /// A family of groups drawn as strips of one card.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,56 +63,48 @@ impl Family {
         }
     }
 
-    /// The plot right of strip `group`'s controls: the scope right of the
-    /// first oscillator's when the preset has it, the main envelope's curve.
-    fn plot(self, group: &str, first: bool, scope: bool) -> Option<Plot> {
+    /// The plot right of the first strip's controls: the scope right of the
+    /// first oscillator's when the preset has it, the main envelope's curve
+    /// right of the envelope's, before the others.
+    fn plot(self, first: bool, scope: bool) -> Option<Plot> {
         match self {
             Self::Oscillators => (first && scope).then_some(Plot::Scope),
-            Self::Envelopes => (first && group == "envelope").then_some(Plot::Envelope),
+            Self::Envelopes => first.then_some(Plot::Envelope),
             Self::Lfos => None,
+        }
+    }
+
+    /// The height of a strip: a quiet row, its title on its left — or over
+    /// it, for the envelopes, which stand side by side.
+    fn strip_height(self, s: Scale) -> i32 {
+        match self {
+            Self::Envelopes => (HEAD_H + QUIET_H) * s,
+            Self::Oscillators | Self::Lfos => QUIET_H * s,
         }
     }
 }
 
 /// The card of `family`: its `strips` (group, index of the groups) in bands one
-/// under the other — the filter and the mod envelopes share one, side by side;
-/// `scope`: whether the preset has the scope, which then sits right of the
-/// first oscillator's controls. The card is wide enough for its plot.
+/// under the other — the envelopes share one, side by side, the main envelope's
+/// curve between it and the others; `scope`: whether the preset has the scope,
+/// which then sits right of the first oscillator's controls. The card is wide
+/// enough for its plot.
 pub(crate) fn family_block(source: &Source, family: Family, strips: &[(&str, usize)], scope: bool) -> Block {
     let s = source.s;
     let mut items = Vec::new();
     let (x, top) = (PAD_X * s, PAD_Y * s);
-    // Every strip is a quiet row, the envelopes' faders included.
-    let strip_h = QUIET_H * s;
+    let strip_h = family.strip_height(s);
     let title_w = title_width(strips, s);
     let half_gap = STRIP_GAP * s / 2;
-    let bands = bands_of(family, strips);
-    // Each band: its y and its strips' group, left and right edge.
-    let mut rows: Vec<Band<'_>> = Vec::new();
-    for (band, strips) in bands.into_iter().enumerate() {
-        let y = top + band as i32 * (strip_h + STRIP_GAP * s);
-        let mut next = x;
-        let mut placed = Vec::new();
-        for &(group, gi) in strips {
-            let right = push_strip(&mut items, source, family, (group, gi), (next, y), title_w);
-            placed.push((group, next, right));
-            next = right + STRIP_GAP * s;
-        }
-        rows.push((y, placed));
-    }
+    let (rows, plots) = push_bands(&mut items, source, family, strips, title_w, scope);
     let min_w = |plot: Plot| if plot == Plot::Scope { SCOPE_MIN_W } else { CURVE_MIN_W } * s;
-    let mut right = x;
-    let mut plots = Vec::new();
-    for (bi, (y, strips)) in rows.iter().enumerate() {
-        for (si, &(group, _, controls_right)) in strips.iter().enumerate() {
-            right = right.max(controls_right);
-            if let Some(plot) = family.plot(group, bi == 0 && si == 0, scope) {
-                let left = controls_right + PLOT_GAP * s;
-                right = right.max(left + min_w(plot));
-                plots.push((plot, left, *y));
-            }
-        }
-    }
+    let right = rows
+        .iter()
+        .flat_map(|(_, strips)| strips)
+        .map(|&(_, _, right)| right)
+        .chain(plots.iter().map(|&(plot, left, _, width)| left + width.unwrap_or_else(|| min_w(plot))))
+        .max()
+        .unwrap_or(x);
     let (w, h) = (right + PAD_X * s, rows.last().map_or(top, |(y, _)| y + strip_h) + PAD_Y * s);
     let inner_right = w - PAD_X * s;
     let frame =
@@ -120,8 +118,8 @@ pub(crate) fn family_block(source: &Source, family: Family, strips: &[(&str, usi
             framed: false,
         })
     });
-    let plotted = plots.into_iter().map(|(plot, left, y)| {
-        let rect = Rect::new(left, y, inner_right - left, strip_h);
+    let plotted = plots.into_iter().map(|(plot, left, y, width)| {
+        let rect = Rect::new(left, y, width.map_or(inner_right, |w| left + w) - left, strip_h);
         let group = if plot == Plot::Scope { "scope" } else { family.name() };
         Card { group: group.into(), rect, bypassed: false, plot: Some((plot, rect)), framed: false }
     });
@@ -132,18 +130,46 @@ pub(crate) fn family_block(source: &Source, family: Family, strips: &[(&str, usi
     Block { items, size: (w, h), cards, matrix: None, controls }
 }
 
-/// The strips grouped into bands: the main envelope on its own, the filter
-/// and the mod envelopes side by side under it, each other strip on its own.
-fn bands_of<'a, 'b>(family: Family, strips: &'a [(&'b str, usize)]) -> Vec<&'a [(&'b str, usize)]> {
-    let split = if family == Family::Envelopes {
-        strips.iter().position(|(group, _)| *group == "envelope").map(|at| at + 1)
-    } else {
-        None
-    };
-    match split {
-        Some(at) if at < strips.len() => vec![&strips[..at], &strips[at..]],
-        _ => strips.iter().map(std::slice::from_ref).collect(),
+/// Place the strips of each band and the plot right of its strip: a plot with
+/// strips after it keeps its own width; one at a band's end grows with the card.
+fn push_bands<'b>(
+    items: &mut Vec<Item>,
+    source: &Source<'_>,
+    family: Family,
+    strips: &[(&'b str, usize)],
+    title_w: i32,
+    scope: bool,
+) -> (Vec<Band<'b>>, Vec<PlotPlace>) {
+    let s = source.s;
+    let (x, top) = (PAD_X * s, PAD_Y * s);
+    let strip_h = family.strip_height(s);
+    let min_w = |plot: Plot| if plot == Plot::Scope { SCOPE_MIN_W } else { CURVE_MIN_W } * s;
+    let bands = bands_of(family, strips);
+    let mut rows = Vec::new();
+    let mut plots = Vec::new();
+    for (bi, strips) in bands.into_iter().enumerate() {
+        let y = top + bi as i32 * (strip_h + STRIP_GAP * s);
+        let mut next = x;
+        let mut placed = Vec::new();
+        for (si, &(group, gi)) in strips.iter().enumerate() {
+            let right = push_strip(items, source, family, (group, gi), (next, y), title_w);
+            placed.push((group, next, right));
+            next = right + BESIDE_GAP * s;
+            let Some(plot) = family.plot(bi == 0 && si == 0, scope) else { continue };
+            let left = right + PLOT_GAP * s;
+            let width = (si + 1 < strips.len()).then(|| min_w(plot));
+            next = left + width.unwrap_or_else(|| min_w(plot)) + BESIDE_GAP * s;
+            plots.push((plot, left, y, width));
+        }
+        rows.push((y, placed));
     }
+    (rows, plots)
+}
+
+/// The strips grouped into bands: the envelopes side by side in one, each
+/// other strip on its own.
+fn bands_of<'a, 'b>(family: Family, strips: &'a [(&'b str, usize)]) -> Vec<&'a [(&'b str, usize)]> {
+    if family == Family::Envelopes { vec![strips] } else { strips.iter().map(std::slice::from_ref).collect() }
 }
 
 /// The width the strips' titles take, left of their controls: the
@@ -154,7 +180,8 @@ fn title_width(strips: &[(&str, usize)], s: Scale) -> i32 {
 }
 
 /// Strip `group` (index `gi` of the groups) of `family` at `(x, y)`, its
-/// controls `title_w` right of its head; the x right of its last control.
+/// controls `title_w` right of its head (an envelope's: under it); the x
+/// right of its last control, or of its title.
 fn push_strip(
     items: &mut Vec<Item>,
     source: &Source,
@@ -167,10 +194,13 @@ fn push_strip(
     if family == Family::Oscillators {
         return synth_strip::push_strip(items, source.draft, (group, gi), source.fields, (x, y), s, source.lfo);
     }
-    push_head(items, source.draft, (group, gi), (x, y), s);
+    let head_right = push_head(items, source.draft, (group, gi), (x, y), s);
     let mut cells = field_cells(source.draft, group, source.fields, source.lfo);
     // The stages (faders) first, so that they line up from strip to strip.
     cells.sort_by_key(|cell| !crate::synth_cells::is_fader(cell));
+    if family == Family::Envelopes {
+        return push_row(items, cells, (x, y + HEAD_H * s), QUIET_H, s).max(head_right);
+    }
     push_row(items, cells, (x + title_w, y), QUIET_H, s)
 }
 
@@ -191,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn the_main_envelope_keeps_its_curve_and_the_other_two_share_its_card() {
+    fn the_envelopes_share_one_band_titles_over_faders_the_curve_beside_the_main() {
         let (d, built) = built();
         let fields = all_fields(&d);
         let rect = |path: &str| {
@@ -202,40 +232,37 @@ mod tests {
         let frame = card(Family::Envelopes.name()).rect;
         let curves: Vec<_> = built.cards.iter().filter_map(|c| c.plot).filter(|(p, _)| *p == Plot::Envelope).collect();
         assert_eq!(curves.len(), 1, "only the main envelope's curve");
-        let main = card("envelope").rect;
         let (_, curve) = curves[0];
-        assert!(curve.y >= main.y && curve.y + curve.h <= main.y + main.h, "in the main band");
         assert!(curve.x + curve.w <= frame.x + frame.w, "in the card");
-        let controls = built.items.iter().filter(|i| {
-            matches!(i.id, Some(Id::SynthField(_)))
-                && i.rect.x >= main.x
-                && i.rect.x < main.x + main.w
-                && i.rect.y >= main.y
-                && i.rect.y < main.y + main.h
-        });
-        assert!(controls.into_iter().all(|i| i.rect.x + i.rect.w <= curve.x), "right of its faders");
-        let filter = card("filterEnv").rect;
-        let mod_env = card("modEnvelope").rect;
-        assert_eq!(filter.y, mod_env.y, "one band");
-        assert!(filter.x + filter.w <= mod_env.x, "side by side");
-        assert!(
-            rect("filterEnv.attack").y >= rect("envelope.attack").y + QUIET_H * Scale::ONE,
-            "under the main envelope"
+        let groups = Family::Envelopes.groups();
+        let bands: Vec<Rect> = groups.iter().map(|g| card(g).rect).collect();
+        for pair in bands.windows(2) {
+            assert_eq!(pair[0].y, pair[1].y, "one band");
+            assert!(pair[0].x + pair[0].w <= pair[1].x, "side by side");
+        }
+        let main = bands[0];
+        assert!(curve.x >= main.x + main.w, "right of the main envelope");
+        assert!(curve.x + curve.w <= bands[1].x, "before the filter envelope");
+        assert!(curve.w >= CURVE_MIN_W * Scale::ONE, "wide enough for the curve");
+        assert_eq!(
+            (curve.y, curve.h),
+            (main.y + STRIP_GAP * Scale::ONE / 2, main.h - STRIP_GAP * Scale::ONE),
+            "as tall"
         );
-        for group in ["filterEnv", "modEnvelope"] {
-            let band = card(group).rect;
-            assert!(band.y >= frame.y && band.y + band.h <= frame.y + frame.h);
-            let no_curve = built
-                .cards
+        for (group, band) in groups.iter().zip(&bands) {
+            assert!(band.y >= frame.y && band.y + band.h <= frame.y + frame.h, "{group}: in the card");
+            let title = built
+                .items
                 .iter()
-                .filter_map(|c| c.plot)
-                .all(|(p, r)| p != Plot::Envelope || r.y + r.h <= band.y || r.y >= band.y + band.h);
-            assert!(no_curve, "{group}: no curve in its band");
+                .find(|i| matches!(&i.kind, Kind::Text { text, .. } if *text == model::group_label(group)))
+                .unwrap_or_else(|| panic!("{group}: its title"))
+                .rect;
+            let attack = rect(&format!("{group}.attack"));
+            assert!(attack.y >= title.y + title.h, "{group}: its title over its faders");
+            assert_eq!(attack.x, band.x, "{group}: its faders under its title");
         }
         for stage in ["attack", "decay", "sustain", "release"] {
-            let filter_x = rect(&format!("filterEnv.{stage}")).x;
-            let mod_x = rect(&format!("modEnvelope.{stage}")).x;
-            assert_eq!(mod_x - filter_x, mod_env.x - filter.x, "{stage}: their faders line up");
+            assert_eq!(rect(&format!("envelope.{stage}")).y, rect(&format!("modEnvelope.{stage}")).y, "{stage}");
         }
         assert!(matches!(&built.items.iter().find(|i| i.rect == rect("envelope.attack")).unwrap().kind,
             Kind::Value { spec, .. } if spec.style == crate::control::Style::Fader));

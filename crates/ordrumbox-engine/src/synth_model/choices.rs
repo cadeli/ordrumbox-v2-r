@@ -89,13 +89,13 @@ pub fn choices(path: &str) -> Option<Vec<&'static str>> {
 }
 
 /// Value `value` of list control `path` as a preset holds it: the slope,
-/// the FM algorithm and the oscillators' octaves and semitones (numbers,
-/// which the editor offers on a list) hold numbers.
+/// the FM algorithm, the unison's layers and the oscillators' octaves and
+/// semitones (numbers, which the editor offers on a list) hold numbers.
 pub fn choice_value(path: &str, value: &str) -> Value {
     let is_tuning = ["vco1.", "vco2.", "vco3."]
         .iter()
         .any(|vco| path.strip_prefix(vco).is_some_and(|key| matches!(key, "octave" | "semitone")));
-    if is_tuning || matches!(path, "filter.slope" | "fm.algo") {
+    if is_tuning || matches!(path, "filter.slope" | "fm.algo" | "unison.count") {
         Value::from(value).to_number().map_or_else(|| Value::from(value), Value::from)
     } else {
         Value::from(value)

@@ -4,14 +4,17 @@
 //! filter, the envelopes), then what moves it (the LFOs, the modulation
 //! envelope, the matrix), then the master — in rows filled to the full width, each card as tall as its
 //! row (`synth_rows.rs`) — its power LED
-//! and title, then its plot (the filter curve, the envelope) left of its
-//! knobs, faders, spins and switches in a row (`synth_cells.rs`; the
-//! filter's slope under its type). The oscillators, the LFOs and the
+//! and title, then its plot (the filter curve left of its controls, the main
+//! envelope's curve right of its own) and its knobs, faders, spins and
+//! switches in a row (`synth_cells.rs`; the filter's slope under its type).
+//! The oscillators, the LFOs and the
 //! envelopes are strips in bands of a card of their family
 //! (`synth_family.rs`): the scope (four cycles of the oscillators), with no
-//! title, in the room VCO1's strip leaves right of its controls, the main
-//! envelope's curve right of its faders, with the filter and the mod
-//! envelopes side by side in the band under it.
+//! title, in the room VCO1's strip leaves right of its controls; the three
+//! envelopes side by side, each title over its faders, the main envelope's
+//! curve right of its own. Filter 2 shares Filter's card, beside it
+//! (`synth_filters.rs`); the voice, the unison and the noise are narrow cards
+//! of columns (`synth_column.rs`).
 //!
 //! [`SynthLayout`] and [`build`] place everything as panel items (the ids
 //! name groups and fields by their index in [`model::groups`] and
@@ -29,8 +32,10 @@ use crate::frame;
 use crate::panel::{Id, Item, Kind, Rect};
 use crate::synth_bar::{self, Bar};
 use crate::synth_cells::{Cell, KNOB_H, Place, push_head, push_row};
+use crate::synth_column::{COLUMN_GROUPS, column_block};
 use crate::synth_faders;
 use crate::synth_family::{Family, family_block};
+use crate::synth_filters::{MERGED_GROUP, filter_block};
 use crate::synth_matrix::MatrixList;
 use crate::synth_rows;
 use crate::synth_spread;
@@ -43,9 +48,9 @@ pub(crate) const PAD_Y: i32 = 4;
 /// The space between two cards (at scale 1).
 const CARD_GAP: i32 = 8;
 /// The height of a card's head, the space under it included (at scale 1).
-const HEAD_H: i32 = 18;
+pub(crate) const HEAD_H: i32 = 18;
 /// A plot's width left of its card's controls, and the space right of it (at scale 1).
-const PLOT_W: i32 = 120;
+pub(crate) const PLOT_W: i32 = 120;
 pub(crate) const PLOT_GAP: i32 = 8;
 /// The scope in the oscillators' card: its narrowest (at scale 1), else
 /// it has a card of its own, its plot this high.
@@ -80,8 +85,8 @@ pub fn all_fields(draft: &Object) -> Vec<String> {
     model::groups(draft).iter().flat_map(|g| model::fields(draft, g)).collect()
 }
 
-/// What a field shows as: a knob, a list (values and labels, on a spin), a
-/// a wave (on a spin that draws
+/// What a field shows as: a knob, a list (values and labels, on a spin: the
+/// unison's layers among them), a wave (on a spin that draws
 /// it), a switch, a LED (oscillator 2's sync), or nothing (an object).
 enum Field {
     Knob,
@@ -129,6 +134,11 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
         return Field::List(
             FM_ALGORITHMS.iter().enumerate().map(|(i, (l, _))| (i.to_string(), (*l).to_owned())).collect(),
         );
+    }
+    if path == "unison.count" {
+        // Whole layers, 1 to the most a preset holds: saturating is meant.
+        let most = model::find_meta(path).map_or(1.0, |meta| meta.max).round() as i32;
+        return Field::List((1..=most).map(|n| (n.to_string(), n.to_string())).collect());
     }
     if path == "filter.slope" {
         return Field::List(FILTER_SLOPES.iter().map(|(v, l)| ((*v).to_owned(), (*l).to_owned())).collect());
@@ -344,6 +354,15 @@ pub fn build(
                 continue;
             }
             scope_block(&source, (group, gi))
+        } else if group == MERGED_GROUP {
+            continue;
+        } else if group == "filter" {
+            match shown.iter().find(|(_, g)| *g == MERGED_GROUP) {
+                Some(&(f2i, _)) => filter_block(&source, (gi, f2i)),
+                None => card_block(&source, (group, gi)),
+            }
+        } else if let Some(&(_, columns)) = COLUMN_GROUPS.iter().find(|(g, _)| *g == group) {
+            column_block(&source, (group, gi), columns)
         } else {
             card_block(&source, (group, gi))
         };
@@ -423,9 +442,9 @@ fn card_plot(group: &str) -> Option<Plot> {
 }
 
 /// The knob of numeric field `path`, at the value an LFO gives it now if
-/// one moves it; greyed out where it does nothing ([`model::is_inert`]). Only
-/// a discrete knob ([`model::Meta::is_discrete`]) writes its value under it;
-/// the others say it in their tooltip ([`crate::synth_cells::field_tip`]).
+/// one moves it; greyed out where it does nothing ([`model::is_inert`]). It
+/// says its value in its tooltip ([`crate::synth_cells::field_tip`]), not
+/// under it.
 pub(crate) fn knob_kind(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option<f64>) -> Kind {
     let meta = model::find_meta(path);
     let label = model::field_label(path).to_owned();
@@ -435,12 +454,8 @@ pub(crate) fn knob_kind(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option
     let base = model::number(draft, path).or_else(|| model::extra_value(draft, path)).unwrap_or(0.0);
     let spec = meta.map_or_else(|| Spec::knob(0.0, 1.0, 0.01, 0.0), knob_spec);
     let value = lfo(path).map_or(base, |m| m.clamp(spec.min, spec.max));
-    let text = match meta {
-        Some(meta) if meta.is_discrete() => crate::control::Format::Fmt.value(value, meta.unit),
-        _ => String::new(),
-    };
     let lfo_on = model::lfo_targeted(draft, path);
-    Kind::Value { spec, value, label: Some(label), text, lfo: lfo_on }
+    Kind::Value { spec, value, label: Some(label), text: String::new(), lfo: lfo_on }
 }
 
 /// The fields whose control goes under another's, in its column: the
@@ -602,21 +617,21 @@ mod tests {
             }
             assert!(item.rect.x + item.rect.w <= layout.area.x + layout.area.w + 1, "{item:?}");
         }
-        // Every numeric control but the algorithm and the three octaves
-        // (spins) is a knob or a fader, greyed out where it does nothing (the
+        // Every numeric control but the algorithm, the unison's layers and the
+        // three octaves (spins) is a knob or a fader, greyed out where it does nothing (the
         // widths of sine waves, the clock of white noise); the matrix lists
         // its free line only.
         let inert = fields.iter().filter(|path| model::is_inert(&d, path)).count();
         assert_eq!(inert, 4);
         // The bar has no knob.
-        assert_eq!(knobs, model::metas().count() - 4 - inert - (ordrumbox_engine::MATRIX_SIZE - 1));
+        assert_eq!(knobs, model::metas().count() - 5 - inert - (ordrumbox_engine::MATRIX_SIZE - 1));
         assert!(matches!(built.items[0].kind, Kind::Select { selected: 1, .. }));
         // The cards in their one order: the oscillators' card, its strips
         // (vco2, vco3 off: gain 0) and the scope, the voice, the unison, FM
-        // (its flag unset), the noise, the filter and the second filter (off
-        // until the preset has one), the envelopes' card (the envelope and its
-        // curve, then the filter's and the mod envelope side by side), the
-        // pitch envelope, the LFOs' card (off: at 0 Hz), the matrix and the master.
+        // (its flag unset), the noise, the filter with the second filter beside
+        // it (off until the preset has one), the envelopes' card (the three side
+        // by side, the main envelope's curve after its own), the pitch envelope,
+        // the LFOs' card (off: at 0 Hz), the matrix and the master.
         let groups: Vec<_> = built.cards.iter().map(|c| (c.group.as_str(), c.bypassed)).collect();
         assert_eq!(
             groups,
@@ -632,6 +647,7 @@ mod tests {
                 ("noise", false),
                 ("filter", false),
                 ("filter2", true),
+                ("filter", false),
                 (Family::Envelopes.name(), false),
                 ("envelope", false),
                 ("filterEnv", false),
@@ -655,11 +671,15 @@ mod tests {
         let vco1_controls = built.items.iter().filter(|i| in_band(i.rect));
         assert!(vco1_controls.into_iter().all(|i| i.rect.x + i.rect.w <= scope.x), "right of VCO1's controls");
         let group = "filter";
-        let card = built.cards.iter().find(|c| c.group == group).unwrap();
+        let frame = built.cards.iter().find(|c| c.group == group && c.framed).unwrap();
+        let card = built.cards.iter().find(|c| c.group == group && c.plot.is_some()).unwrap();
         let (_, plot) = card.plot.unwrap();
-        assert_eq!(card.rect.h, (HEAD_H + KNOB_H + 2 * PAD_Y) * Scale::ONE, "{group}: one row");
+        assert_eq!(frame.rect.h, (HEAD_H + KNOB_H + 2 * PAD_Y) * Scale::ONE, "{group}: one row");
         let inside = |r: Rect| {
-            r.x >= card.rect.x && r.x < card.rect.x + card.rect.w && r.y >= plot.y && r.y < card.rect.y + card.rect.h
+            r.x >= frame.rect.x
+                && r.x < frame.rect.x + frame.rect.w
+                && r.y >= plot.y
+                && r.y < frame.rect.y + frame.rect.h
         };
         let controls = built.items.iter().filter(|i| matches!(i.id, Some(Id::SynthField(_))) && inside(i.rect));
         assert!(controls.into_iter().all(|i| i.rect.x > plot.x + plot.w), "{group}");
@@ -749,7 +769,7 @@ mod tests {
     }
 
     #[test]
-    fn only_a_discrete_knob_writes_its_value_and_the_noise_mode_is_under_its_filter_type() {
+    fn the_knobs_keep_their_value_to_their_tooltip_and_the_noise_mode_is_under_its_filter_type() {
         let d = draft();
         let layout = SynthLayout::new(912, 680, Scale::ONE, 0);
         let built = build(&d, (&["p".to_owned()], "p"), &layout, 0, &|_| None);
@@ -765,7 +785,11 @@ mod tests {
         for path in ["fm.amount", "unison.detune", "noise.mix", "lfo.freq", "vco1.detune", "masterVolume"] {
             assert_eq!(text(path), "", "{path}: continuous");
         }
-        assert_eq!(text("unison.count"), "1", "the unison's layers are few");
+        assert!(
+            matches!(&item("unison.count").kind, Kind::Spin { labels, selected: 0, .. } if labels.first().is_some_and(|l| l == "1")),
+            "the unison's layers on a spin"
+        );
+        assert_eq!(model::choice_value("unison.count", "3"), Value::from(3.0), "a number, as a preset holds it");
         let (kind, mode) = (item("noise.filterType").rect, item("noise.mode").rect);
         assert_eq!(mode.x, kind.x, "in its column");
         assert!(mode.y > kind.y + kind.h - 1, "under it");

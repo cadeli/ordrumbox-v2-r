@@ -26,7 +26,7 @@ const QUIET_KNOB_W: i32 = 44;
 /// A fader's place in a row (at scale 1): as high as a knob, narrow.
 const FADER_W: i32 = 20;
 /// The space between two controls (at scale 1).
-const GAP: i32 = 8;
+pub(crate) const GAP: i32 = 8;
 /// How far a screen sits below the top of a knob, so that their labels line up.
 const SCREEN_TOP: i32 = 5;
 /// The characters a spin's screen holds.
@@ -44,7 +44,7 @@ const POWER_H: i32 = 13;
 const TITLE_X: i32 = 18;
 
 /// A control of a row: its id, what it is, its label, where it goes.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Cell {
     pub id: Id,
     pub kind: Kind,

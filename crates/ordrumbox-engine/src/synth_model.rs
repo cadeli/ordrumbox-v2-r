@@ -70,19 +70,6 @@ pub struct Meta {
     pub log: bool,
 }
 
-/// The most notches a control may have and still count as discrete (its
-/// value written on its knob): the unison's voices, not a detune in cents.
-const DISCRETE_NOTCHES_MAX: f64 = 16.0;
-
-impl Meta {
-    /// Whether the control takes a few whole values, each worth reading on
-    /// the card (the unison's voices), rather than a continuous range.
-    #[must_use]
-    pub fn is_discrete(&self) -> bool {
-        self.step >= 1.0 && (self.max - self.min) / self.step <= DISCRETE_NOTCHES_MAX
-    }
-}
-
 const fn meta(path: &'static str, min: f64, max: f64, step: f64, unit: &'static str) -> Meta {
     Meta { path, min, max, default: min, step, unit, label: None, log: false }
 }

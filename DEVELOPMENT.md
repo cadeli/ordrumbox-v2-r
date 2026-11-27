@@ -747,7 +747,18 @@ name and its value (`synth_cells::field_tip`). The noise card's mode spin is und
 The LFOs' sync is a spin, no longer a stepped knob: a spin of the synth editor is as wide as its longest option
 (`1/16T`) when that is more than four characters. No snapshot changed.
 
-The envelopes' card keeps only the main envelope's curve, right of its A, D, S, R faders; the filter envelope and the
-mod envelope share the band under it, side by side in that card instead of a strip each. Their controls, ids and sound
-are unchanged; the card is one strip shorter. The smallest editor grows by 10 pixels at scale 1
-(`synth_view::CARDS_H`) so that the five rows still fit at every scale. No snapshot changed.
+The three envelopes share one band of their card, side by side (`synth_family.rs`), each title over its faders instead
+of on its left, and the main envelope's curve sits right of its own faders, before the filter envelope and the mod
+envelope, narrower (at least 60 pixels at scale 1, was 90). The envelopes' card is one band high, 66 pixels at scale 1
+(was 92). Their controls, ids and sound are unchanged. No snapshot changed.
+
+The Voice and Unison cards are columns (`synth_column.rs`): their controls one under the other, so that they stand
+beside the oscillators' card, in its row, which grows by 10 pixels at scale 1 (146, was 136); the rows under it take
+the cards that no longer fit in it. The unison's layers are a spin of whole numbers, written as a number
+(`synth_model::choice_value`), no longer a knob writing its value: no knob of the editor writes one any more, and
+`Meta::is_discrete` is gone. No snapshot changed.
+
+Filter 2 no longer has a card of its own: it sits beside Filter 1 in Filter's card, with its head and power LED, while
+Filter 1's curve stays left of its faders (`synth_filters.rs`). The noise card takes two columns of controls, about
+227 pixels wide at scale 1, so that both filters fit in one row (`synth_column.rs`). Their controls, ids and sound are
+unchanged. No snapshot changed.
