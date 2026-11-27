@@ -54,6 +54,9 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
 
 /// One item, by what it is.
 fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
+    if item.skin != Skin::Flat && super::hardware::draw_item(canvas, item, scale) {
+        return;
+    }
     let t = scale.px();
     let r = item.rect;
     match &item.kind {

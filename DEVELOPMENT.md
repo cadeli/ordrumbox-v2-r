@@ -762,3 +762,27 @@ Filter 2 no longer has a card of its own: it sits beside Filter 1 in Filter's ca
 Filter 1's curve stays left of its faders (`synth_filters.rs`). The noise card takes two columns of controls, about
 227 pixels wide at scale 1, so that both filters fit in one row (`synth_column.rs`). Their controls, ids and sound are
 unchanged. No snapshot changed.
+
+The synth editor is drawn as a hardware panel, in every colour scheme (`panel/hardware.rs`, `synth_paint.rs`): brushed
+metal, cards with a title band (a family's card has none), black knobs ringed with ticks, faders with a light cap,
+round green LEDs, dark buttons (yellow when on) and green-on-black screens; the orDrumbox logo sits right of the
+preset bar, at half size, when it fits. Each `panel::Item` has a `Skin` (`Flat` everywhere else). Gradients and soft
+edges are computed as it draws (`Canvas::fill_disc`). Layout, controls, ids and sound are unchanged. No snapshot
+changed.
+
+The synth editor's cards take the colour scheme's hue (`hardware::Cards`, from the scheme's line and panel colours);
+the metal, the knobs, the buttons and the screens stay the same in every scheme. The preset bar has 8 pixels of room
+above it (`HEAD_TOP`). The noise card has two lines of three controls (level, filter frequency, resonance; filter
+type, mode, rate), the envelopes' faders are as tall as the filters' (`ENVELOPE_H`), and Voice with Unison, FM and the
+master are one width at the right edge (`synth_rows::Size::is_fixed`). Controls, ids and sound are unchanged. No
+snapshot changed.
+
+A synth preset's key makes a card of the synth editor only when its value is an object of fields
+(`synth_model::groups`): a stray text or number (a `"profile": "bass"` left in a preset) is kept in the file but no
+longer shows as an empty card. `synth_editor_rust.txt` changed for it (the `partial` preset's `"zeta": 3` is no longer
+a card). The last card, at the right edge, as wide as FM, shows the orDrumbox emblem (`assets/images/logo.png`,
+decoded by `build.rs`, its painted checkerboard made transparent); the master takes its own width left of it.
+
+The filters' faders and Filter 1's curve take the height of their card's row when it is taller than they need (beside the
+noise card, about twice a knob's height at scale 1): `Block::grows_down`, set by `synth_filters.rs` only. The spins,
+ids and sound are unchanged. No snapshot changed.

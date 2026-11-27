@@ -20,6 +20,10 @@ pub(crate) const KNOB_H: i32 = 56;
 /// a knob over its label (at scale 1). Tall enough for a knob drawn over
 /// its label, not beside it.
 pub(crate) const QUIET_H: i32 = 40;
+/// The height of the envelopes' faders (at scale 1): two quiet rows, the
+/// noise's two lines, so that the filter's faders, in the noise's row, take
+/// it too.
+pub(crate) const ENVELOPE_H: i32 = 2 * QUIET_H;
 /// A knob's place in a quiet row (at scale 1): as wide as its label needs,
 /// the knob over it being no wider.
 const QUIET_KNOB_W: i32 = 44;
@@ -94,10 +98,10 @@ pub(crate) fn head_width(group: &str, s: Scale) -> i32 {
     TITLE_X * s + text_width(&model::group_label(group), s)
 }
 
-/// Whether `cell` is a fader (a stage of an envelope, a filter's frequency).
+/// Whether a control of `kind` is a fader (a stage of an envelope, a filter's frequency).
 #[must_use]
-pub(crate) fn is_fader(cell: &Cell) -> bool {
-    matches!(&cell.kind, Kind::Value { spec, .. } if spec.style == Style::Fader)
+pub(crate) fn is_fader(kind: &Kind) -> bool {
+    matches!(kind, Kind::Value { spec, .. } if spec.style == Style::Fader)
 }
 
 /// Push `cells` side by side from `x`, their tops at `top`, in a row

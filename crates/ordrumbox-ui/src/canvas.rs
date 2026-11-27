@@ -109,6 +109,26 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    /// A disc centred on `(cx, cy)`, `radius` pixels, with a vertical
+    /// gradient from `top` to `bottom` (the pair), its edge smoothed over
+    /// what is under it; parts outside the canvas are dropped.
+    pub fn fill_disc(&mut self, (cx, cy): (f64, f64), radius: f64, (top, bottom): (Rgb, Rgb)) {
+        if radius <= 0.0 {
+            return;
+        }
+        // Whole pixels around the disc: rounding outwards is meant.
+        let (y0, y1) = ((cy - radius).floor() as i32, (cy + radius).ceil() as i32);
+        let (x0, x1) = ((cx - radius).floor() as i32, (cx + radius).ceil() as i32);
+        for y in y0..=y1 {
+            let color = lerp(top, bottom, y - y0, y1 - y0);
+            for x in x0..=x1 {
+                let d = (f64::from(x) + 0.5 - cx).hypot(f64::from(y) + 0.5 - cy);
+                let coverage = (radius + 0.5 - d).clamp(0.0, 1.0);
+                self.blend(x, y, color, (coverage * 255.0).round() as u8);
+            }
+        }
+    }
+
     /// A line from `a` to `b`, `t` thick.
     pub fn line(&mut self, (x0, y0): (i32, i32), (x1, y1): (i32, i32), t: i32, color: Rgb) {
         let steps = (x1 - x0).abs().max((y1 - y0).abs()).max(1);

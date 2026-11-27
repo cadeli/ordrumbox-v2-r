@@ -5,7 +5,8 @@
 //! [`GENERATED`], [`ALERT`]) are the only way to them. Tracks have colours
 //! of their own, softer than the accents ([`track`]). Labels are muted,
 //! values and the controls that hold them are plain text colour: an accent
-//! marks a state, not a number. Flat colours only: no glow, no gradient.
+//! marks a state, not a number. Flat colours only: no glow, no gradient — but
+//! in the synth editor, drawn as a hardware panel (`panel/hardware.rs`).
 
 use std::cell::Cell;
 
@@ -332,6 +333,22 @@ pub fn note(color: Rgb, velocity: f64) -> Rgb {
     mix(cell(), color, 0.35 + 0.65 * velocity.clamp(0.0, 1.0))
 }
 
+/// The WCAG contrast ratio of `a` over `b`, 1 to 21 (the tests check the
+/// schemes with it).
+#[cfg(test)]
+#[must_use]
+pub(crate) fn contrast(a: Rgb, b: Rgb) -> f64 {
+    let luminance = |c: Rgb| {
+        let channel = |shift: u32| {
+            let v = f64::from((c >> shift) & 0xFF) / 255.0;
+            if v <= 0.039_28 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+        };
+        0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+    };
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -344,19 +361,6 @@ mod tests {
         assert_eq!(note(PINK, 1.0), PINK);
         assert_eq!(mix(0x000000, 0xFF8040, 0.5), 0x804020);
         assert_ne!(note(PINK, 0.0), cell());
-    }
-
-    /// The WCAG contrast ratio of `a` over `b`, 1 to 21.
-    fn contrast(a: Rgb, b: Rgb) -> f64 {
-        let luminance = |c: Rgb| {
-            let channel = |shift: u32| {
-                let v = f64::from((c >> shift) & 0xFF) / 255.0;
-                if v <= 0.039_28 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
-            };
-            0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
-        };
-        let (la, lb) = (luminance(a), luminance(b));
-        (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
     }
 
     #[test]

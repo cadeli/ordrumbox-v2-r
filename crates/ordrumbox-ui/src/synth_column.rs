@@ -1,35 +1,39 @@
 //! The narrow cards of the synth editor, the voice, the unison and the noise:
-//! their controls in one or two columns, one under the other, so that the
-//! cards stand beside the oscillators' or the filter's, in their row.
+//! their controls in lines of one to three, each centred in its column, so
+//! that the cards stand beside the oscillators' or the filter's, in their row.
 
-use crate::panel::{Item, Rect};
+use crate::panel::{Id, Item, Rect};
 use crate::scale::Scale;
 use crate::synth_cells::{Cell, GAP, Place, QUIET_H, push_head, push_row};
 use crate::synth_view::{Block, Card, HEAD_H, PAD_X, PAD_Y, Source, field_cells, is_bypassed};
 
 /// The narrow cards and the number of columns their controls take.
-pub(crate) const COLUMN_GROUPS: [(&str, usize); 3] = [("voice", 1), ("unison", 1), ("noise", 2)];
+pub(crate) const COLUMN_GROUPS: [(&str, usize); 3] = [("voice", 1), ("unison", 1), ("noise", 3)];
+
+/// The fields that open their card's first line, in this order; the others
+/// follow in theirs: the noise's level, then its filter's frequency and resonance.
+const FIRST: [&str; 3] = ["noise.mix", "noise.filterFreq", "noise.filterQ"];
 
 /// Card `group` (index `gi` of the groups): its head, then its controls in
-/// `columns` columns, each control over its label, centred in its column.
+/// lines of `columns`, each control over its label, centred in its column.
 pub(crate) fn column_block(source: &Source, (group, gi): (&str, usize), columns: usize) -> Block {
     let s = source.s;
     let mut items = Vec::new();
     let (x, y) = (PAD_X * s, PAD_Y * s);
     let head_right = push_head(&mut items, source.draft, (group, gi), (x, y), s);
     let top = y + HEAD_H * s;
+    let columns = columns.max(1);
     let rows = rows_of(source, group);
-    let per_column = rows.len().div_ceil(columns).max(1);
     let mut next = x;
     let mut content_right = x;
-    for part in rows.chunks(per_column) {
-        let (pushed, right) = push_column(part, (next, top), s);
+    for column in 0..columns.min(rows.len()) {
+        let (pushed, right) = push_column(rows.iter().skip(column).step_by(columns), (next, top), s);
         items.extend(pushed);
         content_right = right;
         next = right + GAP * s;
     }
-    let tallest = i32::try_from(per_column).unwrap_or(i32::MAX) * QUIET_H * s;
-    let (w, h) = (content_right.max(head_right) + x, top + tallest + y);
+    let line_count = i32::try_from(rows.len().div_ceil(columns).max(1)).unwrap_or(i32::MAX);
+    let (w, h) = (content_right.max(head_right) + x, top + line_count * QUIET_H * s + y);
     let card = Card {
         group: group.into(),
         rect: Rect::new(0, 0, w, h),
@@ -38,10 +42,11 @@ pub(crate) fn column_block(source: &Source, (group, gi): (&str, usize), columns:
         framed: true,
     };
     // The columns move apart to the middle of a widened card.
-    Block { items, size: (w, h), cards: vec![card], matrix: None, controls: Some((x, top)) }
+    Block { items, size: (w, h), cards: vec![card], matrix: None, controls: Some((x, top)), grows_down: false }
 }
 
-/// The controls of `group` in rows: a stacked spin stays with the one it goes under.
+/// The controls of `group` in rows, those of [`FIRST`] first: a stacked spin
+/// stays with the one it goes under.
 fn rows_of(source: &Source, group: &str) -> Vec<Vec<Cell>> {
     let mut rows: Vec<Vec<Cell>> = Vec::new();
     for cell in field_cells(source.draft, group, source.fields, source.lfo) {
@@ -50,14 +55,22 @@ fn rows_of(source: &Source, group: &str) -> Vec<Vec<Cell>> {
             _ => rows.push(vec![cell]),
         }
     }
+    let rank = |row: &Vec<Cell>| {
+        let path = row.first().and_then(|cell| match cell.id {
+            Id::SynthField(fi) => source.fields.get(usize::from(fi)),
+            _ => None,
+        });
+        path.and_then(|path| FIRST.iter().position(|first| first == path)).unwrap_or(FIRST.len())
+    };
+    rows.sort_by_key(rank);
     rows
 }
 
 /// The controls of `rows` at `(x, top)`, one row under the other, each centred
 /// in the column; the x right of the column.
-fn push_column(rows: &[Vec<Cell>], (x, top): (i32, i32), s: Scale) -> (Vec<Item>, i32) {
+fn push_column<'a>(rows: impl Iterator<Item = &'a Vec<Cell>>, (x, top): (i32, i32), s: Scale) -> (Vec<Item>, i32) {
     let mut pushed = Vec::new();
-    for (row, cells) in rows.iter().enumerate() {
+    for (row, cells) in rows.enumerate() {
         let mut items = Vec::new();
         let row_top = top + row as i32 * QUIET_H * s;
         let right = push_row(&mut items, cells.clone(), (x, row_top), QUIET_H, s);
@@ -75,7 +88,6 @@ fn push_column(rows: &[Vec<Cell>], (x, top): (i32, i32), s: Scale) -> (Vec<Item>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::panel::Id;
     use crate::synth_family::Family;
     use crate::synth_view::{SynthLayout, all_fields, build};
     use ordrumbox_engine::synth_model as model;
@@ -127,13 +139,12 @@ mod tests {
             let fi = fields.iter().position(|f| f == path).unwrap_or_else(|| panic!("{path}"));
             crate::panel::find(&built.items, Id::SynthField(fi as u16)).unwrap_or_else(|| panic!("{path}")).rect
         };
-        let mix = rect("noise.mix");
-        let freq = rect("noise.filterFreq");
-        let q = rect("noise.filterQ");
-        assert_eq!(freq.x, mix.x, "one column");
-        assert!(freq.y >= mix.y + mix.h, "one under the other");
-        assert!(q.x > mix.x + mix.w, "two columns");
-        assert_eq!(rect("noise.rate").x, q.x);
-        assert_eq!(rect("noise.mode").x, rect("noise.filterType").x, "its mode still under its type");
+        let (mix, freq, q) = (rect("noise.mix"), rect("noise.filterFreq"), rect("noise.filterQ"));
+        assert_eq!((freq.y, q.y), (mix.y, mix.y), "one line: the level, the frequency, the resonance");
+        assert!(mix.x + mix.w < freq.x && freq.x + freq.w < q.x, "in this order");
+        let (kind, mode, rate) = (rect("noise.filterType"), rect("noise.mode"), rect("noise.rate"));
+        assert!(kind.y >= mix.y + mix.h, "the second line");
+        assert!(kind.x + kind.w <= mode.x && mode.x + mode.w <= rate.x, "the filter's type, the mode, the rate");
+        assert!(card.h <= HEAD_H + 2 * QUIET_H + 2 * PAD_Y, "two lines high, {card:?}");
     }
 }

@@ -350,11 +350,13 @@ pub fn hydrate(draft: &mut Object) {
 }
 
 /// The cards of `draft`, in order: the known ones,
-/// then any other group it has (not a bypass flag nor a tag), by name.
+/// then any other group it has (an object of fields, not a tag), by name. A
+/// key of another kind (a bypass flag, a text such as a stray `profile`) is
+/// kept in the preset but makes no card.
 pub fn groups(draft: &Object) -> Vec<String> {
     let mut groups: Vec<String> = GROUP_ORDER.iter().map(|g| (*g).to_owned()).collect();
-    for (key, _) in draft.iter() {
-        let is_card = !NUMBER_KEYS.contains(&key) && !TAG_KEYS.contains(&key) && !key.starts_with("bypass");
+    for (key, value) in draft.iter() {
+        let is_card = matches!(value, Value::Object(_)) && !NUMBER_KEYS.contains(&key) && !TAG_KEYS.contains(&key);
         if is_card && !groups.iter().any(|g| g == key) {
             groups.push(key.to_owned());
         }
@@ -590,6 +592,12 @@ mod tests {
         let d = defaults();
         let groups = groups(&d);
         assert!(!groups.iter().any(|g| g == "subGain"), "{groups:?}");
+        let mut stray = d.clone();
+        stray.insert("profile", Value::from("bass"));
+        stray.insert("extra", Value::Object(Object::new()));
+        let stray_groups = super::groups(&stray);
+        assert!(!stray_groups.iter().any(|g| g == "profile"), "a text makes no card");
+        assert_eq!(stray_groups.last().map(String::as_str), Some("extra"), "an object of fields does");
         // The filter envelope's card has its stages; its amount stays in the filter's.
         let filter_env = fields(&d, "filterEnv");
         assert_eq!(filter_env.first().map(String::as_str), Some("filterEnv.attack"), "{filter_env:?}");

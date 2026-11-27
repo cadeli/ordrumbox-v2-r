@@ -21,7 +21,7 @@ use super::{Session, session_panel};
 use crate::canvas::{Canvas, text_width};
 use crate::frame;
 use crate::panel::Id;
-use crate::panel::{Item, Kind, Rect, dim};
+use crate::panel::{Item, Kind, Rect, Skin, dim};
 use crate::picker::{Export, Purpose};
 use crate::store;
 use crate::synth_view::{self, Built, SynthLayout};
@@ -151,12 +151,13 @@ impl Session {
                 let label = format!("USE ON {name}");
                 let w = text_width(&label, scale) + 12 * scale;
                 let rect = Rect::new(x, line.y, w, line.h);
-                items.push(Item::new(Some(Id::SynthButton(USE_BUTTON)), rect, Kind::Button { label, on: false }));
+                let button = Item::new(Some(Id::SynthButton(USE_BUTTON)), rect, Kind::Button { label, on: false });
+                items.push(button.skinned(Skin::Metal));
                 x += w + 8 * scale;
                 format!("{name} {plays}")
             }
         };
-        items.push(Item::text(x, line.y + 3 * scale, text, dim(), scale));
+        items.push(Item::text(x, line.y + 3 * scale, text, dim(), scale).skinned(Skin::Metal));
     }
 
     /// The presets' keys, sorted.
@@ -342,7 +343,7 @@ impl Session {
         };
         let Some((built, layout)) = self.synth_built((canvas.width(), canvas.height(), scale)) else { return };
         let (time, bpm) = self.synth_clock();
-        synth_view::draw(canvas, &edit.draft, &built, &layout, time, bpm);
+        crate::synth_paint::draw(canvas, &edit.draft, &built, &layout, time, bpm);
     }
 
     /// An LFO moves a knob or the plots: keep redrawing.

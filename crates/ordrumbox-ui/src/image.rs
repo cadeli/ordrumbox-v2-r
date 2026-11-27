@@ -13,6 +13,10 @@ pub struct Image {
 
 /// The orDrumbox logo (`assets/images/logo2.png`), at the top of Help > About.
 pub const LOGO: Image = Image { width: 320, height: 64, rgba: include_bytes!(concat!(env!("OUT_DIR"), "/logo.rgba")) };
+/// The orDrumbox emblem, a round badge (`assets/images/logo.png`), in the
+/// synth editor's last card.
+pub const EMBLEM: Image =
+    Image { width: 192, height: 192, rgba: include_bytes!(concat!(env!("OUT_DIR"), "/emblem.rgba")) };
 
 impl Image {
     /// Its width in pixels at `scale`.
@@ -51,6 +55,7 @@ mod tests {
 
     #[test]
     fn the_logo_pixels_fill_the_logo() {
+        assert_eq!(EMBLEM.rgba.len(), EMBLEM.width * EMBLEM.height * 4);
         assert_eq!(LOGO.rgba.len(), LOGO.width * LOGO.height * 4);
         assert!(LOGO.pixel(LOGO.width - 1, LOGO.height - 1).is_some());
         assert!(LOGO.pixel(LOGO.width, 0).is_none());

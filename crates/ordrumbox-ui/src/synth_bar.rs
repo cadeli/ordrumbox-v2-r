@@ -41,6 +41,12 @@ impl Bar {
         });
         Self { preset, buttons }
     }
+
+    /// The x right of its last button.
+    #[must_use]
+    pub fn right(&self) -> i32 {
+        self.buttons.last().map_or(self.preset.x + self.preset.w, |b| b.x + b.w)
+    }
 }
 
 /// The bar's items for preset `current` of `presets`.

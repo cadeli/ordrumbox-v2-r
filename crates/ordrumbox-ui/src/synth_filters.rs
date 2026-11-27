@@ -1,6 +1,7 @@
 //! The synth editor's filter card: Filter and Filter 2 side by side, each
 //! with its head over its controls, Filter 1's response curve under its head
-//! and left of its faders. Filter 2 has no card of its own.
+//! and left of its faders. Filter 2 has no card of its own. The faders and the
+//! curve take the height of the card's row.
 
 use crate::panel::Rect;
 use crate::synth_cells::{KNOB_H, push_head, push_row};
@@ -51,7 +52,7 @@ pub(crate) fn filter_block(source: &Source, (fi, f2i): (usize, usize)) -> Block 
     };
     let curve =
         Card { group: "filter".into(), rect: plot, bypassed: false, plot: Some((Plot::Filter, plot)), framed: false };
-    Block { items, size: (w, h), cards: vec![frame, merged, curve], matrix: None, controls: None }
+    Block { items, size: (w, h), cards: vec![frame, merged, curve], matrix: None, controls: None, grows_down: true }
 }
 
 #[cfg(test)]
@@ -82,9 +83,24 @@ mod tests {
         assert!(rect("filter2.type").x > rect("filter.drive").x + rect("filter.drive").w, "beside Filter 1");
         assert_eq!(rect("filter2.type").y, rect("filter.type").y, "same row");
         assert!(curve.x + curve.w < rect("filter.type").x, "left of the controls");
-        assert_eq!(curve.h, KNOB_H * Scale::ONE);
         for path in ["filter2.freq", "filter2.Q"] {
             assert!(rect(path).x >= merged.x, "{path}: in its strip");
         }
+        // The row is as tall as the noise card: the faders and the curve take its height.
+        let foot = frame.y + frame.h - PAD_Y;
+        assert!(curve.h > KNOB_H, "{curve:?}");
+        assert_eq!(curve.y + curve.h, foot, "the curve");
+        for path in ["filter.freq", "filter.Q", "filter.drive", "filter2.freq", "filter2.Q"] {
+            assert_eq!((rect(path).y, rect(path).y + rect(path).h), (curve.y, foot), "{path}");
+        }
+        assert!(merged.y + merged.h <= frame.y + frame.h, "Filter 2's strip in the card");
+        // In a row no taller than it (narrow, the noise has a row of its own), they keep a knob's height.
+        let narrow = build(&d, (&[], ""), &SynthLayout::new(740, 680, Scale::ONE, 0), 0, &|_| None);
+        let (_, curve) =
+            narrow.cards.iter().find_map(|c| c.plot.filter(|(plot, _)| *plot == Plot::Filter)).expect("curve");
+        assert_eq!(curve.h, KNOB_H);
+        let type_fi = fields.iter().position(|f| f == "filter.type").expect("filter.type") as u16;
+        let narrow_type = crate::panel::find(&narrow.items, Id::SynthField(type_fi)).expect("filter.type").rect;
+        assert_eq!(rect("filter.type").h, narrow_type.h, "a spin keeps its height");
     }
 }

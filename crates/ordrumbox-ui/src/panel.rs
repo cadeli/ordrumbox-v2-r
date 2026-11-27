@@ -430,29 +430,47 @@ impl Kind {
     }
 }
 
+/// How an item is drawn: in the app's flat look, or in the synth editor's
+/// hardware panel (`panel/hardware.rs`), on one of its cards or on the
+/// metal around them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Skin {
+    #[default]
+    Flat,
+    Card,
+    Metal,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub id: Option<Id>,
     pub rect: Rect,
     pub kind: Kind,
+    pub skin: Skin,
 }
 
 impl Item {
     pub fn new(id: Option<Id>, rect: Rect, kind: Kind) -> Self {
-        Self { id, rect, kind }
+        Self { id, rect, kind, skin: Skin::Flat }
     }
 
     pub fn text(x: i32, y: i32, text: impl Into<String>, color: Rgb, scale: Scale) -> Self {
         let text = text.into();
         let rect = Rect::new(x, y, text_width(&text, scale), 8 * scale);
-        Self { id: None, rect, kind: Kind::Text { text, color } }
+        Self::new(None, rect, Kind::Text { text, color })
     }
 
     /// A panel's title at `(x, y)`, in a row of text at `scale`.
     pub fn title(x: i32, y: i32, text: impl Into<String>, scale: Scale) -> Self {
         let text = text.into();
         let rect = Rect::new(x, y, text_width(&text, scale.title()), 8 * scale.title());
-        Self { id: None, rect, kind: Kind::Title { text } }
+        Self::new(None, rect, Kind::Title { text })
+    }
+
+    /// The item drawn in `skin`.
+    #[must_use]
+    pub fn skinned(self, skin: Skin) -> Self {
+        Self { skin, ..self }
     }
 
     /// Takes the keyboard focus (Tab cycles through these).
@@ -588,6 +606,8 @@ mod draw;
 mod dropdown;
 #[path = "panel/entry.rs"]
 mod entry;
+#[path = "panel/hardware.rs"]
+pub(crate) mod hardware;
 #[path = "panel/tabs.rs"]
 mod tabs;
 pub use draw::draw;

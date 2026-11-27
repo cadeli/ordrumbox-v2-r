@@ -3,7 +3,8 @@
 //! for, and every card on one screen, always in the same order — what makes the sound (the sources, the
 //! filter, the envelopes), then what moves it (the LFOs, the modulation
 //! envelope, the matrix), then the master — in rows filled to the full width, each card as tall as its
-//! row (`synth_rows.rs`) — its power LED
+//! row (`synth_rows.rs`), FM in a column at the right edge beside the rows of the
+//! noise and the filters and of the envelopes — its power LED
 //! and title, then its plot (the filter curve left of its controls, the main
 //! envelope's curve right of its own) and its knobs, faders, spins and
 //! switches in a row (`synth_cells.rs`; the filter's slope under its type).
@@ -18,35 +19,40 @@
 //!
 //! [`SynthLayout`] and [`build`] place everything as panel items (the ids
 //! name groups and fields by their index in [`model::groups`] and
-//! [`all_fields`]); [`draw`] paints the cards and the plots under them.
+//! [`all_fields`]), each in the hardware skin (`panel/hardware.rs`); `synth_paint.rs`
+//! paints the metal, the cards and the plots under them.
 
 use crate::scale::Scale;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS, VOICE_MODE_LABELS};
 use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES, VOICE_MODES};
 
-use crate::canvas::{Canvas, Rgb};
 use crate::control::Spec;
 use crate::editors::FILTER_ICONS;
 use crate::frame;
-use crate::panel::{Id, Item, Kind, Rect};
+use crate::panel::{Id, Item, Kind, Rect, Skin};
 use crate::synth_bar::{self, Bar};
-use crate::synth_cells::{Cell, KNOB_H, Place, push_head, push_row};
+use crate::synth_cells::{Cell, KNOB_H, Place, is_fader, push_head, push_row};
 use crate::synth_column::{COLUMN_GROUPS, column_block};
 use crate::synth_faders;
 use crate::synth_family::{Family, family_block};
 use crate::synth_filters::{MERGED_GROUP, filter_block};
 use crate::synth_matrix::MatrixList;
-use crate::synth_rows;
+use crate::synth_rows::{self, Column, Size};
 use crate::synth_spread;
 use crate::synth_strip;
-use crate::{scroll_thumb, theme};
 
 /// The space inside a card around what it holds, across and down (at scale 1).
 pub(crate) const PAD_X: i32 = 6;
 pub(crate) const PAD_Y: i32 = 4;
 /// The space between two cards (at scale 1).
 const CARD_GAP: i32 = 8;
+/// The card in a column at the right edge, beside the rows of the cards
+/// after it (the noise and the filters, the envelopes), and how many.
+const COLUMN_GROUP: &str = "fm";
+/// The card of the orDrumbox emblem, the last, which is no group of the preset.
+pub(crate) const EMBLEM_GROUP: &str = "emblem";
+const COLUMN_ROW_COUNT: usize = 2;
 /// The height of a card's head, the space under it included (at scale 1).
 pub(crate) const HEAD_H: i32 = 18;
 /// A plot's width left of its card's controls, and the space right of it (at scale 1).
@@ -56,28 +62,6 @@ pub(crate) const PLOT_GAP: i32 = 8;
 /// it has a card of its own, its plot this high.
 pub(crate) const SCOPE_MIN_W: i32 = 60;
 const SCOPE_H: i32 = 60;
-
-fn card_color() -> Rgb {
-    theme::panel()
-}
-fn card_off_color() -> Rgb {
-    theme::bg()
-}
-fn border_color() -> Rgb {
-    theme::line()
-}
-fn surface_color() -> Rgb {
-    theme::screen()
-}
-fn grid_color() -> Rgb {
-    theme::panel_2()
-}
-/// The sound's curves and the switches that are on.
-const ACCENT: Rgb = theme::LIVE;
-/// The same, a step back: an on switch's ground, the filter's side curves.
-fn accent_dim() -> Rgb {
-    theme::mix(theme::LIVE, theme::panel(), 0.55)
-}
 
 /// Every field of the draft's cards, card after card: the index a
 /// [`Id::SynthField`] names.
@@ -189,12 +173,14 @@ pub enum Plot {
     Envelope,
 }
 
+/// The space above the preset bar, under the menu bar and the toolbar (at scale 1).
+const HEAD_TOP: i32 = 8;
 /// The top of the cards' area, under the preset bar and the track's line (at scale 1).
-const AREA_TOP: i32 = 42;
+const AREA_TOP: i32 = HEAD_TOP + 42;
 /// The height the cards take, every one shown, in the narrowest editor: five
 /// rows (at scale 1, rounding included). The smallest window leaves them this
 /// (`every_card_fits_the_smallest_window`).
-const CARDS_H: i32 = 560;
+const CARDS_H: i32 = 552;
 /// The height the editor needs under the header, at scale 1: the smallest window gives it.
 pub const MIN_HEIGHT: i32 = AREA_TOP + CARDS_H;
 
@@ -202,6 +188,9 @@ pub const MIN_HEIGHT: i32 = AREA_TOP + CARDS_H;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SynthLayout {
     scale: Scale,
+    /// The whole editor, and its head: the preset bar, the track's line, the logo.
+    panel: Rect,
+    head: Rect,
     pub bar: Bar,
     /// The line under the preset bar: what the track edited plays.
     pub track_line: Rect,
@@ -214,15 +203,36 @@ impl SynthLayout {
         let s = scale;
         let margin = 16 * s;
         let top = frame::body_top(scale);
-        let track_line = Rect::new(margin, top + 20 * s, (width - 2 * margin).max(0), 14 * s);
+        let head_top = top + HEAD_TOP * s;
+        let track_line = Rect::new(margin, head_top + 20 * s, (width - 2 * margin).max(0), 14 * s);
         let area_top = top + AREA_TOP * s;
-        let bottom = frame::footer_top(height, scale, status_lines) - margin / 2;
+        let footer = frame::footer_top(height, scale, status_lines);
+        let bottom = footer - margin / 2;
         Self {
             scale,
-            bar: Bar::new(margin, top, s),
+            panel: Rect::new(0, top, width.max(0), (footer - top).max(0)),
+            head: Rect::new(margin, head_top, (width - 2 * margin).max(0), (AREA_TOP - HEAD_TOP - 6) * s),
+            bar: Bar::new(margin, head_top, s),
             track_line,
             area: Rect::new(margin, area_top, (width - 2 * margin).max(0), (bottom - area_top).max(0)),
         }
+    }
+
+    #[must_use]
+    pub fn scale(&self) -> Scale {
+        self.scale
+    }
+
+    /// The whole editor, painted as one panel.
+    #[must_use]
+    pub fn panel(&self) -> Rect {
+        self.panel
+    }
+
+    /// The editor's head, above the cards.
+    #[must_use]
+    pub fn head(&self) -> Rect {
+        self.head
     }
 }
 
@@ -262,6 +272,9 @@ pub(crate) struct Block {
     /// The top-left corner of its controls, spread when it is widened; none:
     /// what reaches its right edge takes the width (the scope, the matrix).
     pub(crate) controls: Option<(i32, i32)>,
+    /// Whether its faders, its plot and its bands grow down with it when
+    /// its row is taller than it (the filters' card).
+    pub(crate) grows_down: bool,
 }
 
 impl Block {
@@ -283,6 +296,16 @@ impl Block {
         }
         if let Some(origin) = self.controls {
             synth_spread::spread(&mut self.items, origin, dw);
+        }
+        if self.grows_down {
+            let taller = |r: Rect| Rect::new(r.x, r.y, r.w, r.h + dh);
+            for item in self.items.iter_mut().filter(|item| is_fader(&item.kind)) {
+                item.rect = taller(item.rect);
+            }
+            for card in self.cards.iter_mut().filter(|card| !card.framed) {
+                card.rect = taller(card.rect);
+                card.plot = card.plot.map(|(plot, r)| (plot, taller(r)));
+            }
         }
         self.size = (old_w + dw, old_h + dh);
     }
@@ -324,6 +347,7 @@ pub fn build(
     let s = layout.scale;
     let mut built = Built::default();
     synth_bar::push_bar(&mut built.items, (presets, current), &layout.bar);
+    let bar_count = built.items.len();
 
     let groups = model::groups(draft);
     let fields = all_fields(draft);
@@ -368,11 +392,54 @@ pub fn build(
         };
         blocks.push(block);
     }
-    let sizes: Vec<_> = blocks.iter().map(|block| block.size).collect();
-    for (block, rect) in blocks.into_iter().zip(synth_rows::place(&sizes, layout.area, CARD_GAP * s)) {
+    blocks.push(emblem_block(s));
+    let sizes = sizes_of(&blocks, CARD_GAP * s);
+    let column = blocks
+        .iter()
+        .position(|block| block.cards.first().is_some_and(|card| card.group == COLUMN_GROUP))
+        .map(|index| Column { index, row_count: COLUMN_ROW_COUNT });
+    for (block, rect) in blocks.into_iter().zip(synth_rows::place(&sizes, layout.area, CARD_GAP * s, column)) {
         built.place(block, rect, s);
     }
+    for (i, item) in built.items.iter_mut().enumerate() {
+        item.skin = if i < bar_count { Skin::Metal } else { Skin::Card };
+    }
     built
+}
+
+/// The sizes the rows place `blocks` at: the cards at the right edge (the
+/// voice and the unison side by side, FM's column, the emblem) one width,
+/// the widest's, which they keep.
+fn sizes_of(blocks: &[Block], gap: i32) -> Vec<Size> {
+    let mut sizes: Vec<Size> = blocks.iter().map(|block| Size::from(block.size)).collect();
+    let at = |group: &str| blocks.iter().position(|block| block.cards.first().is_some_and(|card| card.group == group));
+    let pair = at("voice").zip(at("unison"));
+    let pair_w = pair.map_or(0, |(v, u)| sizes[v].w + gap + sizes[u].w);
+    let singles: Vec<usize> = [at(COLUMN_GROUP), at(EMBLEM_GROUP)].into_iter().flatten().collect();
+    let right_w = singles.iter().map(|&i| sizes[i].w).fold(pair_w, i32::max);
+    if let Some((v, u)) = pair {
+        let extra = right_w - pair_w;
+        sizes[v] = Size { w: sizes[v].w + extra / 2, h: sizes[v].h, is_fixed: true };
+        sizes[u] = Size { w: sizes[u].w + extra - extra / 2, h: sizes[u].h, is_fixed: true };
+    }
+    for i in singles {
+        sizes[i] = Size { w: right_w, h: sizes[i].h, is_fixed: true };
+    }
+    sizes
+}
+
+/// The emblem's card, last, at the right edge: no controls, as wide as FM
+/// ([`sizes_of`]), as tall as its row, a knob's height at least.
+fn emblem_block(s: Scale) -> Block {
+    let size = (0, (HEAD_H + KNOB_H) * s);
+    let card = Card {
+        group: EMBLEM_GROUP.into(),
+        rect: Rect::new(0, 0, 0, size.1),
+        bypassed: false,
+        plot: None,
+        framed: true,
+    };
+    Block { items: Vec::new(), size, cards: vec![card], matrix: None, controls: None, grows_down: false }
 }
 
 /// Whether the card of `group` is bypassed.
@@ -395,7 +462,7 @@ fn scope_block(source: &Source, (group, gi): (&str, usize)) -> Block {
         plot: Some((Plot::Scope, plot)),
         framed: true,
     };
-    Block { items, size: (w, h), cards: vec![card], matrix: None, controls: None }
+    Block { items, size: (w, h), cards: vec![card], matrix: None, controls: None, grows_down: false }
 }
 
 /// Card `group` (index `gi` of the groups): its head, then its plot left of
@@ -429,7 +496,7 @@ fn card_block(source: &Source, (group, gi): (&str, usize)) -> Block {
         plot,
         framed: true,
     };
-    Block { items, size: (w, h), cards: vec![card], matrix, controls }
+    Block { items, size: (w, h), cards: vec![card], matrix, controls, grows_down: false }
 }
 
 /// The plot a card shows left of its controls, as high as a knob (the
@@ -460,7 +527,7 @@ pub(crate) fn knob_kind(draft: &Object, path: &str, lfo: &dyn Fn(&str) -> Option
 
 /// The fields whose control goes under another's, in its column: the
 /// field, the one it goes under.
-const STACKED: [(&str, &str); 2] = [("filter.slope", "filter.type"), ("noise.mode", "noise.filterType")];
+const STACKED: [(&str, &str); 1] = [("filter.slope", "filter.type")];
 
 /// The controls of `group`, in its fields' order, as cells of a row; a
 /// field of [`STACKED`] right after the one it goes under.
@@ -500,83 +567,6 @@ pub(crate) fn field_cells(
         }
     }
     cells
-}
-
-/// Paint the cards (under their items) and their plots.
-pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLayout, time: f64, bpm: f64) {
-    let s = layout.scale;
-    for card in &built.cards {
-        let r = card.rect;
-        let fill = if card.bypassed { card_off_color() } else { card_color() };
-        if card.framed {
-            canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
-            canvas.fill_rect(r.x + s.px(), r.y + s.px(), r.w - 2 * s, r.h - 2 * s, fill);
-        } else if card.bypassed {
-            canvas.fill_rect(r.x, r.y, r.w, r.h, fill);
-        }
-        if let Some((plot, rect)) = card.plot {
-            canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, surface_color());
-            match plot {
-                Plot::Scope => draw_scope(canvas, &model::scope(draft, time, bpm), rect, s),
-                Plot::Envelope => draw_envelope(canvas, draft, "envelope", rect, s),
-                Plot::Filter => draw_filter(canvas, draft, rect, s, time, bpm),
-            }
-        }
-    }
-    if let Some(list) = built.matrix.filter(MatrixList::scrolls) {
-        scroll_thumb::draw(canvas, list.bar, list.thumb(), s);
-    }
-}
-
-/// The scope: the samples across, -1 to 1 around the middle.
-fn draw_scope(canvas: &mut Canvas, samples: &[f64], r: Rect, s: Scale) {
-    let mid = r.y + r.h / 2;
-    canvas.fill_rect(r.x, mid, r.w, s.px(), grid_color());
-    let n = samples.len().max(1);
-    let points = samples
-        .iter()
-        .enumerate()
-        .map(|(i, v)| (r.x + (i as i32 * r.w) / n as i32, mid - (v * f64::from(r.h / 2 - 4 * s)) as i32));
-    canvas.polyline(points, (s * 3 / 2).max(1), ACCENT);
-}
-
-/// The envelope: attack, decay, sustain, release.
-fn draw_envelope(canvas: &mut Canvas, draft: &Object, group: &str, r: Rect, s: Scale) {
-    let mid = r.y + r.h / 2;
-    canvas.fill_rect(r.x, mid, r.w, s.px(), grid_color());
-    let (points, total) = model::envelope(draft, group);
-    let point = |(t, v): (f64, f64)| {
-        (r.x + ((t / total) * f64::from(r.w - 1)) as i32, mid - (v * f64::from(r.h / 2 - 4 * s)) as i32)
-    };
-    canvas.polyline(points.into_iter().map(point), (s * 3 / 2).max(1), ACCENT);
-}
-
-/// The filter's response, 20 Hz to 20 kHz across, -30 to +12 dB, and the
-/// band an LFO on the frequency sweeps.
-fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: Scale, time: f64, bpm: f64) {
-    let to_x = |f: f64| r.x + (((f.log10() - 20f64.log10()) / 3.0) * f64::from(r.w)) as i32;
-    let to_y = |db: f64| r.y + r.h - 1 - (((db + 30.0) / 42.0) * f64::from(r.h - 1)) as i32;
-    for f in [100.0, 1000.0, 10_000.0] {
-        canvas.fill_rect(to_x(f), r.y, s.px(), r.h, grid_color());
-    }
-    for db in [0.0, -20.0] {
-        canvas.fill_rect(r.x, to_y(db), r.w, s.px(), grid_color());
-    }
-    const N: usize = 200;
-    let (kind, fc, q, slope_db, band) = model::filter_now(draft, time, bpm);
-    let curve = |canvas: &mut Canvas, fc: f64, color: Rgb, t: i32| {
-        let response = model::filter_response(&kind, fc, q, slope_db, N);
-        canvas.polyline(
-            response.iter().enumerate().map(|(i, db)| (r.x + (i as i32 * (r.w - 1)) / N as i32, to_y(*db))),
-            t,
-            color,
-        );
-    };
-    if let Some((low, high)) = band {
-        curve(canvas, low, accent_dim(), s.px());
-        curve(canvas, high, accent_dim(), s.px());
-    }
-    curve(canvas, fc, ACCENT, (s * 3 / 2).max(1));
 }
 
 #[cfg(test)]
@@ -631,7 +621,7 @@ mod tests {
         // (its flag unset), the noise, the filter with the second filter beside
         // it (off until the preset has one), the envelopes' card (the three side
         // by side, the main envelope's curve after its own), the pitch envelope,
-        // the LFOs' card (off: at 0 Hz), the matrix and the master.
+        // the LFOs' card (off: at 0 Hz), the matrix, the master and the emblem.
         let groups: Vec<_> = built.cards.iter().map(|c| (c.group.as_str(), c.bypassed)).collect();
         assert_eq!(
             groups,
@@ -658,7 +648,8 @@ mod tests {
                 ("lfo", true),
                 ("lfo2", true),
                 ("matrix", false),
-                ("master", false)
+                ("master", false),
+                (EMBLEM_GROUP, false)
             ]
         );
         // The scope, with no title, in VCO1's band right of its controls; the
@@ -683,6 +674,45 @@ mod tests {
         };
         let controls = built.items.iter().filter(|i| matches!(i.id, Some(Id::SynthField(_))) && inside(i.rect));
         assert!(controls.into_iter().all(|i| i.rect.x > plot.x + plot.w), "{group}");
+    }
+
+    #[test]
+    fn fm_stands_in_a_column_beside_the_filters_and_the_envelopes() {
+        let built = build(&draft(), (&[], ""), &SynthLayout::new(912, 680, Scale::ONE, 0), 0, &|_| None);
+        let card = |group: &str| {
+            built.cards.iter().find(|c| c.framed && c.group == group).unwrap_or_else(|| panic!("{group}")).rect
+        };
+        let (fm, filter, envelopes, pitch) = (card("fm"), card("filter"), card("envelopes"), card("pitchEnv"));
+        assert!(card("unison").y < fm.y, "out of the first row");
+        assert_eq!((fm.y, fm.y + fm.h), (filter.y, envelopes.y + envelopes.h), "as tall as both rows");
+        assert_eq!(fm.x + fm.w, card("unison").x + card("unison").w, "at the right edge");
+        for r in [filter, pitch] {
+            assert_eq!(r.x + r.w + CARD_GAP, fm.x, "the rows end before it");
+        }
+        assert!(card("lfos").y > fm.y + fm.h, "the next row under it");
+    }
+
+    #[test]
+    fn the_right_edge_is_one_width_and_the_envelopes_faders_are_the_filters_height() {
+        let d = draft();
+        let built = build(&d, (&[], ""), &SynthLayout::new(912, 680, Scale::ONE, 0), 0, &|_| None);
+        let card = |group: &str| {
+            built.cards.iter().find(|c| c.framed && c.group == group).unwrap_or_else(|| panic!("{group}")).rect
+        };
+        let (voice, fm, emblem, master) = (card("voice"), card("fm"), card(EMBLEM_GROUP), card("master"));
+        for r in [fm, emblem] {
+            assert_eq!((r.x, r.x + r.w), (voice.x, card("unison").x + card("unison").w), "{r:?}");
+        }
+        assert_eq!((emblem.y, emblem.h), (master.y, master.h), "the emblem ends the master's row");
+        assert_eq!(master.x + master.w + CARD_GAP, emblem.x, "the master left of it");
+        let fields = all_fields(&d);
+        let height = |path: &str| {
+            let fi = fields.iter().position(|f| f == path).unwrap_or_else(|| panic!("{path}"));
+            crate::panel::find(&built.items, Id::SynthField(fi as u16)).unwrap_or_else(|| panic!("{path}")).rect.h
+        };
+        for path in ["envelope.attack", "filterEnv.release", "filter.freq", "filter2.Q"] {
+            assert_eq!(height(path), crate::synth_cells::ENVELOPE_H, "{path}");
+        }
     }
 
     /// Whether an item says "Scope".
@@ -769,7 +799,7 @@ mod tests {
     }
 
     #[test]
-    fn the_knobs_keep_their_value_to_their_tooltip_and_the_noise_mode_is_under_its_filter_type() {
+    fn the_knobs_keep_their_value_to_their_tooltip_and_the_noise_mode_is_beside_its_filter_type() {
         let d = draft();
         let layout = SynthLayout::new(912, 680, Scale::ONE, 0);
         let built = build(&d, (&["p".to_owned()], "p"), &layout, 0, &|_| None);
@@ -791,19 +821,7 @@ mod tests {
         );
         assert_eq!(model::choice_value("unison.count", "3"), Value::from(3.0), "a number, as a preset holds it");
         let (kind, mode) = (item("noise.filterType").rect, item("noise.mode").rect);
-        assert_eq!(mode.x, kind.x, "in its column");
-        assert!(mode.y > kind.y + kind.h - 1, "under it");
-    }
-
-    #[test]
-    fn draws_at_any_size() {
-        let d = draft();
-        for (w, h) in [(1, 1), (40, 30), (740, 680)] {
-            let mut pixels = vec![0; w * h];
-            let mut canvas = Canvas::new(&mut pixels, w, h);
-            let layout = SynthLayout::new(w as i32, h as i32, Scale::ONE, 0);
-            let built = build(&d, (&[], ""), &layout, 0, &|_| None);
-            draw(&mut canvas, &d, &built, &layout, 0.3, 120.0);
-        }
+        assert_eq!(mode.y, kind.y, "in its line");
+        assert!(mode.x >= kind.x + kind.w, "beside it");
     }
 }

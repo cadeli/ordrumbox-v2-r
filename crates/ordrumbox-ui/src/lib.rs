@@ -54,6 +54,7 @@ mod synth_faders;
 mod synth_family;
 mod synth_filters;
 mod synth_matrix;
+mod synth_paint;
 mod synth_rows;
 mod synth_spread;
 mod synth_strip;

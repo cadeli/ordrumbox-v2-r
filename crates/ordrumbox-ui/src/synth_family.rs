@@ -7,7 +7,7 @@
 
 use crate::panel::{Item, Rect};
 use crate::scale::Scale;
-use crate::synth_cells::{QUIET_H, push_head, push_row};
+use crate::synth_cells::{ENVELOPE_H, QUIET_H, push_head, push_row};
 use crate::synth_strip::{self, STRIP_GAP, TITLE_W};
 use crate::synth_view::{
     Block, Card, HEAD_H, PAD_X, PAD_Y, PLOT_GAP, Plot, SCOPE_MIN_W, Source, field_cells, is_bypassed,
@@ -78,7 +78,7 @@ impl Family {
     /// it, for the envelopes, which stand side by side.
     fn strip_height(self, s: Scale) -> i32 {
         match self {
-            Self::Envelopes => (HEAD_H + QUIET_H) * s,
+            Self::Envelopes => (HEAD_H + ENVELOPE_H) * s,
             Self::Oscillators | Self::Lfos => QUIET_H * s,
         }
     }
@@ -127,7 +127,7 @@ pub(crate) fn family_block(source: &Source, family: Family, strips: &[(&str, usi
     // A plot takes the width; without one, the controls spread across it, right of the titles.
     let has_plot = cards.iter().any(|c| c.plot.is_some());
     let controls = (!has_plot).then_some((x + title_w, 0));
-    Block { items, size: (w, h), cards, matrix: None, controls }
+    Block { items, size: (w, h), cards, matrix: None, controls, grows_down: false }
 }
 
 /// Place the strips of each band and the plot right of its strip: a plot with
@@ -197,9 +197,9 @@ fn push_strip(
     let head_right = push_head(items, source.draft, (group, gi), (x, y), s);
     let mut cells = field_cells(source.draft, group, source.fields, source.lfo);
     // The stages (faders) first, so that they line up from strip to strip.
-    cells.sort_by_key(|cell| !crate::synth_cells::is_fader(cell));
+    cells.sort_by_key(|cell| !crate::synth_cells::is_fader(&cell.kind));
     if family == Family::Envelopes {
-        return push_row(items, cells, (x, y + HEAD_H * s), QUIET_H, s).max(head_right);
+        return push_row(items, cells, (x, y + HEAD_H * s), ENVELOPE_H, s).max(head_right);
     }
     push_row(items, cells, (x + title_w, y), QUIET_H, s)
 }
