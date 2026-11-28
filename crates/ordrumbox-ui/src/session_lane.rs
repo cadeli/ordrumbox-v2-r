@@ -70,6 +70,15 @@ impl Session {
         LANES.get(usize::from(self.editors.lane)).and_then(|(key, _)| editors::note_prop(key))
     }
 
+    /// Pick the lane's setting from the list's value.
+    pub(super) fn set_lane(&mut self, value: &str) {
+        if let Ok(lane) = value.parse::<u8>()
+            && usize::from(lane) < LANES.len()
+        {
+            self.editors.lane = lane;
+        }
+    }
+
     /// A press at `(x, y)` on the lane's bars: their notes take the value
     /// pressed, and a drag begins; whether it was the lane's.
     pub fn lane_press(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
@@ -308,12 +317,14 @@ mod tests {
     }
 
     #[test]
-    fn the_lane_follows_its_tab_and_the_cursor() {
+    fn the_lane_follows_its_list_and_the_cursor() {
         let mut s = session();
         s.selection.cursor = Some(Cursor { track: 1, beat: 0, step: 0 });
-        let layout = s.grid_layout(SIZE).expect("the grid is shown");
-        let tab = layout.lane_tab_rect(2);
-        assert!(click(&mut s, tab.x + 2, tab.y + 2));
+        let list = s.grid_layout(SIZE).expect("the grid is shown").lane_list_rect();
+        let items = s.panel_layout(SIZE.0, SIZE.1, SIZE.2).items;
+        assert_eq!(crate::panel::find(&items, Id::LaneList).map(|item| item.rect), Some(list));
+        assert!(click(&mut s, list.x + 2, list.y + 2));
+        choose(&mut s, 2);
         assert_eq!(s.editors.lane, 2);
         let (x, y) = bar(&s, 1, 1.0);
         assert!(s.lane_press(SIZE, x, y));
@@ -351,24 +362,26 @@ mod tests {
         let lane = layout.lane_rect();
         assert!(!s.lane_press(SIZE, lane.x - 2, lane.y + 2));
         assert!(!s.lane_press(SIZE, lane.x + 2, lane.y - 2));
-        assert!(layout.lane_tab_rect(0).y > layout.add_track_rect().y, "under the add-track button");
+        assert!(layout.lane_list_rect().y > layout.add_track_rect().y, "under the add-track button");
     }
 
     #[test]
-    fn the_tabs_stay_put_and_the_bars_take_the_room_left() {
+    fn the_list_stays_put_and_the_bars_take_the_room_left() {
         let mut s = session();
         let before = s.grid_layout(SIZE).expect("the grid is shown");
-        let tabs: Vec<_> = (0..LANES.len()).map(|i| before.lane_tab_rect(i)).collect();
+        let list = before.lane_list_rect();
+        let logo = before.lane_logo_rect();
         let lane = before.lane_rect();
+        assert!(logo.y >= lane.y && logo.y + logo.h < list.y, "above the list, beside the bars");
         assert!(lane.y >= before.add_track_rect().y + before.add_track_rect().h, "under the add-track button");
-        assert!(lane.y <= tabs[0].y && lane.y + lane.h == tabs[LANES.len() - 1].y + tabs[LANES.len() - 1].h);
+        assert!(lane.y <= list.y && lane.y + lane.h == list.y + list.h);
         for _ in 0..12 {
             s.add_track_named("CLAP");
         }
         let after = s.grid_layout(SIZE).expect("the grid is shown");
-        let moved: Vec<_> = (0..LANES.len()).map(|i| after.lane_tab_rect(i)).collect();
-        assert_eq!(tabs, moved, "the tabs never move");
-        assert!(after.lane_rect().h <= lane.h && after.lane_rect().h >= tabs[0].h * view::lane_tab_rows());
+        assert_eq!(list, after.lane_list_rect(), "the list never moves");
+        assert_eq!(logo, after.lane_logo_rect(), "the logo never moves");
+        assert!(after.lane_rect().h <= lane.h && after.lane_rect().h >= list.h);
         assert!(after.lane_rect().y >= after.add_track_rect().y + after.add_track_rect().h);
     }
 
@@ -465,8 +478,8 @@ mod tests {
         let after = s.grid_layout(SIZE).unwrap();
         let (b, a) = (before.lane_rect().h, after.lane_rect().h);
         assert!(a > b || a == b && s.chrome.lane_height.is_some(), "taller, or already as tall as the room allows");
-        // Tabs keep their place whatever the bars' height.
-        assert_eq!(before.lane_tab_rect(3), after.lane_tab_rect(3));
+        // The list keeps its place whatever the bars' height.
+        assert_eq!(before.lane_list_rect(), after.lane_list_rect());
         // Down as far as it goes: the tabs' height.
         assert!(s.grid_lane_resize_press(SIZE, x, after.lane_edge_rect().y + 1));
         s.grid_lane_resize_move(5000);

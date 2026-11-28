@@ -1,34 +1,29 @@
-//! The lane under the grid's rows: its tabs, its bars and the strip that
-//! sets its height, in the grid's [`Layout`].
+//! The lane under the grid's rows: its list of settings with the logo above
+//! it, its bars, and the strip that sets its height, in the grid's [`Layout`].
 
 use super::{Layout, VOLUME_WIDTH};
-use crate::editors;
 use crate::panel::Rect;
 
-/// Height of a lane tab, the gap between two, per scale unit: the tabs stand
-/// in rows of [`LANE_TAB_COLUMNS`] left of the lane, which is as high as they are.
-pub(super) const LANE_TAB_HEIGHT: i32 = 14;
-pub(super) const LANE_TAB_GAP: i32 = 2;
-/// The lane tabs side by side in a row.
-pub(super) const LANE_TAB_COLUMNS: usize = 2;
-
-/// The rows the lane's tabs stand in.
-#[must_use]
-pub const fn lane_tab_rows() -> i32 {
-    editors::LANES.len().div_ceil(LANE_TAB_COLUMNS) as i32
-}
+/// Height of the lane's list box, per scale unit: the list keeps the bottom
+/// of the grid, whatever the bars' height.
+pub(super) const LANE_LIST_HEIGHT: i32 = 14;
+/// Height of the logo above the lane's list, per scale unit: `logo2.png` at
+/// half its natural size, fitted to the list's width.
+pub(super) const LANE_LOGO_HEIGHT: i32 = 32;
+/// The gap between the logo and the lane's list, per scale unit.
+pub(super) const LANE_LOGO_GAP: i32 = 4;
 /// The gap between the add-track button and the lane, per scale unit.
 pub(super) const LANE_GAP: i32 = 8;
 /// The tallest the lane's bars get, per scale unit: they take the room the
 /// rows leave, up to this.
-pub(super) const MAX_LANE: i32 = 160;
+pub(super) const MAX_LANE: i32 = 480;
 /// The tallest the lane can be set to, per scale unit.
-pub const MAX_LANE_SET: i32 = 320;
+pub const MAX_LANE_SET: i32 = 960;
 
-/// Height of the lane under the rows, per scale unit: the rows of its tabs.
+/// Height of the lane under the rows at its smallest, per scale unit: the
+/// logo and the list box left of its bars.
 pub const fn lane_height() -> i32 {
-    let rows = lane_tab_rows();
-    rows * LANE_TAB_HEIGHT + (rows - 1) * LANE_TAB_GAP
+    LANE_LOGO_HEIGHT + LANE_LOGO_GAP + LANE_LIST_HEIGHT
 }
 
 impl Layout {
@@ -45,17 +40,27 @@ impl Layout {
         Rect::new(self.grid_left, self.lane_top - gap, self.grid_width, gap)
     }
 
-    /// The tab of lane `lane`, left of the bars: the tabs stand in rows of
-    /// [`LANE_TAB_COLUMNS`], together as wide as the add-track button, and
-    /// keep the bottom of the grid, whatever the bars' height.
+    /// The list that picks the lane's setting, left of the bars: as wide as
+    /// the add-track button, and kept at the bottom of the grid whatever the
+    /// bars' height.
     #[must_use]
-    pub fn lane_tab_rect(&self, lane: usize) -> Rect {
-        let (row, column) = ((lane / LANE_TAB_COLUMNS) as i32, (lane % LANE_TAB_COLUMNS) as i32);
-        let y = self.bottom - lane_height() * self.scale + row * (LANE_TAB_HEIGHT + LANE_TAB_GAP) * self.scale;
-        let gap = LANE_TAB_GAP * self.scale;
-        let columns = LANE_TAB_COLUMNS as i32;
-        let w = (self.volume_x + VOLUME_WIDTH * self.scale - self.left - (columns - 1) * gap) / columns;
-        Rect::new(self.left + column * (w + gap), y, w, LANE_TAB_HEIGHT * self.scale)
+    pub fn lane_list_rect(&self) -> Rect {
+        let h = LANE_LIST_HEIGHT * self.scale;
+        Rect::new(self.left, self.bottom - h, self.list_width(), h)
+    }
+
+    /// The logo just above the lane's list, as wide as it: the lane is never
+    /// shorter than the two, so the logo keeps its place whatever the bars' height.
+    #[must_use]
+    pub fn lane_logo_rect(&self) -> Rect {
+        let list = self.lane_list_rect();
+        let h = LANE_LOGO_HEIGHT * self.scale;
+        Rect::new(self.left, list.y - LANE_LOGO_GAP * self.scale - h, self.list_width(), h)
+    }
+
+    /// The width of the lane's list and logo: the add-track button's.
+    fn list_width(&self) -> i32 {
+        self.volume_x + VOLUME_WIDTH * self.scale - self.left
     }
 
     /// The step of the page (0: its first) of a track of `spb` steps per

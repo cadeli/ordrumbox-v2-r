@@ -236,6 +236,36 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    /// Draw `image` centred in `x, y, w, h`, kept whole and with its aspect:
+    /// smaller than its natural size when the room is tight. Source pixels are
+    /// sampled nearest, without allocating.
+    pub fn draw_image_fit(&mut self, x: i32, y: i32, w: i32, h: i32, image: &Image, scale: Scale) {
+        let (source_w, source_h) = image.size();
+        if w <= 0 || h <= 0 || source_w == 0 || source_h == 0 {
+            return;
+        }
+        let natural_w = image.width_at(scale).max(1);
+        let natural_h = image.height_at(scale).max(1);
+        let fit = (f64::from(w) / f64::from(natural_w)).min(f64::from(h) / f64::from(natural_h)).min(1.0);
+        let draw_w = (f64::from(natural_w) * fit).round() as usize;
+        let draw_h = (f64::from(natural_h) * fit).round() as usize;
+        if draw_w == 0 || draw_h == 0 {
+            return;
+        }
+        let (width, height) = (draw_w as i32, draw_h as i32);
+        let left = x + (w - width) / 2;
+        let top = y + (h - height) / 2;
+        for row in 0..draw_h {
+            let source_row = row * source_h / draw_h;
+            for col in 0..draw_w {
+                let source_col = col * source_w / draw_w;
+                if let Some((color, alpha)) = image.pixel(source_col, source_row) {
+                    self.blend(left + col as i32, top + row as i32, color, alpha);
+                }
+            }
+        }
+    }
+
     fn blend(&mut self, x: i32, y: i32, color: Rgb, coverage: u8) {
         if coverage == 0 || !(0..self.width as i32).contains(&x) || !(0..self.height as i32).contains(&y) {
             return;

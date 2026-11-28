@@ -875,3 +875,13 @@ The pattern card's title reads NEXT while the pattern waits, the list framed whe
 is gone). The header is 52 px taller at scale 1 (`frame::HEADER_CONTROLS_HEIGHT`) and the smallest window wider
 (the cards' right edge). No snapshot changed. `docs/images/header.png` and `window-grid.png` still show the old
 header.
+
+The grid lane's tabs are one list box on the left of the bars (`Id::LaneList`, a `Kind::Select` whose values are
+indices in `editors::LANES`): it opens the same list, and Up / Down step through it. The rows of tabs are gone, so
+`lane_height()` is now the lane at its smallest: the one-line list at the grid's bottom (`LANE_LIST_HEIGHT`) and,
+just above it and as wide, the built-in `image::LOGO` (`assets/images/logo2.png`) at half its natural size
+(`LANE_LOGO_HEIGHT`, 32 px at scale 1), which `Canvas::draw_image_fit` fits centred and with its aspect, without
+allocating. No strip above the bars holds it: the bars take all the height under the add-track button. The lane's
+automatic maximum is 480 px (`MAX_LANE`) and a drag can set it to 960 px (`MAX_LANE_SET`), three times the old 160
+and 320. `Layout::lane_logo_rect` keeps the logo left of the bars, in the lane's smallest height, so it never moves.
+No snapshot changed. `docs/images/grid.png` still shows the tabs.

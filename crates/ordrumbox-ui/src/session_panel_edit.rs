@@ -376,6 +376,7 @@ impl Session {
                 }
             }
             Id::SynthPreset | Id::SynthField(_) => self.synth_select(id, value),
+            Id::LaneList => self.set_lane(value),
             Id::KitKit => {
                 let target = self.kits.kits().iter().position(|k| k.name == value);
                 if let (Some(sample), Some(target)) = (self.kit_editor.sample, target)
@@ -461,7 +462,6 @@ impl Session {
             Id::Tab(i) => self.editors.tab = i,
             Id::GenerationTab(i) => self.editors.generation_tab = i,
             Id::GenerationAdvanced => self.editors.generation_advanced = !self.editors.generation_advanced,
-            Id::Lane(i) => self.editors.lane = i,
             Id::Row(_) => self.select_row(id),
             Id::LoadSample => self.open_picker(Purpose::ReplaceTrackSample),
             Id::SongButton(button) => self.song_button(button),

@@ -19,6 +19,12 @@ pub const EMBLEM: Image =
     Image { width: 192, height: 192, rgba: include_bytes!(concat!(env!("OUT_DIR"), "/emblem.rgba")) };
 
 impl Image {
+    /// Its size in source pixels.
+    #[must_use]
+    pub const fn size(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
+
     /// Its width in pixels at `scale`.
     #[must_use]
     pub fn width_at(&self, scale: Scale) -> i32 {

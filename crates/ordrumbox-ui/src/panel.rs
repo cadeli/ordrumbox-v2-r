@@ -301,8 +301,9 @@ pub enum Id {
     TrackVolume(usize),
     /// The right-click menu of the lane under the grid.
     LaneMenu,
-    /// A tab of the lane under the grid: an index in `editors::LANES`.
-    Lane(u8),
+    /// The list that picks the lane under the grid: a value is an index in
+    /// `editors::LANES`.
+    LaneList,
     /// A track's rename entry.
     TrackName(usize),
     /// The grid's right-click menus.

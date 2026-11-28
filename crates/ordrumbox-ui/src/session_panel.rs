@@ -178,7 +178,7 @@ impl Session {
         }
     }
 
-    /// The grid in the main region: the lane's tabs and the tracks' volume sliders.
+    /// The grid in the main region: the lane's list and the tracks' volume sliders.
     fn grid_items(&self, layout: &mut PanelLayout, pattern: &Pattern, body: &view::Body, scale: Scale) {
         let grid = Layout::new(
             body.main_w,
@@ -189,10 +189,11 @@ impl Session {
             self.chrome.beat_window,
             self.chrome.lane_height,
         );
-        for (i, (_, label)) in editors::LANES.iter().enumerate() {
-            let kind = Kind::Tab { label: (*label).to_owned(), active: usize::from(self.editors.lane) == i };
-            layout.items.push(Item::new(Some(Id::Lane(i as u8)), grid.lane_tab_rect(i), kind));
-        }
+        let (values, labels): (Vec<_>, Vec<_>) =
+            editors::LANES.iter().enumerate().map(|(i, (_, label))| (i.to_string(), (*label).to_owned())).unzip();
+        let selected = usize::from(self.editors.lane).min(labels.len().saturating_sub(1));
+        let kind = Kind::Select { values, labels, selected };
+        layout.items.push(Item::new(Some(Id::LaneList), grid.lane_list_rect(), kind));
         let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
         for (t, track) in pattern.tracks.iter().enumerate().take(grid.tracks()) {
             let (value, lfo) = self.shown_track_volume(t, track.volume, spec);

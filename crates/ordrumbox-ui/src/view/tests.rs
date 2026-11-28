@@ -181,6 +181,31 @@ fn the_ruler_sits_above_the_rows_and_its_beats_start_their_cells() {
 }
 
 #[test]
+fn the_lane_logo_and_list_keep_their_places() {
+    let library = library();
+    let pattern = library.patterns.first().unwrap();
+    for scale in [Scale::ONE, Scale::from_quarters(5), Scale::whole(2)] {
+        let automatic = Layout::new(1100 * scale, 700 * scale, scale, pattern, 0, BeatWindow::default(), None);
+        let set = Layout::new(1100 * scale, 700 * scale, scale, pattern, 0, BeatWindow::default(), Some(200));
+        let short = Layout::new(1100 * scale, 700 * scale, scale, pattern, 0, BeatWindow::default(), Some(14));
+        let (add, logo, lane, list) =
+            (automatic.add_track_rect(), automatic.lane_logo_rect(), automatic.lane_rect(), automatic.lane_list_rect());
+        assert_eq!((logo.x, logo.w), (list.x, list.w), "scale {scale}: as wide as the list");
+        assert!(logo.y + logo.h < list.y, "scale {scale}: above the list");
+        assert!(logo.y >= lane.y, "scale {scale}: beside the bars");
+        assert!(logo.x + logo.w <= lane.x, "scale {scale}: left of the bars");
+        assert_eq!(list.y + list.h, automatic.bottom, "scale {scale}: at the grid's bottom");
+        assert_eq!(list.w, add.w, "scale {scale}: as wide as the add-track button");
+        assert!(lane.y >= add.y + add.h, "scale {scale}: under the add-track button");
+        assert_eq!(lane.y + lane.h, automatic.bottom, "scale {scale}: the bars fill the lane");
+        assert_eq!(set.lane_logo_rect(), logo, "scale {scale}: the logo does not move with the lane");
+        assert_eq!(set.lane_list_rect(), list, "scale {scale}: the list does not move with the lane");
+        assert_eq!(short.lane_logo_rect(), logo, "scale {scale}: the shortest lane keeps the logo");
+        assert!(short.lane_logo_rect().y >= short.lane_rect().y, "scale {scale}: the shortest lane holds the logo");
+    }
+}
+
+#[test]
 fn body_splits_the_window_above_the_footer() {
     let library = library();
     let pattern = library.patterns.first().unwrap();

@@ -498,7 +498,7 @@ lane, the ruler, a knob or a list, it says what a click, a drag and a right-clic
 cursor otherwise. Under the rows: the <strong>+ NEW TRACK</strong> button, then the lane.</p>
 <figure>
   <img src="images/grid.png" alt="The pattern grid: tracks with mute and solo boxes, names, samples, volume sliders and steps, the add-track button and the velocity lane">
-  <figcaption>The grid on a 12/8 pattern: per track the M / S boxes, the name and its sample, the volume slider, then the steps (the CHH track has 3 steps per beat). Under the rows, <strong>+ NEW TRACK</strong> and the lane on VELOCITY for the KICK track.</figcaption>
+  <figcaption>The grid on a 12/8 pattern: per track the M / S boxes, the name and its sample, the volume slider, then the steps (the CHH track has 3 steps per beat). Under the rows, <strong>+ NEW TRACK</strong> and the lane on VELOCITY for the KICK track. This picture still shows the tabs that the lane's list box replaces.</figcaption>
 </figure>
 
 <h3>A track row</h3>
@@ -515,9 +515,11 @@ cursor otherwise. Under the rows: the <strong>+ NEW TRACK</strong> button, then 
 <p>Under the rows, the lane shows one setting of the track editor's track, a bar per note:
 <strong>VELOCITY</strong>, <strong>CHANCE</strong> (its probability), <strong>RETRIG</strong> (how many times it plays)
 <strong>PAN</strong>, <strong>LENGTH</strong> (how long it is held, in steps) or <strong>SHIFT</strong> (how early or
-late it plays, off the grid), picked by the tabs on its left. Click a bar to set its value at that height, or drag across
-the bars to draw them; a drag is one undo step.</p>
-<p>The last three tabs are <strong>parameter locks</strong>: <strong>FILTER</strong> (the track's filter cutoff, 20 Hz to
+late it plays, off the grid), picked by the list box on its left. Click a bar to set its value at that height, or drag across
+the bars to draw them; a drag is one undo step. The orDrumbox logo sits just above the list, left of the
+bars, so the bars take all the height under <strong>+ NEW TRACK</strong>. The lane grows up to 480 px tall, or up to 960 px when you drag its top edge, and the
+list stays at its bottom.</p>
+<p>The last three settings in the list are <strong>parameter locks</strong>: <strong>FILTER</strong> (the track's filter cutoff, 20 Hz to
 20 kHz), <strong>REVERB</strong> and <strong>DELAY</strong> (the track's reverb and delay mix) while the note plays. A note
 without a bar has no lock and leaves the track's own setting; a lock lasts until the track's next note. Paint a bar down
 to the bottom of the lane to clear it. A lock turns on what the track has off (a lowpass filter, a room reverb); a delay of

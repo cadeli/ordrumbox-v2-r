@@ -91,12 +91,13 @@ the beats: drag its thumb, or the wheel with Shift held. The two ends of the thu
 one: the other stays), as does Ctrl+wheel around the pointer; down to one beat across. Under the rows, the **lane** shows one setting of the
 track editor's track, a bar per note: **VELOCITY**, **CHANCE** (its probability), **RETRIG**
 (how many times it plays), **PAN**, **PITCH** (whole semitones, the middle is no change), **LENGTH** (how long it is held, in steps) or **SHIFT**
-(how early or late it plays, off the grid), picked by the tabs on its left. Click a bar to set
+(how early or late it plays, off the grid), picked by the list on its left. Click a bar to set
 its value at that height, or drag across the bars to draw them; a drag is one undo step. A bubble gives the
 value as you draw and when the pointer rests on a bar. Right-click a bar for a menu: **Reset this step** or
 **Reset all notes** puts the notes back to the setting's default (a lock is cleared). Drag the lane's top edge (the strip just above the bars) to set its height; **Automatic height** in the same menu gives back the default, which fills the room the rows leave.
+The orDrumbox logo sits just above the list, left of the bars, so the bars take all the height under **+ NEW TRACK**. The lane grows up to 480 px tall (or the height you drag it to, up to 960 px), and the list stays at its bottom.
 
-The last three tabs are **parameter locks**: **FILTER** (the track's filter cutoff, 20 Hz to
+The last three settings in the list are **parameter locks**: **FILTER** (the track's filter cutoff, 20 Hz to
 20 kHz), **REVERB** and **DELAY** (the track's reverb and delay mix) while the note plays. A note
 without a bar has no lock and leaves the track's own setting; a lock lasts until the track's next
 note. Paint a bar down to the bottom of the lane to clear it. A lock turns on what the track has

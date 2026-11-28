@@ -13,8 +13,6 @@ use ordrumbox_core::{Pattern, Track};
 use ordrumbox_logic::block::BEAT_UNITS;
 
 mod lane;
-#[cfg(test)]
-pub use lane::lane_tab_rows;
 use lane::{LANE_GAP, MAX_LANE};
 pub use lane::{MAX_LANE_SET, lane_height};
 
@@ -91,7 +89,7 @@ pub struct Layout {
     pub(super) total_beats: i32,
     pub(super) tracks: usize,
     /// Top of the lane's bars under the rows (their bottom is `bottom`), the
-    /// tabs' top or higher.
+    /// logo's top or higher.
     pub(super) lane_top: i32,
 }
 
@@ -130,7 +128,7 @@ pub(super) const MIN_ROW: i32 = 10;
 /// the pixel as [`Layout::new`] rounds it.
 pub(super) fn compact_grid_height(scale: Scale) -> i32 {
     let rows = COMPACT_ROWS * (MIN_ROW * scale);
-    RULER_HEIGHT * scale + rows + (ADD_TRACK_GAP + ADD_TRACK_HEIGHT) * scale + LANE_GAP * scale + lane_height() * scale
+    RULER_HEIGHT * scale + rows + (ADD_TRACK_GAP + ADD_TRACK_HEIGHT + LANE_GAP) * scale + lane_height() * scale
 }
 
 /// What the window shows that sets the room the layout needs.
@@ -237,15 +235,16 @@ impl Layout {
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
         let tracks = pattern.tracks.len();
         // The lane keeps the bottom of the grid; the rows share the height
-        // left above the add-track button, and the lane's bars take what
-        // the rows leave (its tabs stay at the bottom).
-        let tabs_top = bottom - lane_height() * scale;
+        // left above the add-track button, and the lane's bars take what the
+        // rows leave. The list of settings stays at the bottom, the logo
+        // above it; the lane is never shorter than the two.
+        let list_top = bottom - lane_height() * scale;
         let fixed = (ADD_TRACK_HEIGHT + ADD_TRACK_GAP + LANE_GAP) * scale;
         // A lane set by the user (`lane`, in scale units) is as tall as it
         // asks, within what leaves the rows their smallest size.
         let tallest = (bottom - top - fixed - tracks.max(1) as i32 * MIN_ROW * scale).max(lane_height() * scale);
         let set_height = lane.map(|h| (h.clamp(lane_height(), MAX_LANE_SET) * scale).min(tallest));
-        let lane_edge = set_height.map_or(tabs_top, |h| bottom - h);
+        let lane_edge = set_height.map_or(list_top, |h| bottom - h);
         let rows_h = lane_edge - top - fixed;
         let row = (rows_h / tracks.max(1) as i32).clamp(MIN_ROW * scale, MAX_ROW * scale);
         let box_size = (row - 4 * scale).clamp(6 * scale, MAX_BOX * scale);
@@ -258,8 +257,8 @@ impl Layout {
         let shown = usize::try_from(rows_h.max(0) / row.max(1)).unwrap_or(0).min(tracks);
         let under_rows = top + shown as i32 * row + fixed;
         let lane_top = match set_height {
-            Some(h) => (bottom - h).max(under_rows).min(tabs_top),
-            None => under_rows.max(bottom - MAX_LANE * scale).min(tabs_top),
+            Some(h) => (bottom - h).max(under_rows).min(list_top),
+            None => under_rows.max(bottom - MAX_LANE * scale).min(list_top),
         };
         Self {
             scale,

@@ -7,6 +7,7 @@ use super::{
     SOLO_ON, View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_live_color,
 };
 use crate::canvas::{Canvas, Rgb, small_cell, small_char_width, text_width};
+use crate::image;
 use crate::panel::{MENU_MARK, Rect, stroke};
 use crate::scale::Scale;
 use crate::scroll_thumb;
@@ -62,6 +63,7 @@ pub(super) fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, lay
     canvas.text(label_x, add.y + (add.h - 8 * scale) / 2, ADD_TRACK_LABEL, scale, theme::text());
 
     draw_scroll_bar(canvas, layout);
+    draw_lane_logo(canvas, layout);
 
     if let Some(zone) = view.zone {
         draw_zone(canvas, &zone, layout);
@@ -203,6 +205,13 @@ fn draw_scroll_bar(canvas: &mut Canvas, layout: &Layout) {
     let color = if layout.beats < layout.total_beats { theme::muted() } else { theme::line() };
     canvas.fill_rect(thumb.0, bar.y + layout.scale.px(), thumb.1, bar.h - 2 * layout.scale.px(), color);
     scroll_thumb::draw_handles(canvas, bar, thumb, layout.scale);
+}
+
+/// The orDrumbox logo above the lane's list, left of its bars, fitted to its
+/// rect with its aspect at every scale.
+fn draw_lane_logo(canvas: &mut Canvas, layout: &Layout) {
+    let r = layout.lane_logo_rect();
+    canvas.draw_image_fit(r.x, r.y, r.w, r.h, &image::LOGO, layout.scale);
 }
 
 /// The lane under the rows: a cell per step of the lane's track on the
