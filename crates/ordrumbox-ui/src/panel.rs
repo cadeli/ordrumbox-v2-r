@@ -196,13 +196,12 @@ pub enum Id {
     /// A row's label: selects the row.
     Row(&'static str),
     // Note editor.
-    NoteTab(u8),
     NoteKnob(&'static str),
-    NoteSlider(&'static str),
-    /// Arp scale / direction select.
+    NoteFader(&'static str),
+    /// A spin of whole numbers (a cycle, a count, the arpeggio's range).
+    NoteSpin(&'static str),
+    /// Arp scale / direction spin.
     NoteSelect(&'static str),
-    /// An arrow of an arp scale / direction screen.
-    NoteSelectStep(&'static str, Step),
     // Kit editor.
     /// The kit to move the selected sample to.
     KitKit,

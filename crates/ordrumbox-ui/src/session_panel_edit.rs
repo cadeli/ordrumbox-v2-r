@@ -197,7 +197,7 @@ impl Session {
                 }
             }
             Id::Lfo(i, param) => self.lfo_value(t, i, param, value),
-            Id::NoteKnob(key) | Id::NoteSlider(key) => self.note_value(t, key, value),
+            Id::NoteKnob(key) | Id::NoteFader(key) => self.note_value(t, key, value),
             _ => {}
         }
     }
@@ -255,7 +255,7 @@ impl Session {
                 "arp octaves".to_owned(),
             )
         } else {
-            (vec![(key, number(value))], history_label(Id::NoteSlider(key)))
+            (vec![(key, number(value))], history_label(Id::NoteFader(key)))
         };
         let desc = format!("Edit note {what} on {}", self.track_name(t));
         self.update_note(t, &updates, &desc, true);
@@ -433,6 +433,10 @@ impl Session {
                 }
             }
             Id::Synth => self.pick_synth(t, value),
+            Id::NoteSpin(key) => match value.parse::<f64>() {
+                Ok(number) => self.note_value(t, key, number),
+                Err(e) => self.message = format!("{}: {value}: {e}", history_label(id)),
+            },
             Id::NoteSelect(key) => {
                 let Some(note) = self.shown_note(t) else { return };
                 let (field, arp) = if key == "arpScale" {
@@ -456,7 +460,6 @@ impl Session {
             Id::Tab(i) => self.editors.tab = i,
             Id::GenerationTab(i) => self.editors.generation_tab = i,
             Id::GenerationAdvanced => self.editors.generation_advanced = !self.editors.generation_advanced,
-            Id::NoteTab(i) => self.editors.note_tab = i,
             Id::Lane(i) => self.editors.lane = i,
             Id::Row(_) => self.select_row(id),
             Id::LoadSample => self.open_picker(Purpose::ReplaceTrackSample),
@@ -518,7 +521,6 @@ impl Session {
             Id::SynthStep(step) => self.step_screen(t, Id::Synth, step),
             Id::TrackSelectStep(key, step) => self.step_screen(t, Id::TrackSelect(key), step),
             Id::LfoTypeStep(i, step) => self.step_screen(t, Id::LfoType(i), step),
-            Id::NoteSelectStep(key, step) => self.step_screen(t, Id::NoteSelect(key), step),
             Id::AutoAssign => {
                 // Auto-assign back on: the synth goes and the sample is picked by name.
                 let on = !track.auto_assign;

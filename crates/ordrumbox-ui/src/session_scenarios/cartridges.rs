@@ -182,7 +182,7 @@ fn the_filter_s_type_is_on_its_screen() {
 }
 
 #[test]
-fn an_arpeggio_s_arrows_step_through_its_directions() {
+fn an_arpeggio_s_spin_steps_through_its_directions() {
     let text = r#"{"patterns":[{"name":"p","tracks":[{"name":"BASS","notes":[{"beat":0,"step":0}]}]}]}"#;
     let (library, _) = Library::parse(text).unwrap();
     let mut s = Session::new(library, KitSet::empty(), Vec::new());
@@ -191,13 +191,20 @@ fn an_arpeggio_s_arrows_step_through_its_directions() {
         view.arp_direction.values[view.arp_direction.selected].clone()
     };
     let first = shown(&s);
-    s.activate(Id::NoteSelectStep("arpDirection", Step::Next));
+    let step = |s: &mut Session, delta: i32| {
+        let view = s.note_view(0);
+        let choice = view.arp_direction;
+        let count = choice.values.len() as i32;
+        let at = usize::try_from((choice.selected as i32 + delta).rem_euclid(count)).unwrap();
+        s.select(Id::NoteSelect("arpDirection"), &choice.values[at]);
+    };
+    step(&mut s, 1);
     let next = shown(&s);
     assert_ne!(next, first);
     assert_eq!(s.pattern().unwrap().tracks[0].notes[0].arp_direction.as_deref(), Some(next.as_str()));
-    s.activate(Id::NoteSelectStep("arpDirection", Step::Previous));
+    step(&mut s, -1);
     assert_eq!(shown(&s), first);
-    s.activate(Id::NoteSelectStep("arpDirection", Step::Previous));
+    step(&mut s, -1);
     let directions = s.note_view(0).arp_direction.values;
     assert_eq!(shown(&s), directions[directions.len() - 1], "from the first, the previous is the last");
 }

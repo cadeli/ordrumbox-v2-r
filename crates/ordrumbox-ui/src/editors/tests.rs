@@ -1,5 +1,6 @@
 use super::tabs::variant_options;
 use super::*;
+use crate::control::Style;
 use crate::panel::{EditorTab, GenerationTab, Id, Item, Rect, Step};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::instrument_family;
@@ -286,54 +287,54 @@ fn the_compose_tab_shows_the_style_values_until_set() {
     assert!(items.iter().any(|i| i.id == Some(Id::Generation("hitVariation"))));
 }
 
-#[test]
-fn the_arpeggio_s_scale_and_direction_are_on_screens() {
+/// A view of `note`, with `range` notes of arpeggio.
+fn note_view(note: Option<Note>, range: usize) -> NoteView {
     let choice = |values: &[&str]| Choice {
         values: values.iter().map(|v| (*v).to_owned()).collect(),
         labels: Vec::new(),
         selected: 0,
     };
-    let state = EditorState { note_tab: 3, ..EditorState::default() };
-    for range in [0, 3] {
-        let view = NoteView {
-            title: "BASS [beat 1 step 1]".into(),
-            note: Some(Note::default()),
-            scales: choice(&["major", "minor"]),
-            arp_direction: choice(&["up", "down"]),
-            arp_range: range,
-            arp_octaves: 1,
-        };
-        let items = note_editor(&view, &state, Rect::new(0, 0, 360, 300), Scale::ONE);
-        for key in ["arpScale", "arpDirection"] {
-            let screen = items.iter().find(|item| item.id == Some(Id::NoteSelect(key))).map(|item| &item.kind);
-            assert!(matches!(screen, Some(Kind::Screen { lit, .. }) if *lit == (range > 0)), "{key} range {range}");
-            for step in [Step::Previous, Step::Next] {
-                assert!(items.iter().any(|item| item.id == Some(Id::NoteSelectStep(key, step))), "{key} {step:?}");
-            }
-        }
+    NoteView {
+        title: "BASS [beat 1 step 1]".into(),
+        note,
+        scales: choice(&["major", "minor"]),
+        arp_direction: choice(&["up", "down"]),
+        arp_range: range,
+        arp_octaves: 1,
     }
 }
 
 #[test]
-fn note_editor_hides_the_euclidean_prob() {
-    let view = NoteView {
-        title: "KICK [beat 1 step 1]".into(),
-        note: Some(Note::default()),
-        scales: Choice::default(),
-        arp_direction: Choice::default(),
-        arp_range: 0,
-        arp_octaves: 1,
-    };
-    let state = EditorState { note_tab: 2, ..EditorState::default() };
-    let items = note_editor(&view, &state, Rect::new(0, 0, 360, 300), Scale::ONE);
-    let sliders: Vec<_> = items
-        .iter()
-        .filter_map(|i| match i.id {
-            Some(Id::NoteSlider(k)) => Some(k),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(sliders, ["euclideanPulses", "euclideanRotation"]);
+fn the_note_editor_shows_every_setting_on_one_screen() {
+    let area = Rect::new(0, 0, note_strip_width(Scale::ONE), note_strip_height(Scale::ONE));
+    let items = note_editor(&note_view(Some(Note::default()), 3), area, Scale::ONE);
+    let kind = |id: Id| items.iter().find(|item| item.id == Some(id)).map(|item| &item.kind);
+    for key in ["arpScale", "arpDirection"] {
+        assert!(matches!(kind(Id::NoteSelect(key)), Some(Kind::Spin { .. })), "{key}");
+    }
+    let spins = ["cycle", "cycleOffset", "retriggerCount", "retriggerRate", "euclideanPulses", "euclideanRotation"];
+    for key in spins.into_iter().chain(["arpRange", "arpOctaves"]) {
+        assert!(matches!(kind(Id::NoteSpin(key)), Some(Kind::Spin { .. })), "{key}");
+    }
+    let Some(Kind::Spin { values, selected, .. }) = kind(Id::NoteSpin("arpRange")) else { panic!("arpRange") };
+    assert_eq!(values[*selected], "3");
+    for key in ["probability", "retriggerProbability", "retriggerFade", "shiftSteps"] {
+        let fader = matches!(kind(Id::NoteFader(key)), Some(Kind::Value { spec, .. }) if spec.style == Style::Fader);
+        assert!(fader, "{key}");
+    }
+    for key in ["velocity", "pitch", "pan", "lengthSteps"] {
+        assert!(matches!(kind(Id::NoteKnob(key)), Some(Kind::Value { spec, .. }) if spec.style == Style::Knob));
+    }
+    // Every control inside the strip, none over another.
+    let controls: Vec<Rect> = items.iter().filter(|item| item.id.is_some()).map(|item| item.rect).collect();
+    for (i, r) in controls.iter().enumerate() {
+        assert!(
+            r.x >= area.x && r.x + r.w <= area.x + area.w && r.y >= area.y && r.y + r.h <= area.y + area.h,
+            "{r:?}"
+        );
+        let overlaps = |o: &Rect| r.x < o.x + o.w && o.x < r.x + r.w && r.y < o.y + o.h && o.y < r.y + r.h;
+        assert!(!controls[i + 1..].iter().any(overlaps), "{r:?}");
+    }
 }
 
 #[test]
@@ -490,18 +491,9 @@ fn no_control_moves_whatever_the_tab_and_the_settings() {
 
     let mut places = Vec::new();
     for note in [Some(Note::default()), None] {
-        for note_tab in 0..NOTE_TABS.len() as u8 {
-            let view = NoteView {
-                title: "KICK [beat 1 step 1]".into(),
-                note: note.clone(),
-                scales: Choice { values: vec!["major".into()], labels: Vec::new(), selected: 0 },
-                arp_direction: Choice { values: vec!["up".into()], labels: Vec::new(), selected: 0 },
-                arp_range: 2,
-                arp_octaves: 2,
-            };
-            let state = EditorState { note_tab, ..EditorState::default() };
-            let items = note_editor(&view, &state, Rect::new(700, 400, 360, 200), Scale::ONE);
-            assert_put(&mut places, &items, &format!("note tab {note_tab}"));
+        for range in [0, 2] {
+            let items = note_editor(&note_view(note.clone(), range), Rect::new(700, 400, 900, 90), Scale::ONE);
+            assert_put(&mut places, &items, &format!("range {range}"));
         }
     }
 }

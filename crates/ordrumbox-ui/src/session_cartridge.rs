@@ -52,7 +52,7 @@ impl Session {
 
     /// A screen's arrows: the value before or after the one screen `id`
     /// shows, set as its list sets it (`Id::Synth`, `Id::LfoType`,
-    /// `Id::TrackSelect`, `Id::NoteSelect`).
+    /// `Id::TrackSelect`).
     pub(super) fn step_screen(&mut self, t: usize, id: Id, step: Step) {
         let Some(choice) = self.screen_choice(t, id) else { return };
         match choice.stepped(step) {
@@ -69,10 +69,6 @@ impl Session {
             Id::Synth => Some(synth_choice(&self.synths.presets, track)),
             Id::LfoType(i) => editors::lfo_target(i).map(|target| editors::lfo_wave_choice(track, target)),
             Id::TrackSelect(key) => Some(editors::select_choice(track, key, &self.editors)),
-            Id::NoteSelect(key) => {
-                let view = self.note_view(t);
-                Some(if key == "arpScale" { view.scales } else { view.arp_direction })
-            }
             _ => None,
         }
     }

@@ -104,7 +104,9 @@ off (a lowpass filter, a room reverb); a delay of type none stays off.
 
 The **note editor** (the selected note's velocity, pitch, pan, trigger, retrigger,
 euclidean, arpeggio and timing settings) is a strip under the grid and under the piano roll, the
-views that edit notes. The track editor, on the right, holds the track's settings only.
+views that edit notes: one card a group, all on one screen, in the synth editor's look (knobs for
+the note, spinners for whole numbers and choices, vertical faders for the rest). The track
+editor, on the right, holds the track's settings only.
 
 A note's **Length** (a knob beside Velocity, Pitch and Pan, 1 step by default, a quarter of a step at least) is how
 long a synth note is held before its release, and how long the MIDI note sent or exported

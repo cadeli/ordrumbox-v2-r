@@ -16,7 +16,6 @@ use ordrumbox_core::{FilterType, Note, RetriggerSpacing, ScaleList, Track, num};
 pub struct EditorState {
     pub tab: EditorTab,
     pub generation_tab: GenerationTab,
-    pub note_tab: u8,
     /// The lane under the grid: an index in [`LANES`].
     pub lane: u8,
     /// The Generate tab shows its Advanced settings.

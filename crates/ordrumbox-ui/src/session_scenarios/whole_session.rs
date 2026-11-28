@@ -255,9 +255,9 @@ fn every_knob_of_the_editors_is_undone() {
     let (width, height, scale) = WINDOW;
     let mut turned = 0;
     for tab in EditorTab::ALL {
-        for sub_tab in 0..4 {
+        for sub_tab in 0..4u8 {
             s.editors.tab = tab;
-            (s.editors.generation_tab, s.editors.note_tab) = (GenerationTab::ALL[usize::from(sub_tab) % 3], sub_tab);
+            s.editors.generation_tab = GenerationTab::ALL[usize::from(sub_tab) % 3];
             let knobs: Vec<Id> = s
                 .panel_layout(width, height, scale)
                 .items

@@ -851,3 +851,12 @@ with ticks; they keep their value under their label (a knob of the hardware look
 the synth editor's have none). The measurements and the waveform are on screens. The cards' bands and padding
 take some room (`KitLayout`): at a given window size the table may show fewer rows. Controls, ids and sound are unchanged. No snapshot
 changed.
+
+The note editor has no tabs any more: its settings are on one screen, in the synth editor's hardware look
+(`editors/note.rs`). On the metal, a row of cards, widened together to the strip's width: the note's (its title in
+the band, the Velocity, Pitch, Pan and Length knobs), then Trigger, Retrigger, Euclidean, Arpeggio and Timing. The
+whole numbers (cycle, offset, retrigger count and rate, pulses, rotation, the arpeggio's range and octaves) and the
+arpeggio's scale and direction are spins, two to a column; the chances, the fade and the shift vertical faders with
+their value under them. `Id::NoteTab`, `Id::NoteSelectStep` and `EditorState::note_tab` are gone, `Id::NoteSlider`
+is `Id::NoteFader`, and `Id::NoteSpin` sets a whole number. The scale and direction are no longer dimmed while the
+arpeggio is off. The strip keeps its height. No snapshot changed. `docs/images/note-editor.png` still shows the tabs.

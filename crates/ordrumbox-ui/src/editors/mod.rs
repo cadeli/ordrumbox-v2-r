@@ -49,6 +49,11 @@ impl Choice {
         self.values.get(at).map(String::as_str)
     }
 
+    /// The same choice on a spin, its ▲ and ▼ beside it.
+    pub fn spin(&self) -> Kind {
+        Kind::spin(self.values.clone(), self.shown_labels(), self.selected)
+    }
+
     /// The labels shown: the values when there are none.
     fn shown_labels(&self) -> Vec<String> {
         if self.labels.is_empty() { self.values.clone() } else { self.labels.clone() }
@@ -102,6 +107,21 @@ pub struct NoteView {
     pub arp_octaves: usize,
 }
 
+impl NoteView {
+    /// No note to show, `title` in its place.
+    #[must_use]
+    pub fn none(title: &str) -> Self {
+        Self {
+            title: title.to_owned(),
+            note: None,
+            scales: Choice::default(),
+            arp_direction: Choice::default(),
+            arp_range: 0,
+            arp_octaves: 1,
+        }
+    }
+}
+
 /// What the kit editor's controls show.
 #[derive(Debug, Clone)]
 pub struct KitControls {
@@ -113,15 +133,17 @@ pub struct KitControls {
     pub shape: Shape,
 }
 
+mod kit;
 mod layout;
-mod note_kit;
+mod note;
 mod tables;
 mod tabs;
 #[cfg(test)]
 mod tests;
 mod values;
 
+pub use kit::*;
 pub use layout::*;
-pub use note_kit::*;
+pub use note::*;
 pub use tables::*;
 pub use values::*;

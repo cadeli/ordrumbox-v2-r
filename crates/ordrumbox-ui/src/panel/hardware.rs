@@ -35,6 +35,8 @@ const BUTTON_ON_TEXT: Rgb = 0x001E_1E10;
 const LED_ON: (Rgb, Rgb) = (0x00C8_FFAE, 0x0036_C824);
 const LED_OFF: (Rgb, Rgb) = (0x002E_5A32, 0x0016_3519);
 const LED_RIM: Rgb = 0x0008_1A0A;
+/// A card's title band (at scale 1).
+pub(crate) const CARD_HEAD: i32 = 14;
 /// The 11 ticks around a knob's 270°.
 const TICKS: i32 = 11;
 const KNOB_START: f64 = 135.0;
@@ -137,6 +139,8 @@ pub(crate) fn draw_screen(canvas: &mut Canvas, r: Rect, s: Scale) {
 pub(super) fn draw_item(canvas: &mut Canvas, item: &Item, s: Scale) -> bool {
     let r = item.rect;
     match &item.kind {
+        Kind::Panel if item.skin == Skin::Metal => draw_metal(canvas, r),
+        Kind::Card if item.skin == Skin::Card => draw_card(canvas, r, Some(CARD_HEAD * s), false, s),
         Kind::Text { text, .. } => {
             let color = if item.skin == Skin::Metal { METAL_TEXT } else { Cards::current().label };
             canvas.text(r.x, r.y, &fit(text, r.w.max(text_width(text, s)), s), s, color);

@@ -1,6 +1,6 @@
 //! The tables the editors read: tabs, effects, settings, ranges and labels.
 
-use super::note_kit::note_default;
+use super::note::note_default;
 use crate::control::Format;
 use ordrumbox_engine::kit::edit::SampleField;
 
@@ -330,8 +330,8 @@ pub const LOOP_PROPS: [Prop; 3] = [
     prop("grooveAmount", "Amount", 0.0, 1.0, 0.01, Format::Plain),
 ];
 
-/// Note editor tabs.
-pub const NOTE_TABS: [&str; 5] = ["Trigger", "Retrigger", "Euclidean", "Arpeggio", "Timing"];
+/// The titles of the note editor's cards after the note's own, one a group of [`NOTE_GROUPS`].
+pub const NOTE_CARDS: [&str; 5] = ["TRIGGER", "RETRIGGER", "EUCLIDEAN", "ARPEGGIO", "TIMING"];
 
 /// The note editor's knobs and their units.
 pub const NOTE_KNOBS: [(Prop, &str); 4] = [
@@ -342,26 +342,55 @@ pub const NOTE_KNOBS: [(Prop, &str); 4] = [
     (prop("lengthSteps", "Length", MIN_LENGTH_SLIDER, MAX_LENGTH_SLIDER, 0.25, Format::Fmt), ""),
 ];
 
-/// A row of a note editor tab.
+/// A control of a note editor card: a fader for a value that runs on, a
+/// spin for a whole number or a choice (the arpeggio's scale and direction).
 #[derive(Debug, Clone, Copy)]
 pub enum NoteRow {
-    Slider(Prop),
+    Fader(Prop),
+    Count(Prop),
     Select(&'static str, &'static str),
+}
+
+impl NoteRow {
+    /// The setting's key.
+    #[must_use]
+    pub const fn key(&self) -> &'static str {
+        match self {
+            Self::Fader(p) | Self::Count(p) => p.key,
+            Self::Select(key, _) => key,
+        }
+    }
+
+    /// The setting's label.
+    #[must_use]
+    pub const fn label(&self) -> &'static str {
+        match self {
+            Self::Fader(p) | Self::Count(p) => p.label,
+            Self::Select(_, label) => label,
+        }
+    }
+
+    /// The setting's range, when it is a number.
+    #[must_use]
+    pub const fn prop(&self) -> Option<&Prop> {
+        match self {
+            Self::Fader(p) | Self::Count(p) => Some(p),
+            Self::Select(..) => None,
+        }
+    }
 }
 
 /// A note's chance, 0–1, shown as a percentage.
 pub(super) const fn note_chance(key: &'static str, label: &'static str) -> NoteRow {
-    NoteRow::Slider(prop(key, label, 0.0, 1.0, 0.01, Format::Percent))
+    NoteRow::Fader(prop(key, label, 0.0, 1.0, 0.01, Format::Percent))
 }
 
 pub(super) const fn note_count(key: &'static str, label: &'static str, min: f64, max: f64) -> NoteRow {
-    NoteRow::Slider(count(key, label, min, max, Format::Fmt))
+    NoteRow::Count(count(key, label, min, max, Format::Fmt))
 }
 
-/// The rows of each note tab. The Euclidean tab's "Prob"
-/// (the same setting as the Retrig tab's) never shows: both sliders share
-/// one key, and the second one takes the first one's place.
-pub const NOTE_GROUPS: [&[NoteRow]; NOTE_TABS.len()] = [
+/// The controls of each note card, under its title of [`NOTE_CARDS`].
+pub const NOTE_GROUPS: [&[NoteRow]; NOTE_CARDS.len()] = [
     &[
         note_count("cycle", "Cycle", 1.0, 16.0),
         note_count("cycleOffset", "Offset", 0.0, 15.0),
@@ -371,7 +400,7 @@ pub const NOTE_GROUPS: [&[NoteRow]; NOTE_TABS.len()] = [
         note_count("retriggerCount", "Retrigger", 1.0, 16.0),
         note_count("retriggerRate", "Rate", 1.0, 16.0),
         note_chance("retriggerProbability", "Probability"),
-        NoteRow::Slider(prop("retriggerFade", "Fade", 0.0, 1.0, 0.01, Format::Percent)),
+        NoteRow::Fader(prop("retriggerFade", "Fade", 0.0, 1.0, 0.01, Format::Percent)),
     ],
     &[note_count("euclideanPulses", "Pulses", 0.0, 16.0), note_count("euclideanRotation", "Rotation", 0.0, 15.0)],
     &[
@@ -380,7 +409,7 @@ pub const NOTE_GROUPS: [&[NoteRow]; NOTE_TABS.len()] = [
         note_count("arpRange", "Range", 0.0, 12.0),
         note_count("arpOctaves", "Octaves", 1.0, MAX_OCTAVES as f64),
     ],
-    &[NoteRow::Slider(prop("shiftSteps", "Shift", -MAX_SHIFT_STEPS, MAX_SHIFT_STEPS, 0.01, Format::Percent))],
+    &[NoteRow::Fader(prop("shiftSteps", "Shift", -MAX_SHIFT_STEPS, MAX_SHIFT_STEPS, 0.01, Format::Percent))],
 ];
 
 /// The shortest and the longest note the note editor's slider and the lane
@@ -396,15 +425,12 @@ pub fn note_range(key: &str) -> Option<(f64, f64)> {
     Some((prop.min, if key == "lengthSteps" { MAX_LENGTH_STEPS } else { prop.max }))
 }
 
-/// The note editor's setting of key `key`: a knob's or a slider's.
+/// The note editor's setting of key `key`: a knob's, a fader's or a spin's.
 #[must_use]
 pub fn note_prop(key: &str) -> Option<&'static Prop> {
     let knobs = NOTE_KNOBS.iter().map(|(prop, _)| prop);
-    let sliders = NOTE_GROUPS.iter().flat_map(|rows| rows.iter()).filter_map(|row| match row {
-        NoteRow::Slider(prop) => Some(prop),
-        NoteRow::Select(..) => None,
-    });
-    knobs.chain(sliders).chain(LOCK_PROPS.iter()).find(|prop| prop.key == key)
+    let rows = NOTE_GROUPS.iter().flat_map(|rows| rows.iter()).filter_map(NoteRow::prop);
+    knobs.chain(rows).chain(LOCK_PROPS.iter()).find(|prop| prop.key == key)
 }
 
 /// The note settings the grid's lane shows, one bar per step: their keys

@@ -21,13 +21,6 @@ pub fn help(id: Id) -> Option<Help> {
         },
         Id::GenerationAdvanced => ["Advanced settings", "the manual, Groovy, Engine and Compose settings"],
         Id::Regenerate => ["New line", "write this track's line again, in its style"],
-        Id::NoteTab(tab) => match tab {
-            0 => ["Trigger", "when the note plays: every N loops, its chance"],
-            1 => ["Retrigger", "repeats of the note, how fast, their chance, their fade"],
-            2 => ["Euclidean", "hits spread evenly up to the next note"],
-            3 => ["Arpeggio", "the note played as a run of scale notes"],
-            _ => ["Timing", "how long the note is held, how far off the grid it plays"],
-        },
         Id::Lane(lane) => match lane {
             0 => ["Velocity lane", "how loud each note of the track is: click or drag the bars"],
             1 => ["Chance lane", "how likely each note of the track is to play: click or drag the bars"],
@@ -40,8 +33,6 @@ pub fn help(id: Id) -> Option<Help> {
         Id::LfoType(_) => ["LFO wave", "the shape the setting follows"],
         Id::LfoTypeStep(_, Step::Previous) => ["Previous wave", "the LFO's wave before the one shown"],
         Id::LfoTypeStep(_, Step::Next) => ["Next wave", "the LFO's wave after the one shown"],
-        Id::NoteSelectStep(_, Step::Previous) => ["Previous", "the arpeggio's scale or direction before the one shown"],
-        Id::NoteSelectStep(_, Step::Next) => ["Next", "the arpeggio's scale or direction after the one shown"],
         Id::Lfo(_, param) => match param {
             LfoParam::Freq => ["LFO rate", "how fast the setting moves, in Hz"],
             LfoParam::Min => ["LFO minimum", "the lowest value the setting reaches"],
@@ -117,7 +108,8 @@ pub fn help(id: Id) -> Option<Help> {
         | Id::Toggle(key)
         | Id::Row(key)
         | Id::NoteKnob(key)
-        | Id::NoteSlider(key)
+        | Id::NoteFader(key)
+        | Id::NoteSpin(key)
         | Id::NoteSelect(key) => setting_help(key)?,
         _ => return None,
     })
@@ -273,7 +265,7 @@ mod tests {
     use super::*;
     use crate::editors::{
         FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVY, GENERATION_MANUAL, GenerationRow,
-        KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_TABS, NoteRow,
+        KNOB_BAR, LOOP_PROPS, NOTE_GROUPS,
     };
 
     #[test]
@@ -288,12 +280,7 @@ mod tests {
                 GenerationRow::Toggle(key, _) | GenerationRow::Select(key, _) => key,
             });
         }
-        for row in NOTE_GROUPS.iter().flat_map(|g| g.iter()) {
-            keys.push(match row {
-                NoteRow::Slider(p) => p.key,
-                NoteRow::Select(key, _) => key,
-            });
-        }
+        keys.extend(NOTE_GROUPS.iter().flat_map(|g| g.iter()).map(|row| row.key()));
         keys.extend([
             "mono",
             "legato",
@@ -310,16 +297,12 @@ mod tests {
             assert!(help(Id::Fx(key)).is_some(), "{key}");
             assert!(help(Id::Row(key)).is_some(), "the label of {key}");
         }
-        for tab in 0..NOTE_TABS.len() as u8 {
-            assert!(help(Id::NoteTab(tab)).is_some(), "note tab {tab}");
-        }
         for fx in 0..FX_DEFS.len() as u8 {
             assert!(help(Id::FxPower(fx)).is_some(), "effect {fx}");
         }
         for (key, _) in crate::view::MACROS {
             assert!(help(Id::Macro(key)).is_some(), "{key}");
         }
-        assert_eq!(help(Id::NoteTab(1)).map(|h| h[0]), Some("Retrigger"));
         assert_eq!(help(Id::Fx("transpose")).map(|h| h[0]), Some("Transpose"));
     }
 }

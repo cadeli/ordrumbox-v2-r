@@ -3,7 +3,7 @@
 use super::{ACCENT, ENVELOPE, focus_row_color};
 use crate::canvas::{Canvas, Direction, chars_in, text_width};
 use crate::frame::{body_top, footer_top, margin};
-use crate::panel::hardware::{self, LCD_DIM, LCD_TEXT};
+use crate::panel::hardware::{self, CARD_HEAD, LCD_DIM, LCD_TEXT};
 use crate::panel::{Rect, row_at};
 use crate::sample_overlay::Overlay;
 use crate::scale::Scale;
@@ -101,9 +101,8 @@ pub(super) const KIT_NAME_CHARS: usize = 24;
 pub(super) const KIT_FACT_LABEL: usize = 9;
 /// Labels of the kit's header ("Notes"), in characters.
 pub(super) const KIT_HEAD_LABEL: usize = 7;
-/// A card's title band, its padding around what it holds, and the gap
-/// between two cards, per scale unit.
-const KIT_CARD_HEAD: i32 = 14;
+/// A card's padding around what it holds, and the gap between two cards,
+/// per scale unit (its title band: [`CARD_HEAD`]).
 const KIT_CARD_PAD: i32 = 6;
 const KIT_CARD_GAP: i32 = 6;
 /// The text of a title band, under its top, per scale unit.
@@ -115,7 +114,7 @@ impl KitLayout {
         let margin = margin(scale);
         let top = body_top(scale);
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
-        let (head, pad, gap) = (KIT_CARD_HEAD * s, KIT_CARD_PAD * s, KIT_CARD_GAP * s);
+        let (head, pad, gap) = (CARD_HEAD * s, KIT_CARD_PAD * s, KIT_CARD_GAP * s);
         let left = margin + pad;
         let list_width = (width - 2 * left).max(40 * s);
         let line = KIT_LINE * s;
@@ -204,7 +203,7 @@ impl KitLayout {
 
     /// The title band's height, per [`Scale`].
     pub(super) fn head_h(&self) -> i32 {
-        KIT_CARD_HEAD * self.scale
+        CARD_HEAD * self.scale
     }
 
     /// The measurements' screen.

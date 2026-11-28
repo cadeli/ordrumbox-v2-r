@@ -18,8 +18,8 @@ use ordrumbox_core::{DelayType, Track, num};
 use ordrumbox_engine::strip_settings::delay_beats_used;
 use ordrumbox_logic::generate;
 
+use super::kit::shape_controls;
 use super::layout::*;
-use super::note_kit::shape_controls;
 
 /// The FX tab: the effects one under the other, each a cartridge of its
 /// own, as in the LFO tab: its LED, its name and its type in the label

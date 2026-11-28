@@ -204,16 +204,17 @@ impl Session {
         }
     }
 
-    /// The note editor in `r`, in a card of its own.
+    /// The note editor in `r`, its cards on the metal of the hardware look.
     fn note_editor_items(&self, layout: &mut PanelLayout, r: Rect, scale: Scale) {
         let s = scale;
         let pad = 6 * s;
         let back = Rect::new(r.x - pad, r.y - 4 * s, r.w + 2 * pad, r.h + 6 * s);
-        layout.items.push(Item::new(None, back, Kind::Card));
-        match self.editor_track() {
-            Some(t) => layout.items.extend(editors::note_editor(&self.note_view(t), &self.editors, r, scale)),
-            None => layout.items.push(Item::text(r.x, r.y, "No note", panel::dim(), s)),
-        }
+        layout.items.push(Item::new(None, back, Kind::Panel).skinned(Skin::Metal));
+        let view = match self.editor_track() {
+            Some(t) => self.note_view(t),
+            None => editors::NoteView::none("No note"),
+        };
+        layout.items.extend(editors::note_editor(&view, r, scale));
     }
 
     /// The kit editor in the main region: its controls, and where its details start.
@@ -369,7 +370,7 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::Loop(key) => (prop(&LOOP_PROPS, key), ""),
         Id::Lfo(_, param) => (param.label(), ""),
         Id::NoteKnob(key) => NOTE_KNOBS.iter().find(|(p, _)| p.key == key).map_or(("", ""), |(p, u)| (p.label, *u)),
-        Id::NoteSlider(key) => (note_slider_label(key).unwrap_or(""), ""),
+        Id::NoteFader(key) | Id::NoteSpin(key) | Id::NoteSelect(key) => (note_row_label(key).unwrap_or(""), ""),
         Id::KitKnob(field) | Id::SampleKnob(field) => KIT_KNOBS
             .iter()
             .find(|(f, ..)| *f == field)
@@ -391,13 +392,6 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
             });
             (label.unwrap_or(""), "")
         }
-        Id::NoteSelect(key) => {
-            let label = NOTE_GROUPS.iter().flat_map(|g| g.iter()).find_map(|r| match r {
-                NoteRow::Select(k, label) if *k == key => Some(*label),
-                _ => None,
-            });
-            (label.unwrap_or(""), "")
-        }
         Id::TrackVolume(_) => ("Volume", ""),
         Id::MixerKnob(_, key) => {
             crate::mixer::TRACK_KNOBS.iter().find(|(k, _)| *k == key).map_or(("", ""), |(_, label)| (*label, ""))
@@ -414,12 +408,9 @@ fn generation_slider_label(key: &str) -> Option<&'static str> {
     })
 }
 
-/// The label of the note editor's slider `key`.
-fn note_slider_label(key: &str) -> Option<&'static str> {
-    NOTE_GROUPS.iter().flat_map(|g| g.iter()).find_map(|r| match r {
-        NoteRow::Slider(p) if p.key == key => Some(p.label),
-        _ => None,
-    })
+/// The label of the note editor's fader or spin `key`.
+fn note_row_label(key: &str) -> Option<&'static str> {
+    NOTE_GROUPS.iter().flat_map(|g| g.iter()).find(|r| r.key() == key).map(NoteRow::label)
 }
 
 /// The edits that set the filter of `track` to `filter_type`: from the bypass,
@@ -459,7 +450,7 @@ pub(super) fn history_label(id: Id) -> String {
         | Id::Compose(key)
         | Id::Loop(key)
         | Id::Toggle(key) => key,
-        Id::NoteSlider(key) | Id::NoteKnob(key) | Id::NoteSelect(key) => key,
+        Id::NoteFader(key) | Id::NoteSpin(key) | Id::NoteKnob(key) | Id::NoteSelect(key) => key,
         _ => "",
     };
     let label = Some(control_name(id).0).filter(|l| !l.is_empty()).unwrap_or(key);
@@ -491,7 +482,7 @@ mod tests {
         assert_eq!(history_label(Id::Compose("composeSyncopation")), "Syncopation");
         assert_eq!(history_label(Id::Loop("loopLength")), "Loop Length");
         assert_eq!(history_label(Id::Toggle("pitchScaleLock")), "Scale Lock");
-        assert_eq!(history_label(Id::NoteSlider("euclideanPulses")), "Pulses");
+        assert_eq!(history_label(Id::NoteSpin("euclideanPulses")), "Pulses");
         assert_eq!(history_label(Id::NoteSelect("arpDirection")), "Direction");
         assert_eq!(history_label(Id::NoteKnob("velocity")), "Velocity");
     }
@@ -585,16 +576,13 @@ mod tests {
         for scale in (Scale::ONE.quarters()..=Scale::MAX.quarters()).map(Scale::from_quarters) {
             let (width, height) = view::min_window_size(scale, view::Shown::all());
             let body = view::Body::new(width, height, scale, s.track_editor_width(width, scale), 1, true);
-            for (track, tab, sub, note_tab, advanced) in (0..2).flat_map(|t| {
+            for (track, tab, sub, advanced) in (0..2).flat_map(|t| {
                 EditorTab::ALL.into_iter().flat_map(move |tab| {
-                    GenerationTab::ALL
-                        .into_iter()
-                        .flat_map(move |sub| (0..5u8).flat_map(move |n| [false, true].map(|a| (t, tab, sub, n, a))))
+                    GenerationTab::ALL.into_iter().flat_map(move |sub| [false, true].map(|a| (t, tab, sub, a)))
                 })
             }) {
                 s.editors.tab = tab;
                 s.editors.generation_tab = sub;
-                s.editors.note_tab = note_tab;
                 s.editors.generation_advanced = advanced;
                 s.selection.cursor = Some(view::Cursor { track, beat: 0, step: 0 });
                 let layout = s.panel_layout(width, height, scale);
@@ -604,7 +592,7 @@ mod tests {
                     .map(|i| i.rect.y + i.rect.h)
                     .max()
                     .unwrap();
-                assert!(bottom <= body.main_bottom, "scale {scale} tab {tab:?}/{sub:?} note tab {note_tab}: {bottom}");
+                assert!(bottom <= body.main_bottom, "scale {scale} tab {tab:?}/{sub:?}: {bottom}");
                 if scale == Scale::ONE {
                     tallest = tallest.max(bottom - frame::body_top(scale));
                 }
@@ -615,8 +603,8 @@ mod tests {
                         continue;
                     }
                     let r = item.rect;
-                    assert!(r.y + r.h <= body.main_bottom, "scale {scale} note tab {note_tab}: {r:?}");
-                    assert!(r.x + r.w <= strip.x + strip.w, "scale {scale} note tab {note_tab}: {r:?}");
+                    assert!(r.y + r.h <= body.main_bottom, "scale {scale}: {r:?}");
+                    assert!(r.x + r.w <= strip.x + strip.w, "scale {scale}: {r:?}");
                 }
             }
             let views = view::header_controls(scale).views;
