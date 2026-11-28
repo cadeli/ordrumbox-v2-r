@@ -14,9 +14,13 @@ pub fn content_top(scale: Scale) -> i32 {
     menu::bar_height(scale) + margin(scale) / 2
 }
 
-/// Height of the header's row of controls: a label, then the widget.
+/// Height of the header's controls at scale 1: the metal strip and its
+/// cards (`view/header.rs`).
+pub const HEADER_CONTROLS_HEIGHT: i32 = 80;
+
+/// Height of the header's controls.
 fn controls_height(scale: Scale) -> i32 {
-    28 * scale
+    HEADER_CONTROLS_HEIGHT * scale
 }
 
 /// Top of the header's second line (the last action, undo, the song).

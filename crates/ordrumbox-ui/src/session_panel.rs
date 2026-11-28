@@ -9,26 +9,20 @@
 
 use crate::scale::Scale;
 use ordrumbox_core::json::Value;
-use ordrumbox_core::steps::MAX_BEATS;
-use ordrumbox_core::style::{self, Macros};
-use ordrumbox_core::{num, song};
 
 use super::Session;
-use super::session_labels::style_label;
 use super::session_types::Workspace;
 use crate::control::Spec;
 use crate::editors::{
     self, FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVY, GENERATION_MANUAL,
     GenerationRow, KIT_KNOBS, KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_KNOBS, NoteRow,
 };
-use crate::font;
 use crate::frame;
 use crate::panel::{self, Item, Kind, Rect, Skin};
-use crate::panel::{EditorTab, Id, ViewButton};
+use crate::panel::{EditorTab, Id};
 use crate::view;
 use crate::view::Layout;
 use ordrumbox_core::{FilterType, Pattern, Track};
-use ordrumbox_logic::generate;
 use std::time::Duration;
 
 /// Two clicks on a widget this close are a double-click.
@@ -40,8 +34,6 @@ pub struct PanelLayout {
     pub items: Vec<Item>,
     /// Width the track editor takes on the right (0: not shown).
     pub right: i32,
-    /// Where the kit editor's sample details start, under its controls.
-    pub details_top: i32,
 }
 
 /// The keys the widgets read.
@@ -95,11 +87,7 @@ impl Session {
     /// The widgets of a `width` × `height` window.
     pub(super) fn panel_layout(&self, width: i32, height: i32, scale: Scale) -> PanelLayout {
         let mut layout = PanelLayout::default();
-        self.header_selects(&mut layout, scale);
-        if let Some(pattern) = self.pattern() {
-            self.header_items(&mut layout, pattern, scale);
-        }
-        self.view_buttons(&mut layout, scale);
+        self.header_items(&mut layout, scale);
         // The window split: the main editor top-left, the track editor down the right.
         let right = self.track_editor_width(width, scale);
         let body = self.body((width, height, scale));
@@ -129,50 +117,6 @@ impl Session {
         }
         self.mark_taken_back(&mut layout.items, scale);
         layout
-    }
-
-    /// The header's pattern and kit lists.
-    fn header_selects(&self, layout: &mut PanelLayout, scale: Scale) {
-        let c = view::header_controls(scale);
-        let library = self.editor.library();
-        if self.workspace == Workspace::Song {
-            self.song_select(layout, c.song());
-        } else if !library.patterns.is_empty() {
-            let labels = library
-                .patterns
-                .iter()
-                .enumerate()
-                .map(|(i, p)| p.name.clone().unwrap_or_else(|| format!("Pattern {i}")))
-                .collect();
-            let values = (0..library.patterns.len()).map(|i| i.to_string()).collect();
-            let selected = self.pattern_index.min(library.patterns.len() - 1);
-            layout.items.push(Item::new(Some(Id::PatternList), c.pattern, Kind::Select { values, labels, selected }));
-        }
-        if !self.kits.kits().is_empty() {
-            let labels = self.kits.kits().iter().map(|k| k.name.clone()).collect();
-            let values = (0..self.kits.kits().len()).map(|i| i.to_string()).collect();
-            let selected = self.kit_index.min(self.kits.kits().len() - 1);
-            layout.items.push(Item::new(Some(Id::KitList), c.kit, Kind::Select { values, labels, selected }));
-        }
-    }
-
-    /// The view buttons (the main editor, then the kit editor): the one shown lit.
-    fn view_buttons(&self, layout: &mut PanelLayout, scale: Scale) {
-        let views = view::header_controls(scale).views;
-        let kit_open = self.kit_editor.is_open();
-        for (button, rect) in ViewButton::ALL.into_iter().zip(views) {
-            let on = match button {
-                // The song's slot has no button: the mode switch is its own.
-                ViewButton::Song => continue,
-                ViewButton::Kit => kit_open,
-                _ => !kit_open && self.workspace.view_button() == button,
-            };
-            layout.items.push(Item::new(
-                Some(Id::View(button)),
-                rect,
-                Kind::Button { label: button.label().into(), on },
-            ));
-        }
     }
 
     /// The track editor down the right edge of a window `width` wide: its
@@ -217,12 +161,11 @@ impl Session {
         layout.items.extend(editors::note_editor(&view, r, scale));
     }
 
-    /// The kit editor in the main region: its controls, and where its details start.
+    /// The kit editor in the main region: its controls, on the shared row.
     fn kit_editor_items(&self, layout: &mut PanelLayout, size: (i32, i32, Scale)) {
         let scale = size.2;
         let kit_layout = self.kit_layout(size);
         let area = kit_layout.controls_area();
-        layout.details_top = area.y;
         // The controls on the cards of the hardware look, as the synth
         // editor's (`view/kit.rs`); the texts keep their own colours.
         let on_card = |item: Item| match item.kind {
@@ -231,9 +174,7 @@ impl Session {
         };
         layout.items.extend(self.kit_items(&kit_layout, scale).into_iter().map(on_card));
         if let Some(view) = self.kit_controls() {
-            let (items, bottom) = editors::kit_controls(&view, area, scale);
-            layout.items.extend(items.into_iter().map(on_card));
-            layout.details_top = bottom;
+            layout.items.extend(editors::kit_controls(&view, area, scale).into_iter().map(on_card));
         }
     }
 
@@ -268,65 +209,6 @@ impl Session {
             return (gain.clamp(spec.min, spec.max), true);
         }
         (volume, false)
-    }
-
-    /// The header's transport and generation controls.
-    fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: Scale) {
-        let controls = view::header_controls(scale);
-        let song = self.is_song_mode();
-        for (i, (rect, label)) in controls.mode.iter().zip(view::MODES).enumerate() {
-            let kind = Kind::Button { label: label.into(), on: song == (i == 1) };
-            layout.items.push(Item::new(Some(Id::Mode(i as u8)), *rect, kind));
-        }
-        let playing = self.playing();
-        let label = if playing { "STOP" } else { "PLAY" };
-        layout.items.push(Item::new(
-            Some(Id::Transport),
-            controls.play,
-            Kind::Button { label: label.into(), on: playing },
-        ));
-        // REC in song mode; its slot stays empty in pattern mode.
-        if song {
-            let on = self.is_recording_automation();
-            let kind = Kind::Button { label: "REC".into(), on };
-            layout.items.push(Item::new(Some(Id::RecordAutomation), controls.record, kind));
-        }
-        let spec = Spec::knob(song::MIN_BPM, song::MAX_BPM, 1.0, song::DEFAULT_BPM);
-        let bpm = self.tempo();
-        let text = num::text(bpm);
-        let kind = Kind::Value { spec, value: bpm, label: None, text, lfo: false };
-        layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
-        // The song mode has no pattern settings nor generation: the song list is in their place.
-        if self.workspace == Workspace::Song {
-            return;
-        }
-        let (beats, selected) = beat_choices(pattern.beat_count);
-        let kind = Kind::Select { values: beats.clone(), labels: beats, selected };
-        layout.items.push(Item::new(Some(Id::Beats), controls.beats, kind));
-        // The generation: the pattern's style, ♫, AUTO, the macros.
-        let styles = self.shown_styles();
-        let style = pattern.extra.get(generate::STYLE_KEY).and_then(|g| g.as_str()).unwrap_or_default();
-        let values: Vec<String> =
-            std::iter::once(String::new()).chain(styles.list.iter().map(|s| s.name.clone())).collect();
-        let labels: Vec<String> =
-            std::iter::once("random".to_owned()).chain(styles.list.iter().map(style_label)).collect();
-        let selected = styles.get(style).and_then(|st| values.iter().position(|v| *v == st.name)).unwrap_or(0);
-        layout.items.push(Item::new(Some(Id::StyleList), controls.style, Kind::Select { values, labels, selected }));
-        let button = Kind::Button { label: font::REGENERATE.into(), on: false };
-        layout.items.push(Item::new(Some(Id::GeneratePattern), controls.generate, button));
-        let button = Kind::Button { label: "AUTO".into(), on: self.pattern_auto() };
-        layout.items.push(Item::new(Some(Id::AutoAll), controls.auto, button));
-        let macros = Macros::of(pattern);
-        for (rect, (key, _)) in controls.macros.iter().zip(view::MACROS) {
-            let value = match key {
-                style::ENERGY => macros.energy,
-                style::COMPLEXITY => macros.complexity,
-                _ => macros.variation,
-            };
-            let spec = Spec::knob(0.0, 100.0, 1.0, style::MACRO_NEUTRAL);
-            let kind = Kind::Value { spec, value, label: None, text: num::text(value), lfo: false };
-            layout.items.push(Item::new(Some(Id::Macro(key)), *rect, kind));
-        }
     }
 
     /// Width the track editor takes on the right of a `width`-wide window (0:
@@ -423,23 +305,6 @@ pub(super) fn filter_on(track: &Track, filter_type: String) -> Vec<(&'static str
     updates
 }
 
-/// The pattern list offers every length up to this one, in beats...
-const EVERY_BEAT_UP_TO: i32 = 16;
-/// ...then every length this many beats apart, up to the longest.
-const LONG_BEAT_STEP: usize = 4;
-
-/// The lengths the pattern list offers, and the index of `current`, added when it
-/// is none of them (set by the keys).
-fn beat_choices(current: i32) -> (Vec<String>, usize) {
-    let long = (EVERY_BEAT_UP_TO..=MAX_BEATS).step_by(LONG_BEAT_STEP).skip(1);
-    let mut beats: Vec<i32> = (1..=EVERY_BEAT_UP_TO).chain(long).collect();
-    let selected = beats.binary_search(&current).unwrap_or_else(|at| {
-        beats.insert(at, current);
-        at
-    });
-    (beats.iter().map(i32::to_string).collect(), selected)
-}
-
 /// What an edit of control `id` is called in the undo history: its label,
 /// after its effect's for an effect setting (`Dly Mix`), else its key.
 pub(super) fn history_label(id: Id) -> String {
@@ -467,10 +332,12 @@ mod tests {
     use crate::canvas::Canvas;
     use crate::kits::KitSet;
     use crate::menu::Command;
-    use crate::panel::GenerationTab;
+    use crate::panel::{GenerationTab, ViewButton};
     use crate::ui_input::Button;
+    use ordrumbox_core::style;
     use ordrumbox_core::{Library, Styles};
     use ordrumbox_engine::SynthPresets;
+    use ordrumbox_logic::generate;
 
     #[test]
     fn history_names_an_edit_by_its_label() {
@@ -656,7 +523,7 @@ mod tests {
         let (x, y) = center(view::header_controls(Scale::ONE).bpm);
         s.show_mode(PlayMode::Song);
         s.run(crate::menu::Command::NewSong);
-        s.chrome.widgets.entry_mut().unwrap().text = "verse".into();
+        *s.chrome.widgets.entry_mut().unwrap().text_mut().unwrap() = "verse".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert!(s.song_view_open());
         let song_bpm = s.song().unwrap().bpm;
@@ -685,7 +552,7 @@ mod tests {
         assert_eq!(s.editor.library().bpm, 103.0);
         s.mouse_down(SIZE, x, y, Button::Right, false);
         s.pick(0);
-        s.chrome.widgets.entry_mut().unwrap().text = "140".into();
+        *s.chrome.widgets.entry_mut().unwrap().text_mut().unwrap() = "140".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.editor.library().bpm, 140.0);
         // The beats list: 8.
@@ -702,6 +569,45 @@ mod tests {
         assert!(s.pattern().unwrap().tracks.iter().all(|t| t.auto_mode));
         let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
         assert!(matches!(panel::find(&layout.items, Id::AutoAll).unwrap().kind, Kind::Button { on: true, .. }));
+    }
+
+    #[test]
+    fn the_header_cards_run_the_pattern_commands_and_set_its_key_and_scale() {
+        let mut s = session();
+        let c = view::header_controls(Scale::ONE);
+        // NEW, then DUP: two patterns more, the copy shown.
+        let [new, dup, ..] = c.pattern_buttons;
+        click(&mut s, center(new).0, center(new).1);
+        s.mouse_up();
+        click(&mut s, center(dup).0, center(dup).1);
+        s.mouse_up();
+        assert_eq!((s.editor.library().patterns.len(), s.pattern_index), (3, 2));
+        s.step_pattern(-2);
+        // QUANT opens the quantize card over the whole pattern.
+        let quantize = c.edit_buttons[0];
+        click(&mut s, center(quantize).0, center(quantize).1);
+        s.mouse_up();
+        assert!(matches!(s.chrome.overlay, Some(super::super::session_overlay::Overlay::NoteTool(_))));
+        s.chrome.overlay = None;
+        // The key spin's ▲ and the scale chosen: written to the pattern, one undo step each.
+        s.wheel(SIZE, center(c.key).0, center(c.key).1, 1, false, false);
+        assert_eq!(generate::pattern_key(s.pattern().unwrap()), 1.0);
+        assert_eq!(s.editor.history().next_undo(), Some("Set key → +1"));
+        s.select(Id::PatternScale, "dorian");
+        assert_eq!(generate::pattern_scale(s.pattern().unwrap()).as_deref(), Some("dorian"));
+        // DRUMS lights while the drum lines are generated.
+        let lit = |s: &Session| {
+            let items = s.panel_layout(SIZE.0, SIZE.1, SIZE.2).items;
+            matches!(
+                panel::find(&items, Id::Command(Command::GenerateDrums)).unwrap().kind,
+                Kind::Button { on: true, .. }
+            )
+        };
+        assert!(!lit(&s));
+        let drums = c.parts[0];
+        click(&mut s, center(drums).0, center(drums).1);
+        s.mouse_up();
+        assert!(lit(&s));
     }
 
     #[test]
@@ -785,11 +691,11 @@ mod tests {
     fn the_pattern_menu_renames_and_describes() {
         let mut s = session();
         s.run(Command::RenamePattern);
-        s.chrome.widgets.entry_mut().unwrap().text = " Verse ".into();
+        *s.chrome.widgets.entry_mut().unwrap().text_mut().unwrap() = " Verse ".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.pattern().unwrap().name.as_deref(), Some("Verse"));
         s.run(Command::PatternDescription);
-        assert_eq!(s.chrome.widgets.entry().map(|e| e.text.as_str()), Some(""));
+        assert_eq!(s.chrome.widgets.entry().map(|e| e.text()), Some(""));
         s.panel_text('x');
         s.panel_key(SIZE, PanelKey::Space, false, false);
         s.panel_text('y');

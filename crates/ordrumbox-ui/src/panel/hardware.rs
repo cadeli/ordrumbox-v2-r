@@ -31,6 +31,11 @@ const BUTTON_ON: (Rgb, Rgb) = (0x00F8_F592, 0x00D6_D056);
 const BUTTON_EDGE: Rgb = 0x0007_1114;
 const BUTTON_TEXT: Rgb = 0x00EE_F6F7;
 const BUTTON_ON_TEXT: Rgb = 0x001E_1E10;
+/// The transport's button, green: stopped, and lit while playing.
+const PLAY: (Rgb, Rgb) = (0x0040_A830, 0x0018_5C14);
+const PLAY_ON: (Rgb, Rgb) = (0x00C8_FFAE, 0x0036_C824);
+const PLAY_TEXT: Rgb = 0x00F2_FFEE;
+const PLAY_ON_TEXT: Rgb = 0x000C_2A08;
 /// A LED, lit and dark, and the glint on a lit one.
 const LED_ON: (Rgb, Rgb) = (0x00C8_FFAE, 0x0036_C824);
 const LED_OFF: (Rgb, Rgb) = (0x002E_5A32, 0x0016_3519);
@@ -160,6 +165,10 @@ pub(super) fn draw_item(canvas: &mut Canvas, item: &Item, s: Scale) -> bool {
         Kind::Spin { labels, selected, curve, .. } => draw_spin(canvas, r, (labels, *selected), curve, s),
         Kind::Toggle { on } => draw_button(canvas, r, if *on { "ON" } else { "OFF" }, *on, s),
         Kind::Button { label, on } => draw_button(canvas, r, label, *on, s),
+        Kind::Transport { playing } => {
+            let colors = if *playing { (PLAY_ON, PLAY_ON_TEXT) } else { (PLAY, PLAY_TEXT) };
+            draw_key(canvas, r, transport_label(*playing), colors, s);
+        }
         Kind::Led { on } => draw_led(canvas, r, *on, s),
         Kind::Select { labels, selected, .. } => {
             draw_screen(canvas, r, s);
@@ -311,9 +320,14 @@ fn draw_arrow(canvas: &mut Canvas, r: Rect, points_up: bool, color: Rgb, s: Scal
 
 /// A button (or a switch) with `label`: dark, yellow when `on`.
 fn draw_button(canvas: &mut Canvas, r: Rect, label: &str, on: bool, s: Scale) {
+    let colors = if on { (BUTTON_ON, BUTTON_ON_TEXT) } else { (BUTTON, BUTTON_TEXT) };
+    draw_key(canvas, r, label, colors, s);
+}
+
+/// A button's body in `fill` (top to bottom) in its frame, `label` on it in `text`.
+fn draw_key(canvas: &mut Canvas, r: Rect, label: &str, (fill, text): ((Rgb, Rgb), Rgb), s: Scale) {
     let t = s.px();
     canvas.fill_rounded_gradient(r.x, r.y, r.w, r.h, (BUTTON_EDGE, BUTTON_EDGE), 3 * s);
-    let (fill, text) = if on { (BUTTON_ON, BUTTON_ON_TEXT) } else { (BUTTON, BUTTON_TEXT) };
     canvas.fill_rounded_gradient(r.x + t, r.y + t, r.w - 2 * t, r.h - 2 * t, fill, 3 * s - t);
     let label = fit(label, r.w - 2 * s, s);
     canvas.text(r.x + (r.w - text_width(&label, s)) / 2, r.y + (r.h - 8 * s) / 2, &label, s, text);

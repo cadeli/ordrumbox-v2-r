@@ -391,6 +391,30 @@ fn generation_commands() {
 }
 
 #[test]
+fn a_patterns_key_and_scale_redraw_its_generated_lines_only() {
+    let mut e = editor();
+    let (scales, styles) = (Scales::default(), styles());
+    let mut rng = ordrumbox_core::Rng::new(5);
+    let mut rnd = || rng.next_f64();
+    // A pattern never generated keeps its notes: only the key is written.
+    let notes: Vec<_> = pattern(&e).tracks.iter().map(|t| t.notes.clone()).collect();
+    assert!(e.set_pattern_key(0, 14, (&scales, &styles), &mut rnd));
+    assert_eq!(e.history().next_undo(), Some("Set key → +2"));
+    assert_eq!(crate::generate::pattern_key(pattern(&e)), 2.0);
+    assert_eq!(pattern(&e).tracks.iter().map(|t| t.notes.clone()).collect::<Vec<_>>(), notes);
+    // A generated one: its lines drawn again from its seed, in the scale asked.
+    let p = e.generate_pattern(&scales, &styles, Some("funk"), &mut rnd);
+    assert!(e.set_pattern_scale(p, "dorian", (&scales, &styles), &mut rnd));
+    assert_eq!(e.history().next_undo(), Some("Set scale → dorian"));
+    assert_eq!(crate::generate::pattern_scale(&e.library().patterns[p]).as_deref(), Some("dorian"));
+    let lines = e.library().patterns[p].tracks.clone();
+    assert!(e.set_pattern_scale(p, "major", (&scales, &styles), &mut rnd));
+    assert!(e.set_pattern_scale(p, "dorian", (&scales, &styles), &mut rnd));
+    assert_eq!(e.library().patterns[p].tracks, lines, "the same scale, the same lines");
+    assert!(crate::generate::scale_names().contains(&"dorian"));
+}
+
+#[test]
 fn midi_import_is_one_step() {
     let mut e = editor();
     // Format 0, 96 PPQN: a kick (channel 10, note 36) on beats 1 and 3.

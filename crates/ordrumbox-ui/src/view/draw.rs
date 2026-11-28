@@ -2,14 +2,12 @@
 
 use super::grid::draw_grid;
 use super::kit::{KitLayout, draw_kit};
-use super::layout::{Body, HeaderControls, Layout, MACROS, header_controls, header_text};
+use super::layout::{Body, Layout};
 use super::{
-    ACCENT, HELP, KIT_HELP, LOGO, MIXER_HELP, PATTERN_LABEL, PLAYING, ROLL_HELP, SONG_HELP, SONG_LABEL, SYNTH_HELP,
-    View, WAITING_LABEL, WARNING, background_color,
+    ACCENT, HELP, KIT_HELP, MIXER_HELP, PLAYING, ROLL_HELP, SONG_HELP, SYNTH_HELP, View, WARNING, background_color,
 };
 use crate::canvas::{Canvas, chars_in};
-use crate::frame::{body_top, content_top, footer_top, margin, status_line};
-use crate::panel::{Rect, stroke};
+use crate::frame::{body_top, footer_top, margin, status_line};
 use crate::piano_roll::RollLayout;
 use crate::scale::Scale;
 use crate::song_view::SongLayout;
@@ -52,68 +50,11 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     }
 }
 
-/// The header: the logo, the labelled groups (their widgets are panel
-/// items), the status line and the header's lower edge.
+/// The header: the status line and the header's lower edge. Its
+/// controls, on their metal and cards, are panel items (`view/header.rs`).
 fn draw_header(canvas: &mut Canvas, view: &View, scale: Scale) {
-    let text = header_text(scale);
-    let margin = margin(scale);
-    let top = content_top(scale);
-    canvas.text(margin, top + 9 * scale, "orDrumbox", text, LOGO);
-    let c = header_controls(scale);
-    // The groups' frames, behind their widgets (panel items, drawn later).
-    // The generation's only with a pattern: it has nothing to show without.
-    let song = view.song_view.is_some();
-    for (i, group) in c.groups(scale).into_iter().enumerate() {
-        // The song mode has no generation.
-        if (view.pattern.is_none() && i != 4) || (i == 3 && song) {
-            continue;
-        }
-        canvas.fill_rect(group.x, group.y, group.w, group.h, theme::panel());
-        stroke(canvas, group, scale.px(), theme::line());
-    }
-    draw_header_labels(canvas, view, &c, top, scale);
     draw_status_line(canvas, view, scale);
-    canvas.fill_rect(0, body_top(scale) - margin / 2 + 2 * scale, canvas.width(), 2 * scale, ACCENT);
-}
-
-/// The labels over the header's groups, in a muted colour: the values under
-/// them stand out.
-fn draw_header_labels(canvas: &mut Canvas, view: &View, c: &HeaderControls, top: i32, scale: Scale) {
-    let label = |canvas: &mut Canvas, r: Rect, text: &str| {
-        canvas.text(r.x, top, text, scale, theme::muted());
-    };
-    if view.pattern.is_none() {
-        canvas.text(c.play.x, c.play.y + 4 * scale, "no pattern", scale, theme::muted());
-        label(canvas, c.views[0], "VIEW");
-        return;
-    }
-    label(canvas, c.mode[0], "MODE");
-    label(canvas, c.bpm, "BPM");
-    if view.song_view.is_some() {
-        label(canvas, c.pattern, SONG_LABEL);
-        label(canvas, c.kit, "KIT");
-        label(canvas, c.views[0], "VIEW");
-        return;
-    }
-    match view.waiting {
-        Some(on) => {
-            let color = if on { PLAYING } else { theme::muted() };
-            canvas.text(c.pattern.x, top, WAITING_LABEL, scale, color);
-            if on {
-                let r = c.pattern;
-                let outer = Rect::new(r.x - scale.px(), r.y - scale.px(), r.w + 2 * scale, r.h + 2 * scale);
-                stroke(canvas, outer, scale.px(), PLAYING);
-            }
-        }
-        None => label(canvas, c.pattern, PATTERN_LABEL),
-    }
-    label(canvas, c.beats, "BEATS");
-    label(canvas, c.kit, "KIT");
-    label(canvas, c.style, "STYLE");
-    for (rect, (_, text)) in c.macros.iter().zip(MACROS) {
-        label(canvas, *rect, text);
-    }
-    label(canvas, c.views[0], "VIEW");
+    canvas.fill_rect(0, body_top(scale) - margin(scale) / 2 + 2 * scale, canvas.width(), 2 * scale, ACCENT);
 }
 
 /// The second line of the header: the last action, undo and redo, the song.

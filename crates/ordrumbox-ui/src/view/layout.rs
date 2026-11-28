@@ -3,8 +3,8 @@
 use super::{BEATS_PER_PAGE, BeatWindow, LABEL_CHARS, MIN_STEP_WIDTH, PAGE_BEATS, PAGE_STEPS_PER_BEAT, VOLUME_WIDTH};
 use crate::canvas::text_width;
 use crate::editors;
-use crate::frame::{body_top, content_top, footer_top, margin};
-use crate::panel::{Rect, ViewButton, row_at};
+use crate::frame::{body_top, footer_top, margin};
+use crate::panel::{Rect, row_at};
 use crate::pattern_ruler::PatternRuler;
 use crate::scale::Scale;
 use crate::scroll_thumb::{self, Edge};
@@ -95,112 +95,6 @@ pub struct Layout {
     pub(super) lane_top: i32,
 }
 
-/// Text scale of the header (the 8 px font at 16 px per scale unit).
-pub(super) fn header_text(scale: Scale) -> Scale {
-    scale.times(2)
-}
-
-/// The header, a row of
-/// labelled groups after the logo: MODE (the pattern or the song: what PLAY
-/// plays and what the main editor shows); play; BPM (the tempo knob); PATTERN;
-/// BEATS; KIT; GENERATE (drums, bass, chords); VIEW (grid, piano roll,
-/// synth, kit editor).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HeaderControls {
-    /// The mode switch: the pattern, the song.
-    pub mode: [Rect; 2],
-    pub play: Rect,
-    /// REC beside PLAY: in song mode, the mixer writes the song's automation.
-    pub record: Rect,
-    pub bpm: Rect,
-    pub pattern: Rect,
-    pub beats: Rect,
-    pub kit: Rect,
-    /// The generation: the style list, ♫, AUTO, and the energy, complexity
-    /// and variation macros.
-    pub style: Rect,
-    pub generate: Rect,
-    pub auto: Rect,
-    pub macros: [Rect; 3],
-    /// The view buttons, as [`ViewButton::ALL`] lists them.
-    pub views: [Rect; ViewButton::ALL.len()],
-}
-
-/// The header's macro knobs: their pattern key and label.
-pub const MACROS: [(&str, &str); 3] = [
-    (ordrumbox_core::style::ENERGY, "ENERGY"),
-    (ordrumbox_core::style::COMPLEXITY, "COMPLEXITY"),
-    (ordrumbox_core::style::VARIATION, "VARIATION"),
-];
-
-/// The mode switch's labels: what the window edits and plays.
-pub const MODES: [&str; 2] = ["PATT", "SONG"];
-
-pub fn header_controls(scale: Scale) -> HeaderControls {
-    let s = scale;
-    let (margin, top) = (margin(scale), content_top(scale));
-    let y = top + 11 * s;
-    let mut x = margin + text_width("orDrumbox", header_text(scale)) + 12 * s;
-    let mut next = |w: i32, gap: i32| {
-        let rect = Rect::new(x, y, w * s, 16 * s);
-        x += (w + gap) * s;
-        rect
-    };
-    // Close inside a group, wide between groups: the same total width as
-    // when every gap was alike, so the window's minimum width is kept.
-    let mode = [next(52, 2), next(52, HEADER_GROUP_GAP)];
-    let play = next(36, 4);
-    let record = next(30, 4);
-    let bpm = next(52, HEADER_GROUP_GAP);
-    let pattern = next(104, 4);
-    let beats = next(36, 4);
-    let kit = next(84, HEADER_GROUP_GAP);
-    let style = next(90, 4);
-    let generate = next(22, 4);
-    let auto = next(38, 6);
-    let macros = [next(44, 4), next(64, 4), next(56, HEADER_GROUP_GAP + 2)];
-    let (grid, roll) = (next(40, 2), next(40, 2));
-    // The song's slot, closed: the mode switch is its button.
-    let song = next(0, 0);
-    let views = [grid, roll, song, next(48, 2), next(36, 2), next(40, 0)];
-    HeaderControls { mode, play, record, bpm, pattern, beats, kit, style, generate, auto, macros, views }
-}
-
-/// The gap between two of the header's groups, at scale 1: room for both
-/// groups' frames and a gap between them.
-pub(super) const HEADER_GROUP_GAP: i32 = 14;
-/// How far a header group's frame reaches beyond its controls, at scale 1.
-pub(super) const HEADER_GROUP_PAD: i32 = 4;
-
-impl HeaderControls {
-    /// The song list of the song mode, in the place of the pattern
-    /// list and the beats.
-    #[must_use]
-    pub fn song(&self) -> Rect {
-        Rect::new(self.pattern.x, self.pattern.y, self.beats.x + self.beats.w - self.pattern.x, self.pattern.h)
-    }
-
-    /// The frames of the header's groups: mode (pattern or song), transport
-    /// (play, tempo), pattern (pattern, beats, kit), generation (style, ♫,
-    /// AUTO, macros) and views. Each covers its controls and their labels
-    /// above them.
-    #[must_use]
-    pub fn groups(&self, scale: Scale) -> [Rect; 5] {
-        let pad = HEADER_GROUP_PAD * scale;
-        let top = content_top(scale) - 3 * scale;
-        let frame = |first: Rect, last: Rect| {
-            Rect::new(first.x - pad, top, last.x + last.w - first.x + 2 * pad, first.y + first.h + 3 * scale - top)
-        };
-        [
-            frame(self.mode[0], self.mode[1]),
-            frame(self.play, self.bpm),
-            frame(self.pattern, self.kit),
-            frame(self.style, self.macros[2]),
-            frame(self.views[0], self.views[5]),
-        ]
-    }
-}
-
 /// The room between the main editor and the note editor under it, per scale unit.
 pub(super) const NOTE_GAP: i32 = 14;
 
@@ -270,8 +164,7 @@ impl Shown {
 /// grid without the track editor, the grid and its note editor) and a footer
 /// of one status line.
 pub fn min_window_size(scale: Scale, shown: Shown) -> (i32, i32) {
-    let views = header_controls(scale).views;
-    let width = views[5].x + views[5].w + margin(scale);
+    let width = super::header::header_controls(scale).width(scale);
     // `Body::new` places the editors' bottom at a fixed distance above the
     // window's bottom edge: at a height of 0 it is minus that distance.
     let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, false).main_bottom;

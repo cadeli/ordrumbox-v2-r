@@ -20,13 +20,13 @@ use ordrumbox_core::{Note, RetriggerSpacing, Scales, Track};
 
 pub use auto::{
     AutoGenerator, BASS_PRESET, Harmony, Options, STYLE_KEY, generate_pattern, generate_track, instrument_line,
-    recompose, restyle_pattern,
+    pattern_key, pattern_scale, recompose, restyle_pattern, set_key, set_scale,
 };
 pub use auto_mode::{
     MelodicKind, change_track, is_auto_on, plays_auto, random_track, regenerate_track, run_loop, toggle_auto,
     toggle_drums, toggle_melodic,
 };
-pub use structure::{SectionElement, Structure};
+pub use structure::{SectionElement, Structure, scale_names};
 
 /// The variant names of generator `kind` (`kick`, `hat`…).
 pub fn variant_names(kind: &str) -> Vec<&'static str> {

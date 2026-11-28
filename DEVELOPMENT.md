@@ -844,13 +844,16 @@ or symbols: `font/symbols.rs` draws →, ←, ↔, ►, ◄, ▼ and ♫ in pixe
 ◂ and ▸, and the Generate tab's Advanced ► or ▼ in place of ▸ or ▾. No snapshot changed.
 
 The kit editor is drawn in the synth editor's hardware look (`panel/hardware.rs`, `view/kit.rs`): brushed metal, and
-three cards with a title band, the kit's (its name and counts in the band), the table's (the column titles in the
-band) and the selected sample's (its number and file in the band). The instrument selects and the kit select are
-green-on-black screens, the AUTO buttons and the switches dark buttons (yellow when on), the knobs black knobs ringed
-with ticks; they keep their value under their label (a knob of the hardware look writes its value when it has one;
-the synth editor's have none). The measurements and the waveform are on screens. The cards' bands and padding
-take some room (`KitLayout`): at a given window size the table may show fewer rows. Controls, ids and sound are unchanged. No snapshot
-changed.
+four cards with a title band. The kit's card holds its name and counts in the band; the table of samples and the
+selected sample share one row, the table with its column titles in the band and the sample with its number and file
+in the band; the waveform has a card of its own below them. The table keeps its old row height, with a floor that
+lets the sample's controls fit; the room won at the bottom goes to the waveform. The instrument selects and the kit
+select are green-on-black screens, the AUTO buttons and the switches dark buttons (yellow when on), the knobs black
+knobs ringed with ticks; they keep their value under their label (a knob of the hardware look writes its value when
+it has one; the synth editor's have none). The measurements and the waveform are on screens. The File measurement
+shows only the file name; hovering it shows the whole path (`Id::KitSampleFile`). The cards' bands and padding take
+some room (`KitLayout`): at a given window size the table may show fewer rows. Controls, ids and sound are unchanged.
+No snapshot changed. `docs/images/kit-editor.png` still shows the older three-card layout.
 
 The note editor has no tabs any more: its settings are on one screen, in the synth editor's hardware look
 (`editors/note.rs`). On the metal, a row of cards, widened together to the strip's width: the note's (its title in
@@ -860,3 +863,15 @@ arpeggio's scale and direction are spins, two to a column; the chances, the fade
 their value under them. `Id::NoteTab`, `Id::NoteSelectStep` and `EditorState::note_tab` are gone, `Id::NoteSlider`
 is `Id::NoteFader`, and `Id::NoteSpin` sets a whole number. The scale and direction are no longer dimmed while the
 arpeggio is off. The strip keeps its height. No snapshot changed. `docs/images/note-editor.png` still shows the tabs.
+
+The header is a strip of metal with a row of cards in the note editor's hardware look (`view/header.rs`, the
+widgets in `session_header.rs`): PLAY (mode switch, PLAY, REC, the BPM knob), PATTERN (the pattern list, the beats
+list, NEW, DUP, NAME, INFO, TAGS), EDIT (QUANT, HUMAN, CLEAR, COMPACT), GENERATE (style, ♫, AUTO, DRUMS, BASS,
+CHORDS, a scale spin, a key spin, the three macros as knobs with their label and value), KIT and VIEW. The new
+buttons run their menu command (`Id::Command`). The scale and key spins (`Id::PatternScale`, `Id::PatternKey`) set
+the pattern's `autoScale` and `autoKeyOffset`, one undo step (`Editor::set_pattern_scale`, `set_pattern_key`), and
+draw a generated pattern's lines again from its seed, as the macros do; a pattern without a seed keeps its notes.
+The pattern card's title reads NEXT while the pattern waits, the list framed when the blink is on (`View::waiting`
+is gone). The header is 52 px taller at scale 1 (`frame::HEADER_CONTROLS_HEIGHT`) and the smallest window wider
+(the cards' right edge). No snapshot changed. `docs/images/header.png` and `window-grid.png` still show the old
+header.

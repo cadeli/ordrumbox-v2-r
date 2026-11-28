@@ -3,6 +3,7 @@
 //! label their controls with a word or two; the tooltip says what they do.
 // audit: allow(function size): tables of tooltip texts, one line a control.
 
+use crate::menu::Command;
 use crate::panel::{EditorTab, GenerationTab, Id, LfoParam, Step, ViewButton};
 use ordrumbox_engine::kit::edit::SampleField;
 
@@ -90,6 +91,9 @@ pub fn help(id: Id) -> Option<Help> {
         Id::GeneratePattern => ["Make again (B)", "the pattern made again in its style"],
         Id::AutoAll => ["Auto, every track", "every track in auto mode, or out of it"],
         Id::Macro(key) => macro_help(key)?,
+        Id::Command(command) => command_help(command)?,
+        Id::PatternScale => ["Scale", "the scale the pattern's bass and chord lines are generated in"],
+        Id::PatternKey => ["Key", "semitones the pattern's generated lines move up"],
         Id::View(view) => view_help(view),
         Id::Mode(0) => ["Pattern", "Space plays one pattern, over and over, whatever the view"],
         Id::Mode(_) => ["Song", "Space plays the song, whatever the view: the grid shows the pattern playing"],
@@ -133,6 +137,32 @@ fn fx_help(fx: u8) -> Option<Help> {
         3 => ["Compressor", "turns loud parts down, lit when on"],
         4 => ["Sidechain", "another track's sound turns this one down, lit when on"],
         5 => ["Filter", "cuts lows or highs, lit when on"],
+        _ => return None,
+    })
+}
+
+/// A header button that runs a command of the menus.
+const fn command_help(command: Command) -> Option<Help> {
+    Some(match command {
+        Command::NewPattern => ["New pattern (Ctrl+N)", "an empty pattern after the last one"],
+        Command::DuplicatePattern => ["Duplicate (Ctrl+D)", "a copy of the pattern after it"],
+        Command::RenamePattern => ["Name", "the pattern's name, typed"],
+        Command::PatternDescription => ["Description", "what the pattern is, typed"],
+        Command::PatternTags => ["Tags", "the pattern's style then its features, typed"],
+        Command::PatternInfo => ["Info", "the pattern's name, description and tags, typed in one form"],
+        Command::Quantize => ["Quantize", "notes moved onto the grid: the zone, the cursor's track, else the pattern"],
+        Command::Humanize => {
+            ["Humanize", "notes played a little off, as by hand: the zone, the cursor's track, else the pattern"]
+        }
+        Command::ClearPattern => ["Clear", "every note of the pattern removed, its tracks kept"],
+        Command::CompactTracks => ["Compact", "each track's loop cut to the part it repeats"],
+        Command::GenerateDrums => ["Drums (Shift+D)", "drum lines generated in the style, new every loop; again: off"],
+        Command::GenerateBass => ["Bass (Shift+S)", "a bass line generated in the style, new every loop; again: off"],
+        Command::GenerateChords => ["Chords", "chords generated in the style, new every loop; again: off"],
+        Command::SelectRandomDrumkit => ["Random kit (Shift+G)", "a kit picked at random"],
+        Command::ConvertToSynth => ["Synth (Shift+H)", "every track on a synth sound"],
+        Command::AutoAssignAll => ["Assign (Shift+J)", "every track back on the kit sample its instrument names"],
+        Command::RandomSamples => ["Shuffle (Shift+K)", "a random sample of the kit on every track"],
         _ => return None,
     })
 }
@@ -299,6 +329,9 @@ mod tests {
         }
         for fx in 0..FX_DEFS.len() as u8 {
             assert!(help(Id::FxPower(fx)).is_some(), "effect {fx}");
+        }
+        for command in [Command::NewPattern, Command::Quantize, Command::GenerateChords, Command::RandomSamples] {
+            assert!(help(Id::Command(command)).is_some(), "{command:?}");
         }
         for (key, _) in crate::view::MACROS {
             assert!(help(Id::Macro(key)).is_some(), "{key}");

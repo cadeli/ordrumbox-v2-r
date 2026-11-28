@@ -528,7 +528,7 @@ pub(super) mod tests {
 
     /// `text` typed in the open entry, then Enter.
     pub(crate) fn type_entry(session: &mut Session, text: &str) {
-        session.chrome.widgets.entry_mut().expect("an entry").text = text.into();
+        *session.chrome.widgets.entry_mut().expect("an entry").text_mut().unwrap() = text.into();
         session.panel_key(SIZE, PanelKey::Enter, false, false);
     }
 
@@ -575,7 +575,7 @@ pub(super) mod tests {
         s.song_click(SIZE, row.0, row.1, Button::Right);
         let rename = menu(&s).iter().position(|a| *a == SongAction::RenamePattern(1).into()).unwrap();
         choose(&mut s, rename);
-        assert_eq!(s.chrome.widgets.entry().map(|e| (e.id, e.text.as_str())), Some((Id::SongPattern(1), "b")));
+        assert_eq!(s.chrome.widgets.entry().map(|e| (e.id, e.text())), Some((Id::SongPattern(1), "b")));
         type_entry(&mut s, "B two");
         assert_eq!(s.editor.library().patterns[1].name.as_deref(), Some("B two"));
         // New and Delete.

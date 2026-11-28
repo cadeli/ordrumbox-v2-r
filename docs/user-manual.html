@@ -181,7 +181,7 @@ editor, the VU meters and the kit editor shown or hidden as you left them. It is
 <pre class="layout">┌──────────────────────────────────────────────────────────────┐
 │ Menu bar: File Edit View Pattern Generate Play Song Kit Help │ saved
 ├──────────────────────────────────────────────────────────────┤
-│ Header: PLAY REC BPM MODE PATTERN BEATS KIT STYLE ♫ AUTO VIEW │
+│ Header cards: PLAY · PATTERN · EDIT · GENERATE · KIT · VIEW  │
 │ Status line: last action · undo / redo · song                │
 ├─────────────────────────────────────────────┬────────────────┤
 │  Main editor (one of):                      │  Track editor  │
@@ -219,8 +219,7 @@ an empty part keeps its place.</p>
 nothing else takes it. The zoom is saved in <code>settings.json</code>.</p>
 
 <h3>Colours</h3>
-<p>A deep ground with neon accents, each one meaning one thing: pink for the app itself (the logo,
-panel titles, the selection); cyan for the keyboard focus; lime for what sounds (play, what is on, the
+<p>A deep ground with neon accents, each one meaning one thing: pink for the app itself (panel titles, the selection); cyan for the keyboard focus; lime for what sounds (play, what is on, the
 playhead); yellow for what is chosen (the active tab and view, a solo, loop marks); violet for what
 varies by itself; orange for retriggers and euclidean hits, and for a control taken back from its automation lane; red for problems and mutes. Labels are
 grey and values plain white, with their knobs and sliders: a colour marks a state, never a number.
@@ -443,25 +442,44 @@ slip off the play keys changes nothing; pressed alone, they say so on the status
   <img src="images/header.png" alt="The menu bar and the header">
   <figcaption>The menu bar (the library's name and its save status on the right) and the header.</figcaption>
 </figure>
-<p>Under the menu bar, after the logo, a row of labelled groups:</p>
+<p>Under the menu bar, a strip of metal holds a row of cards, in the look of the note editor
+and the synth editor: each card has its title in its band, then two rows of buttons and lists, then its
+knobs or spinners. Everything that acts on the whole pattern is in the PATTERN, EDIT and GENERATE cards (the
+<strong>Pattern</strong>, <strong>Edit</strong> and <strong>Generate</strong> menus keep them too). The cards keep
+their place whatever they show: in song mode, or without a pattern, the cards that have nothing to show stay
+empty.</p>
 <table>
-<tr><th>Group</th><th>Control</th><th>What it does</th></tr>
-<tr><td><strong>PLAY / STOP</strong></td><td>Button</td><td>Start / stop the pattern, or the song in song mode (lit while playing).</td></tr>
-<tr><td><strong>REC</strong></td><td>Button, song mode</td><td>Record automation: while the song plays, the mixer's controls write their lanes (<a href="#automation">section 11</a>). Same as <strong>Play › Record automation</strong>.</td></tr>
-<tr><td><strong>BPM</strong></td><td>Knob, 20–300</td><td>The session's tempo, which every pattern plays at; in the song panel, the selected song's.</td></tr>
-<tr><td><strong>MODE</strong></td><td><strong>PATTERN</strong> <strong>SONG</strong> (<kbd>F5</kbd>, <kbd>F3</kbd>)</td><td>What <strong>PLAY</strong> and <kbd>Space</kbd> play: one pattern in a loop, or the song, its patterns one after another. The mode shown is lit. Only this switch changes it: the views and their keys leave it as it is. In song mode the grid and the piano roll show the pattern the song is playing, with its playhead; back from the song to the pattern, the pattern keeps the song's tempo.</td></tr>
-<tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern: the list opens on the styles (each with how many patterns it has, the one shown highlighted), and a style opens its patterns beside it; the patterns without a style are under <em>other</em> (<a href="#song-tags">see Tags</a>). <kbd>[</kbd> <kbd>]</kbd> still step through the whole library. While playing, the pattern picked waits for the one playing to end its loop: the label reads <strong>NEXT</strong> until it starts.</td></tr>
-<tr><td><strong>BEATS</strong></td><td>List, 1–16 then every 4th up to 64</td><td>The pattern's length in beats.</td></tr>
-<tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from. It is kept with the library and its projects (one undo step), and comes back at the next start and with a project loaded.</td></tr>
-<tr><td><strong>STYLE</strong></td><td>List</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
-<tr><td><strong>♫</strong></td><td>Button (<kbd>Shift</kbd>+<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter and lines, and the session's tempo. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>
-<tr><td><strong>AUTO</strong></td><td>Button</td><td>Every track of the pattern in auto mode, or out of it.</td></tr>
-<tr><td><strong>ENERGY</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Scales the hits and densities of all lines, ×0.5 to ×1.5.</td></tr>
-<tr><td><strong>COMPLEXITY</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Shifts the complexity and syncopation of every drum part, −100 to +100.</td></tr>
-<tr><td><strong>VARIATION</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Scales the variation of the lines and of the play, from none to twice.</td></tr>
-<tr><td><strong>VIEW</strong></td><td><strong>GRID</strong> <strong>ROLL</strong> <strong>SONG</strong> <strong>SYNTH</strong> <strong>MIX</strong> <strong>KIT</strong></td><td>The main editor shown (lit). <strong>KIT</strong> toggles the kit editor.</td></tr>
+<tr><th>Card</th><th>Control</th><th>What it does</th></tr>
+<tr><td rowspan="4"><strong>PLAY</strong></td><td><strong>PATT</strong> <strong>SONG</strong></td><td>The mode: what <strong>PLAY</strong> and <kbd>Space</kbd> play, one pattern in a loop or the song, its patterns one after another. The mode shown is lit. Only this switch changes it: the views and their keys leave it as it is. In song mode the grid and the piano roll show the pattern the song is playing, with its playhead; back from the song to the pattern, the pattern keeps the song's tempo.</td></tr>
+<tr><td><strong>PLAY / STOP</strong></td><td>Start / stop the pattern, or the song in song mode (lit while playing).</td></tr>
+<tr><td><strong>REC</strong> (song mode)</td><td>Record automation: while the song plays, the mixer's controls write their lanes (<a href="#automation">section 11</a>). Same as <strong>Play › Record automation</strong>.</td></tr>
+<tr><td><strong>BPM</strong> knob, 20–300</td><td>The session's tempo, which every pattern plays at; in the song panel, the selected song's.</td></tr>
+<tr><td rowspan="5"><strong>PATTERN</strong><br>(<strong>SONG</strong> in song mode)</td><td>Pattern list</td><td>Pick a pattern: the list opens on the styles (each with how many patterns it has, the one shown highlighted), and a style opens its patterns beside it; the patterns without a style are under <em>other</em> (<a href="#song-tags">see Tags</a>). <kbd>[</kbd> <kbd>]</kbd> still step through the whole library. While playing, the pattern picked waits for the one playing to end its loop: the card's title reads <strong>NEXT</strong>, blinking, and the list is framed until it starts. In song mode the song list takes its place.</td></tr>
+<tr><td>Beats list, 1–16 then every 4th up to 64</td><td>The pattern's length in beats.</td></tr>
+<tr><td><strong>NEW</strong></td><td>A new, empty pattern (<kbd>Ctrl</kbd>+<kbd>N</kbd>).</td></tr>
+<tr><td><strong>DUP</strong></td><td>A copy of the pattern (<kbd>Ctrl</kbd>+<kbd>D</kbd>).</td></tr>
+<tr><td><strong>INFO</strong></td><td>One form for the pattern's name, description and tags (its style first): <kbd>Tab</kbd> (or a click) goes to the next field, <kbd>Shift</kbd>+<kbd>Tab</kbd> back, <kbd>Enter</kbd> sets the three in one undo step, <kbd>Esc</kbd> cancels. An empty name keeps the old one.</td></tr>
+<tr><td rowspan="4"><strong>EDIT</strong></td><td><strong>QUANT</strong></td><td>Quantize: the notes of the zone, else of the cursor's track, else of the whole pattern moved onto the grid (<strong>Edit › Quantize...</strong>).</td></tr>
+<tr><td><strong>HUMAN</strong></td><td>Humanize: the same notes played a little off, as by hand (<strong>Edit › Humanize...</strong>).</td></tr>
+<tr><td><strong>CLEAR</strong></td><td>Every note of the pattern removed, its tracks kept.</td></tr>
+<tr><td><strong>COMPACT</strong></td><td>Each track's loop cut to the part it repeats.</td></tr>
+<tr><td rowspan="9"><strong>GENERATE</strong></td><td>Style list</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
+<tr><td><strong>♫</strong> (<kbd>Shift</kbd>+<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter and lines, and the session's tempo. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>
+<tr><td><strong>AUTO</strong></td><td>Every track of the pattern in auto mode, or out of it.</td></tr>
+<tr><td><strong>DRUMS</strong> <strong>BASS</strong> <strong>CHORDS</strong></td><td>Drum, bass or chord lines generated in the style, new every loop; lit while they are; again: off (<strong>Generate › Drums / Bass / Chords</strong>).</td></tr>
+<tr><td>Scale spinner</td><td>The scale the pattern's generated bass and chord lines are in (<em>minor</em> until one is chosen).</td></tr>
+<tr><td>Key spinner, +0 to +11</td><td>The semitones the pattern's generated lines move up.</td></tr>
+<tr><td><strong>Energy</strong> knob, 0–100 (50 = unchanged)</td><td>Scales the hits and densities of all lines, ×0.5 to ×1.5.</td></tr>
+<tr><td><strong>Complexity</strong> knob, 0–100 (50 = unchanged)</td><td>Shifts the complexity and syncopation of every drum part, −100 to +100.</td></tr>
+<tr><td><strong>Variation</strong> knob, 0–100 (50 = unchanged)</td><td>Scales the variation of the lines and of the play, from none to twice.</td></tr>
+<tr><td rowspan="5"><strong>KIT</strong></td><td>Kit list</td><td>The kit the tracks draw their samples from. It is kept with the library and its projects (one undo step), and comes back at the next start and with a project loaded.</td></tr>
+<tr><td><strong>RND</strong></td><td>A kit picked at random (<kbd>Shift</kbd>+<kbd>G</kbd>).</td></tr>
+<tr><td><strong>SYNTH</strong></td><td>Every track on a synth sound (<kbd>Shift</kbd>+<kbd>H</kbd>).</td></tr>
+<tr><td><strong>ASSIGN</strong></td><td>Every track back on auto-assign: the kit's sample its instrument names (<kbd>Shift</kbd>+<kbd>J</kbd>).</td></tr>
+<tr><td><strong>SHUF</strong></td><td>A random sample of the kit on every track (<kbd>Shift</kbd>+<kbd>K</kbd>).</td></tr>
+<tr><td><strong>VIEW</strong></td><td><strong>GRID</strong> <strong>ROLL</strong> <strong>SYNTH</strong> <strong>MIX</strong> <strong>KIT</strong></td><td>The main editor shown (lit); the song panel is the mode switch's <strong>SONG</strong>. <strong>KIT</strong> toggles the kit editor.</td></tr>
 </table>
-<p>The three knobs remake the lines at once from the pattern's seed: the same values always give the same lines.</p>
+<p>The three knobs, the scale and the key remake the generated lines at once from the pattern's seed: the same values always give the same lines. A pattern that was never generated keeps its notes: its scale and key only wait for the next generation.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="status">6. Status line and action log</h2>
@@ -1035,11 +1053,11 @@ A knob an LFO moves is purple and follows it. VCO1 to VCO3 share one card, a str
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="kit">13. Kit editor</h2>
-<p><kbd>Ctrl</kbd>+<kbd>K</kbd>. Shows the current kit (its name, the folder its samples are read from, its title and notes), a table of its samples, and the selected sample's details.
+<p><kbd>Ctrl</kbd>+<kbd>K</kbd>. Shows the current kit (its name, the folder its samples are read from, its title and notes), then one row with the table of its samples beside the selected sample's settings and measurements. The waveform has its own card below that row.
 Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</code>. Kit edits are not undo steps.</p>
 <figure>
   <img src="images/kit-editor.png" alt="The kit editor: the kit's title and notes, its sample table with an instrument list per row, gain, transpose and decay knobs, analysis and envelope">
-  <figcaption>The kit editor (on a kit since removed): its title and notes, the samples with their instrument and the tracks that play them, the selected sample's knobs, its analysis and envelope (the decay end is the vertical line).</figcaption>
+  <figcaption>The kit editor (on a kit since removed, and before the sample card moved beside the table): its title and notes, the samples with their instrument and the tracks that play them, the selected sample's knobs, its analysis and envelope (the decay end is the vertical line).</figcaption>
 </figure>
 <table>
 <tr><th>Control</th><th>Range</th><th>What it does</th></tr>
@@ -1061,7 +1079,7 @@ Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</co
 <tr><td>Loop in, Loop out</td><td>within Start – End</td><td>The loop's points (lines on the waveform while Loop is on): the sound plays from Start into the loop, then loops it, so its attack is heard once. By default the whole region loops.</td></tr>
 <tr><td>Loop</td><td>on / off</td><td>Plays the loop (Loop in to Loop out) over and over, until the decay ends the sound.</td></tr>
 <tr><td>Gate</td><td>on / off</td><td>Holds the sound at full level for the note's length, then lets it decay: the decay becomes the release. With Loop, a note lasts as long as it is written. Only in a pattern (the audition has no note).</td></tr>
-<tr><td>Pitch … File</td><td></td><td>Detected pitch, length, peak and RMS levels, the instrument its name suggests, its full path; the envelope under them.</td></tr>
+<tr><td>Pitch … File</td><td></td><td>Detected pitch, length, peak and RMS levels, the instrument its name suggests, and the sample's file name. Hover the file name for its full path. The envelope is on the card below.</td></tr>
 <tr><td>Waveform handles</td><td></td><td>On the waveform (here and in the track editor's Sound tab), drag the line of the start, the end, a loop point (while Loop is on) or the end of the decay: the pointer turns to a sideways arrow over one. The start, the end and the loop's points land on the nearest zero crossing (within 3 ms), so that they do not click.</td></tr>
 </table>
 <table>

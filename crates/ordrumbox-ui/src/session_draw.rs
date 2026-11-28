@@ -66,8 +66,7 @@ impl Session {
         let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
         let position = self.playback.position();
         let size = (canvas.width(), canvas.height(), scale);
-        let waiting = self.waiting_blink();
-        let played = self.played_fraction(waiting);
+        let played = self.played_fraction(self.waiting_blink());
         let shown_beats = self.follow_beats(size, played);
         if self.piano_roll_open() {
             self.roll_follow_playhead();
@@ -90,7 +89,7 @@ impl Session {
             piano_roll: roll,
             synth: self.synth_open(),
             mixer: self.mixer_open(),
-            kit_view: self.kit_view(kit_first, layout.details_top),
+            kit_view: self.kit_view(kit_first),
             right: layout.right,
             beat_window: self.chrome.beat_window,
             ruler_marks: self.ruler_marks(),
@@ -105,7 +104,6 @@ impl Session {
             hint: self.hint(),
             hovered_track: self.hovered_track(),
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
-            waiting,
             playhead: played.map(|played| self.playhead(played, shown_beats)),
             song: song.as_deref(),
             cursor: self.selection.cursor,

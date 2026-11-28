@@ -41,8 +41,10 @@ impl Session {
             self.press_dropdown(dropdown, size, (x, y), button == Button::Left);
             return true;
         }
-        if let Some(entry) = self.chrome.widgets.entry() {
-            if !entry.rect(width, height, scale).contains(x, y) {
+        if let Some(entry) = self.chrome.widgets.entry_mut() {
+            if entry.rect(width, height, scale).contains(x, y) {
+                entry.click(x, y, width, height, scale);
+            } else {
                 self.chrome.widgets.close_entry();
             }
             return true;
@@ -360,6 +362,9 @@ impl Session {
     pub(super) fn control_tip(&self, id: Id) -> Option<[Cow<'static, str>; 2]> {
         if let Id::SynthField(fi) = id {
             return self.synth_field_tip(fi).map(|lines| lines.map(Into::into));
+        }
+        if id == Id::KitSampleFile {
+            return self.kit_file_tip().map(|path| [Cow::Borrowed("File"), Cow::Owned(path)]);
         }
         control_help::help(id).map(|lines| lines.map(Into::into))
     }

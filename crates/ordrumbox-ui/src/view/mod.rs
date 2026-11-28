@@ -41,11 +41,6 @@ const ACCENT: Rgb = theme::ACCENT;
 const PLAYING: Rgb = theme::LIVE;
 /// A track in auto mode (a new line every loop).
 const AUTO: Rgb = theme::CHANCE;
-/// Above the pattern list while the pattern shown waits for the one playing to end its loop.
-const WAITING_LABEL: &str = "NEXT";
-/// The label above the pattern list.
-const PATTERN_LABEL: &str = "PATTERN";
-const SONG_LABEL: &str = "SONG";
 const WARNING: Rgb = theme::ALERT;
 const PLAYHEAD: Rgb = theme::LIVE;
 const LOOP_MARK: Rgb = theme::VALUE;
@@ -59,7 +54,6 @@ const MUTE_ON: Rgb = theme::ALERT;
 fn mute_live_color() -> Rgb {
     theme::mix(theme::ALERT, theme::bg(), 0.5)
 }
-const LOGO: Rgb = theme::ACCENT;
 const SOLO_ON: Rgb = theme::VALUE;
 fn box_off_color() -> Rgb {
     theme::line()
@@ -130,9 +124,6 @@ pub struct View<'a> {
     pub pattern: Option<&'a Pattern>,
     /// Playhead, as a fraction of the pattern length.
     pub playhead: Option<f64>,
-    /// The pattern shown waits for another to end its loop: the blink of
-    /// its marker, on or off.
-    pub waiting: Option<bool>,
     /// The selected song, or the song playing and where.
     pub song: Option<&'a str>,
     pub cursor: Option<Cursor>,
@@ -193,6 +184,7 @@ pub struct View<'a> {
 mod beat_window;
 mod draw;
 mod grid;
+mod header;
 mod kit;
 mod layout;
 mod notice;
@@ -201,6 +193,7 @@ mod tests;
 
 pub use beat_window::{BarHold, BeatWindow};
 pub use draw::*;
+pub use header::*;
 pub use kit::*;
 pub use layout::*;
 pub use notice::*;

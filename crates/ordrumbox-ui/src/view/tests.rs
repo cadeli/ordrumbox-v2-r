@@ -1,6 +1,6 @@
 use super::grid::draw_note_cell;
 use super::*;
-use crate::canvas::{Canvas, text_width};
+use crate::canvas::Canvas;
 use crate::frame::{body_top, footer_top, margin, status_line};
 use crate::menu;
 use crate::panel::Rect;
@@ -45,22 +45,41 @@ fn whole_scales_need_whole_multiples_of_the_smallest_window() {
 }
 
 #[test]
-fn the_header_groups_are_apart_and_inside_the_header() {
+fn the_header_cards_are_apart_on_the_metal_and_hold_their_controls() {
+    let inside = |inner: Rect, outer: Rect| {
+        inner.x >= outer.x
+            && inner.y >= outer.y
+            && inner.x + inner.w <= outer.x + outer.w
+            && inner.y + inner.h <= outer.y + outer.h
+    };
     for quarters in 4..=Scale::MAX.quarters() {
         let scale = Scale::from_quarters(quarters);
         let c = header_controls(scale);
-        let groups = c.groups(scale);
         let (width, _) = min_window_size(scale, Shown::all());
-        let logo_end = margin(scale) + text_width("orDrumbox", header_text(scale));
-        assert!(groups[0].x > logo_end, "scale {scale}: the logo");
-        assert!(groups[4].x + groups[4].w <= width, "scale {scale}: the window's edge");
-        for pair in groups.windows(2) {
+        assert!(c.metal.x >= margin(scale), "scale {scale}: the margin");
+        assert!(c.metal.x + c.metal.w <= width, "scale {scale}: the window's edge");
+        assert!(c.metal.y >= menu::bar_height(scale), "scale {scale}: the menu bar");
+        assert!(c.metal.y + c.metal.h <= status_line(scale), "scale {scale}: the status line");
+        for pair in c.cards.windows(2) {
             assert!(pair[0].x + pair[0].w < pair[1].x, "scale {scale}: {pair:?}");
         }
-        for group in groups {
-            assert!(group.y >= menu::bar_height(scale), "scale {scale}: the menu bar");
-            assert!(group.y + group.h <= status_line(scale), "scale {scale}: the status line");
+        for card in c.cards {
+            assert!(inside(card, c.metal), "scale {scale}: {card:?}");
         }
+        let in_card = |card: HeaderCard, rects: &[Rect]| {
+            for r in rects {
+                assert!(inside(*r, c.card(card)), "scale {scale}: {card:?} {r:?}");
+            }
+        };
+        in_card(HeaderCard::Transport, &[c.mode[0], c.mode[1], c.play, c.record, c.bpm]);
+        in_card(HeaderCard::Pattern, &[c.pattern, c.beats, c.song()]);
+        in_card(HeaderCard::Pattern, &c.pattern_buttons);
+        in_card(HeaderCard::Edit, &c.edit_buttons);
+        in_card(HeaderCard::Generate, &[c.style, c.generate, c.auto, c.scale, c.key]);
+        in_card(HeaderCard::Generate, &c.parts);
+        in_card(HeaderCard::Generate, &c.macros);
+        in_card(HeaderCard::Kit, &[c.kit]);
+        in_card(HeaderCard::View, &c.views);
     }
 }
 use ordrumbox_core::Library;
@@ -95,7 +114,6 @@ fn draws_without_panicking_at_any_size() {
         let view = View {
             pattern: library.patterns.first(),
             playhead: Some(0.5),
-            waiting: None,
             song: Some("SONG demo  measure 3/66"),
             kit_view: None,
             sounds: vec![
@@ -204,7 +222,6 @@ fn kit_editor_draws_and_finds_samples() {
             users: vec![vec!["KICK".into(), "CRASH".into()]],
             selected: 39,
             first: 24,
-            details_top: 200,
             facts: vec![("Pitch", "A4 0ct".into()); KIT_FACTS],
             envelope: &envelope,
             overlay: Overlay::new(&Shape { duration_ms: 100.0, end_ms: 100.0, decay_ms: 50.0, ..Shape::default() }),
@@ -212,31 +229,37 @@ fn kit_editor_draws_and_finds_samples() {
         draw_kit(&mut canvas, &kit, &KitLayout::new(w as i32, h as i32, Scale::ONE, 0));
     }
     let layout = KitLayout::new(1024, 640, Scale::ONE, 0);
-    // The columns in order, the instrument select inside its row, the
-    // details under the table, the measurements right of the controls.
+    // The columns in order, the instrument select inside its row, and the
+    // measurements right of the controls on the sample's side of the row.
     assert!(layout.left < layout.name_x && layout.name_x < layout.instrument_x);
     let select = layout.instrument_rect(1);
     let auto = layout.auto_rect(1);
     assert!(select.x + select.w < auto.x && auto.x + auto.w < layout.users_x);
     assert!(select.y >= layout.list_top + layout.row && select.y + select.h <= layout.list_top + 2 * layout.row);
-    assert!(layout.desc_rect(KIT_DESC_LINES - 1).y < layout.columns_y);
-    assert!(layout.list_top + layout.list_rows * layout.row < layout.detail_y);
+    assert!(layout.desc_rect(KIT_DESC_LINES - 1).y < layout.table_card().y);
     let controls = layout.controls_area();
-    assert!(controls.x + controls.w < layout.facts_x);
-    assert!(layout.facts_bottom() < layout.bottom);
+    assert!(layout.table_card().x < controls.x && controls.x + controls.w < layout.facts_x);
+    assert!(layout.facts_bottom() <= layout.table_card().y + layout.table_card().h);
     assert_eq!(layout.sample_at(0, 40, layout.left + 2, layout.list_top + 1), Some(0));
     assert_eq!(layout.sample_at(0, 1, layout.left + 2, layout.list_top + layout.row + 1), None);
-    assert_eq!(layout.sample_at(0, 40, layout.left + 2, layout.detail_y), None);
-    // The cards one under the other, apart; the table's rows inside its
-    // card, the controls, the measurements and the waveform inside the sample's.
-    let (kit_card, table_card, sample_card) = (layout.kit_card(), layout.table_card(), layout.sample_card(400));
-    assert!(kit_card.y + kit_card.h < table_card.y && table_card.y + table_card.h < sample_card.y);
+    assert_eq!(layout.sample_at(0, 40, layout.sample_x + 2, layout.detail_y), None);
+    // The kit's card above the row the table and the sample share, the
+    // waveform's card below it; the rows and the sample's screen inside theirs.
+    let (kit_card, table_card, sample_card, wave_card) =
+        (layout.kit_card(), layout.table_card(), layout.sample_card(), layout.wave_card());
+    assert!(kit_card.y + kit_card.h < table_card.y);
+    assert_eq!(table_card.y, sample_card.y);
+    assert_eq!(table_card.y + table_card.h, sample_card.y + sample_card.h);
+    assert!(table_card.x + table_card.w < sample_card.x);
+    assert!(wave_card.y > table_card.y + table_card.h && wave_card.w > table_card.w);
+    assert!(wave_card.y + wave_card.h <= layout.bottom);
     assert!(table_card.y + layout.head_h() < layout.list_top);
     assert!(layout.list_top + layout.list_rows * layout.row <= table_card.y + table_card.h);
     assert!(sample_card.y + layout.head_h() < layout.detail_y);
-    let (facts, wave) = (layout.facts_screen(), layout.envelope_rect(400));
-    assert!(facts.x + facts.w <= sample_card.x + sample_card.w && facts.y + facts.h < wave.y);
-    assert!(wave.y + wave.h < sample_card.y + sample_card.h && sample_card.y + sample_card.h <= layout.bottom);
+    let (facts, wave) = (layout.facts_screen(), layout.envelope_rect());
+    assert!(facts.x + facts.w <= sample_card.x + sample_card.w && facts.y + facts.h <= sample_card.y + sample_card.h);
+    assert!(facts.y + facts.h < wave.y);
+    assert!(wave.y >= wave_card.y && wave.y + wave.h <= wave_card.y + wave_card.h);
 }
 
 #[test]

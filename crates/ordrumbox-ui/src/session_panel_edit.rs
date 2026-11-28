@@ -364,6 +364,7 @@ impl Session {
                 }
             }
             Id::StyleList => self.choose_style(value),
+            Id::PatternScale | Id::PatternKey => self.set_harmony(id, value),
             Id::Beats => {
                 if let Ok(beats) = value.parse::<i32>() {
                     self.set_length(beats);
@@ -474,6 +475,7 @@ impl Session {
             }
             Id::GeneratePattern => self.run(Command::GeneratePattern),
             Id::AutoAll => self.run(Command::AutoAll),
+            Id::Command(command) => self.run(command),
             Id::ProjectName | Id::ProjectDescription | Id::PatternDescription => self.text_entry(id),
             Id::PatternTags => self.pattern_tags_entry(),
             Id::KitText(key) => self.kit_text_entry(key),
@@ -489,8 +491,8 @@ impl Session {
                     self.toggle_sample_switch(kit, sample, field);
                 }
             }
-            // Only a title, with a tooltip.
-            Id::KitPlayedBy => {}
+            // Only a title or a measurement, with a tooltip.
+            Id::KitPlayedBy | Id::KitSampleFile => {}
             _ => {
                 let Some(t) = self.editor_track() else { return };
                 self.activate_on_track(t, id);

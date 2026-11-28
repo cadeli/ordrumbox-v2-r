@@ -102,6 +102,39 @@ impl Editor {
         .is_some()
     }
 
+    /// The key of pattern `p` set to `offset` semitones (0–11), its
+    /// generated lines made again in it; one undo step.
+    pub fn set_pattern_key(
+        &mut self,
+        p: usize,
+        offset: i32,
+        (scales, styles): (&Scales, &Styles),
+        rnd: &mut dyn FnMut() -> f64,
+    ) -> bool {
+        let offset = offset.rem_euclid(12);
+        let desc = |_: &Pattern| format!("Set key → +{offset}");
+        self.edit(p, desc, None, |pattern| {
+            generate::set_key(&mut AutoGenerator::new(scales, styles, rnd), pattern, f64::from(offset));
+        })
+        .is_some()
+    }
+
+    /// The scale of pattern `p` set to `scale`, its generated lines made
+    /// again in it; one undo step.
+    pub fn set_pattern_scale(
+        &mut self,
+        p: usize,
+        scale: &str,
+        (scales, styles): (&Scales, &Styles),
+        rnd: &mut dyn FnMut() -> f64,
+    ) -> bool {
+        let desc = |_: &Pattern| format!("Set scale → {scale}");
+        self.edit(p, desc, None, |pattern| {
+            generate::set_scale(&mut AutoGenerator::new(scales, styles, rnd), pattern, scale);
+        })
+        .is_some()
+    }
+
     /// AUTO: every unlocked track of pattern `p` in auto mode, or all out of
     /// it; whether auto mode is now on.
     pub fn toggle_pattern_auto(&mut self, p: usize) -> Option<bool> {

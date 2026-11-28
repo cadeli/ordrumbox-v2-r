@@ -128,6 +128,11 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
             let color = if *on { background_color() } else { theme::text() };
             centered_label(canvas, r, label, scale, color);
         }
+        Kind::Transport { playing } => {
+            canvas.fill_rect(r.x, r.y, r.w, r.h, if *playing { theme::LIVE } else { field_color() });
+            let color = if *playing { background_color() } else { theme::LIVE };
+            centered_label(canvas, r, transport_label(*playing), scale, color);
+        }
         Kind::Disabled { label, .. } => {
             canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
             centered_label(canvas, r, label, scale, theme::disabled());

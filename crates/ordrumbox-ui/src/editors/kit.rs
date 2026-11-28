@@ -14,8 +14,8 @@ use super::layout::*;
 /// Knobs in a row of the kit editor.
 const KIT_KNOB_SLOTS: usize = 5;
 
-/// The kit editor's selects and knobs at `area`; the y under them.
-pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>, i32) {
+/// The kit editor's selects and knobs at `area`.
+pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> Vec<Item> {
     let s = scale;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
     let r = rows.row();
@@ -41,8 +41,7 @@ pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>,
     // The kit editor is wider than the track editor: its knobs go five a row.
     knob_rows(&mut rows, knobs, KIT_KNOB_SLOTS);
     shape_switches(&mut rows, &view.shape, Id::KitToggle);
-    let bottom = rows.y;
-    (rows.items, bottom)
+    rows.items
 }
 
 /// The id of a playback control, by its field.

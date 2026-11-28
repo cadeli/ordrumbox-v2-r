@@ -168,7 +168,7 @@ mod tests {
         let mut s = session();
         s.load_synth("LEAD");
         s.synth_tags_entry();
-        assert_eq!(s.chrome.widgets.entry().map(|e| e.text.as_str()), Some("SYNTHLEAD"));
+        assert_eq!(s.chrome.widgets.entry().map(|e| e.text()), Some("SYNTHLEAD"));
         type_entry(&mut s, " bass , Dub ");
         assert_eq!(s.message, "tags set: listed under BASS");
         let groups = s.synths.presets.groups(Facet::Style);

@@ -37,7 +37,7 @@ pub(super) struct Program {
 
 impl Session {
     /// Generation on (tracks in auto mode): drums, bass, chords.
-    fn generation(&self) -> [bool; 3] {
+    pub(super) fn generation(&self) -> [bool; 3] {
         let generating = |kind: fn(InstrumentFamily) -> bool| {
             self.pattern()
                 .is_some_and(|p| p.tracks.iter().any(|t| generate::is_auto_on(t) && kind(instrument_family(&t.name))))
@@ -179,6 +179,7 @@ impl Session {
             C::RenamePattern => self.text_entry(Id::SongPattern(self.pattern_index)),
             C::PatternDescription => self.text_entry(Id::PatternDescription),
             C::PatternTags => self.pattern_tags_entry(),
+            C::PatternInfo => self.pattern_info_entry(),
             C::PreviousPattern => self.step_pattern(-1),
             C::NextPattern => self.step_pattern(1),
             C::TempoDown => self.step_tempo(-1.0),

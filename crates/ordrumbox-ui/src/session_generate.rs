@@ -3,6 +3,7 @@
 
 use super::Session;
 use super::session_labels::style_label;
+use crate::panel::Id;
 use ordrumbox_core::Styles;
 use ordrumbox_logic::generate;
 use ordrumbox_logic::generate::MelodicKind;
@@ -64,6 +65,29 @@ impl Session {
         let rng = &mut self.generators.rng;
         let sources = (&self.generators.scales, &styles);
         if self.editor.set_pattern_macro(self.pattern_index, key, value, sources, &mut || rng.next_f64()) {
+            self.edited();
+        }
+    }
+
+    /// The scale or key spin set to `value`: the pattern's generated lines
+    /// made again in it.
+    pub(super) fn set_harmony(&mut self, id: Id, value: &str) {
+        let styles = self.generation_styles();
+        let rng = &mut self.generators.rng;
+        let sources = (&self.generators.scales, &styles);
+        let p = self.pattern_index;
+        let changed = match id {
+            Id::PatternKey => match value.parse::<i32>() {
+                Ok(offset) => self.editor.set_pattern_key(p, offset, sources, &mut || rng.next_f64()),
+                Err(e) => {
+                    self.message = format!("key {value}: {e}");
+                    return;
+                }
+            },
+            _ => self.editor.set_pattern_scale(p, value, sources, &mut || rng.next_f64()),
+        };
+        if changed {
+            self.clamp_selection();
             self.edited();
         }
     }

@@ -54,7 +54,7 @@ impl Session {
         let (width, height, scale) = size;
         let layout = self.panel_layout(width, height, scale);
         if let Some(sample) = self.kit_editor.sample {
-            let rect = self.kit_layout(size).envelope_rect(layout.details_top);
+            let rect = self.kit_layout(size).envelope_rect();
             if rect.contains(x, y) {
                 return Some(Wave { kit: self.kit_index, sample, rect });
             }
@@ -153,8 +153,7 @@ mod tests {
 
     /// The x of `fraction` of the kit editor's waveform, and its middle's y.
     fn at(s: &Session, fraction: f64) -> (i32, i32) {
-        let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
-        let r = s.kit_layout(SIZE).envelope_rect(layout.details_top);
+        let r = s.kit_layout(SIZE).envelope_rect();
         (r.x + (fraction * f64::from(r.w - 1)).round() as i32, r.y + r.h / 2)
     }
 

@@ -26,6 +26,12 @@ pub(crate) fn random_key_offset(rnd: &mut dyn FnMut() -> f64) -> f64 {
     pick(rnd, &offsets).copied().unwrap_or(0.0)
 }
 
+/// The scales a pattern is generated in, as `random_scale` draws them.
+#[must_use]
+pub fn scale_names() -> Vec<&'static str> {
+    names("scales")
+}
+
 /// `randomScale`.
 pub(crate) fn random_scale(rnd: &mut dyn FnMut() -> f64) -> String {
     pick(rnd, &names("scales")).map_or_else(String::new, |s| (*s).to_owned())

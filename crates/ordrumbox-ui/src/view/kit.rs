@@ -23,8 +23,6 @@ pub struct KitView<'a> {
     pub selected: usize,
     /// The first sample of the table shown.
     pub first: usize,
-    /// Top of the sample's details, under its controls (selects and knobs).
-    pub details_top: i32,
     /// The selected sample's measurements: label and value, always the same
     /// labels ([`KIT_FACTS`]), the value `-` when unknown.
     pub facts: Vec<(&'static str, String)>,
@@ -41,12 +39,13 @@ pub const KIT_FACTS: usize = 6;
 /// Lines of the kit's description.
 pub const KIT_DESC_LINES: usize = 2;
 
-/// Where the kit editor's parts are, on three cards over the metal of the
+/// Where the kit editor's parts are, on four cards over the metal of the
 /// synth editor's hardware look: the kit (its name and counts in the title
-/// band; folder, title, description), the table of its samples (the column
-/// titles in the band; number, name, instrument, the tracks that play it),
-/// then the selected sample: its controls on the left, its measurements on a
-/// screen on the right, its waveform on a screen under both.
+/// band; folder, title, description), then one row with the table of samples
+/// (the column titles in the band; number, name, instrument, the tracks that
+/// play it) and the selected sample (its controls on the left, its
+/// measurements on a screen on the right), then the waveform on a screen of
+/// its own, under both.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct KitLayout {
     pub(super) scale: Scale,
@@ -54,6 +53,8 @@ pub struct KitLayout {
     pub(super) bottom: i32,
     pub(super) left: i32,
     pub(super) width: i32,
+    /// Width inside the editor's margins: the kit's and the waveform's cards.
+    pub(super) inner_width: i32,
     /// The kit's name, folder, title and description, after their labels.
     pub(super) head_x: i32,
     /// The kit's card, its folder line, title line and first description line.
@@ -68,16 +69,23 @@ pub struct KitLayout {
     pub(super) list_width: i32,
     pub(super) row: i32,
     pub(super) list_rows: i32,
+    /// Bottom of the row the table and the sample share.
+    pub(super) band_bottom: i32,
     /// Columns: sample name, instrument select (its auto-assign button
     /// after it), the tracks playing it.
     pub(super) name_x: i32,
     pub(super) instrument_x: i32,
     pub(super) users_x: i32,
-    /// The selected sample's card, and its controls' top.
-    pub(super) sample_y: i32,
+    /// The selected sample's card beside the table: its left, width,
+    /// controls' top, and where its header's file name starts.
+    pub(super) sample_x: i32,
+    pub(super) sample_width: i32,
+    pub(super) sample_head_x: i32,
     pub(super) detail_y: i32,
     /// The measurements' column.
     pub(super) facts_x: i32,
+    /// Top of the waveform's card, under the shared row.
+    pub(super) wave_y: i32,
 }
 
 /// The kit editor's table row height, per scale unit (a select fits in it).
@@ -107,8 +115,23 @@ const KIT_CARD_PAD: i32 = 6;
 const KIT_CARD_GAP: i32 = 6;
 /// The text of a title band, under its top, per scale unit.
 const KIT_HEAD_TEXT: i32 = 3;
+/// Share of the inner width the sample table takes; the sample card takes the rest.
+const KIT_TABLE_SHARE: i32 = 45;
+/// Narrowest table and sample cards, per scale unit.
+const KIT_TABLE_MIN_W: i32 = 300;
+const KIT_SAMPLE_MIN_W: i32 = 300;
 
 impl KitLayout {
+    /// The table and the sample on the shared row: the table's width, the
+    /// sample's left and width. Both cards' padding is outside them, so their
+    /// contents are a gap and two paddings apart.
+    fn shared_row_columns(left: i32, inner_width: i32, gap: i32, pad: i32, scale: Scale) -> (i32, i32, i32) {
+        let between = gap + 2 * pad;
+        let room = (inner_width - between).max((KIT_TABLE_MIN_W + KIT_SAMPLE_MIN_W) * scale);
+        let width = ((room * KIT_TABLE_SHARE / 100).max(KIT_TABLE_MIN_W * scale)).min(room - KIT_SAMPLE_MIN_W * scale);
+        (width, left + width + between, room - width)
+    }
+
     pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize) -> Self {
         let s = scale;
         let margin = margin(scale);
@@ -116,7 +139,10 @@ impl KitLayout {
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
         let (head, pad, gap) = (CARD_HEAD * s, KIT_CARD_PAD * s, KIT_CARD_GAP * s);
         let left = margin + pad;
-        let list_width = (width - 2 * left).max(40 * s);
+        let inner_width = (width - 2 * left).max(40 * s);
+        // The table and the sample share one row: the table keeps the height
+        // it had next to the details, with a floor for the sample's controls.
+        let (list_width, sample_x, sample_width) = Self::shared_row_columns(left, inner_width, gap, pad, s);
         let line = KIT_LINE * s;
         let kit_y = top + 6 * s;
         let folder_y = kit_y + head + 4 * s;
@@ -126,26 +152,27 @@ impl KitLayout {
         let columns_y = table_y + KIT_HEAD_TEXT * s;
         let row = KIT_ROW * s;
         let list_top = table_y + head + 4 * s;
-        // The details take what they need (their card's band, the controls,
-        // the measurements, a short waveform); the rows the rest, a window
-        // size giving one count.
-        let details = 4 * s + gap + head + 6 * s + (KIT_FACTS as i32 * line).max(KIT_CONTROLS_HEIGHT * s) + 40 * s;
-        let list_rows = ((bottom - list_top - details) / row).clamp(3, 16);
-        let sample_y = list_top + list_rows * row + 4 * s + gap;
-        let detail_y = sample_y + head + 6 * s;
+        let old_details = 4 * s + gap + head + 6 * s + (KIT_FACTS as i32 * line).max(KIT_CONTROLS_HEIGHT * s) + 40 * s;
+        let controls_room = 2 * s + KIT_CONTROLS_HEIGHT * s + pad - 4 * s;
+        let min_rows = (controls_room + row - 1) / row;
+        let list_rows = ((bottom - list_top - old_details) / row).clamp(3, 16).max(min_rows);
+        let band_bottom = list_top + list_rows * row + 4 * s;
+        let detail_y = table_y + head + 6 * s;
+        let wave_y = band_bottom + gap;
         // Columns: the number ("12"), the name, the instrument, the tracks.
         let name_x = left + text_width("000", s);
         let room = list_width - (name_x - left) - (KIT_INSTRUMENT_W + KIT_AUTO_W) * s - 20 * s;
         let name_w = text_width(&"m".repeat(KIT_NAME_CHARS), s).min(room / 2).max(0);
         let instrument_x = name_x + name_w + 8 * s;
         let users_x = instrument_x + (KIT_INSTRUMENT_W + KIT_AUTO_W) * s + 12 * s;
-        let controls_w = (list_width / 2).min(360 * s);
+        let controls_w = (sample_width / 2).min(360 * s);
         Self {
             scale,
             top,
             bottom,
             left,
             width,
+            inner_width,
             head_x: left + text_width(&"m".repeat(KIT_HEAD_LABEL), s),
             kit_y,
             folder_y,
@@ -157,12 +184,16 @@ impl KitLayout {
             list_width,
             row,
             list_rows,
+            band_bottom,
             name_x,
             instrument_x,
             users_x,
-            sample_y,
+            sample_x,
+            sample_width,
+            sample_head_x: sample_x + text_width(&"m".repeat(KIT_HEAD_LABEL), s),
             detail_y,
-            facts_x: left + controls_w + 16 * s,
+            facts_x: sample_x + controls_w + 16 * s,
+            wave_y,
         }
     }
 
@@ -172,28 +203,36 @@ impl KitLayout {
         Rect::new(0, self.top, self.width.max(0), (footer - self.top).max(0))
     }
 
-    /// A card from `y` to `bottom`, across the editor.
-    fn card(&self, y: i32, bottom: i32) -> Rect {
+    /// A card from `y` to `bottom`, `width` wide, its padding outside.
+    fn card(&self, x: i32, y: i32, width: i32, bottom: i32) -> Rect {
         let pad = KIT_CARD_PAD * self.scale;
-        Rect::new(self.left - pad, y, self.list_width + 2 * pad, bottom - y)
+        Rect::new(x - pad, y, width + 2 * pad, bottom - y)
+    }
+
+    /// A card across the editor.
+    fn full_card(&self, y: i32, bottom: i32) -> Rect {
+        self.card(self.left, y, self.inner_width, bottom)
     }
 
     /// The kit's card: its name in the band, its folder, title and description.
     pub(super) fn kit_card(&self) -> Rect {
-        self.card(self.kit_y, self.table_y - KIT_CARD_GAP * self.scale)
+        self.full_card(self.kit_y, self.table_y - KIT_CARD_GAP * self.scale)
     }
 
     /// The table's card: the column titles in the band, the rows.
     pub(super) fn table_card(&self) -> Rect {
-        self.card(self.table_y, self.list_top + self.list_rows * self.row + 4 * self.scale)
+        self.card(self.left, self.table_y, self.list_width, self.band_bottom)
     }
 
-    /// The selected sample's card: its controls (which end at
-    /// `details_top`), its measurements and its waveform.
-    pub(super) fn sample_card(&self, details_top: i32) -> Rect {
-        let wave = self.envelope_rect(details_top);
-        let content = if wave.h > 0 { wave.y + wave.h } else { details_top.max(self.facts_bottom()) };
-        self.card(self.sample_y, (content + KIT_CARD_PAD * self.scale).min(self.bottom))
+    /// The selected sample's card, beside the table: its controls and its
+    /// measurements. Its waveform is in the card below.
+    pub(super) fn sample_card(&self) -> Rect {
+        self.card(self.sample_x, self.table_y, self.sample_width, self.band_bottom)
+    }
+
+    /// The waveform's card: under the row the table and the sample share.
+    pub(super) fn wave_card(&self) -> Rect {
+        self.full_card(self.wave_y, self.bottom)
     }
 
     /// The text of the title band of a card at `card_y`.
@@ -206,34 +245,46 @@ impl KitLayout {
         CARD_HEAD * self.scale
     }
 
-    /// The measurements' screen.
+    /// The measurements' screen, right of the sample's controls.
     pub(super) fn facts_screen(&self) -> Rect {
         let s = self.scale;
         let x = self.facts_x - 6 * s;
         Rect::new(
             x,
             self.detail_y - 4 * s,
-            self.left + self.list_width - x,
+            self.sample_x + self.sample_width - x,
             self.facts_bottom() - self.detail_y + 4 * s,
+        )
+    }
+
+    /// The value of measurement `line`, for the hover that shows it in full.
+    pub fn fact_rect(&self, line: usize) -> Rect {
+        let s = self.scale;
+        let value_x = self.facts_x + text_width(&"m".repeat(KIT_FACT_LABEL), s);
+        Rect::new(
+            value_x,
+            self.detail_y + 2 * s + line as i32 * KIT_LINE * s,
+            (self.sample_x + self.sample_width - 4 * s - value_x).max(0),
+            8 * s,
         )
     }
 
     /// Where the selected sample's selects and knobs go.
     pub fn controls_area(&self) -> Rect {
-        Rect::new(self.left, self.detail_y, (self.facts_x - self.left - 16 * self.scale).max(0), 0)
+        Rect::new(self.sample_x, self.detail_y, (self.facts_x - self.sample_x - 16 * self.scale).max(0), 0)
     }
 
     /// The kit's title, a click edits it.
     pub fn title_rect(&self) -> Rect {
         let x = self.head_x;
-        Rect::new(x, self.title_y, self.left + self.list_width - x, 8 * self.scale)
+        Rect::new(x, self.title_y, self.left + self.inner_width - x, 8 * self.scale)
     }
 
     /// Line `line` of the kit's description, a click edits it.
     pub fn desc_rect(&self, line: usize) -> Rect {
         let x = self.head_x;
         let y = self.desc_y + line as i32 * KIT_LINE * self.scale;
-        Rect::new(x, y, self.left + self.list_width - x, 8 * self.scale)
+        Rect::new(x, y, self.left + self.inner_width - x, 8 * self.scale)
     }
 
     /// The title of the column of tracks playing each sample.
@@ -307,16 +358,15 @@ impl KitLayout {
         (i < count).then_some(i)
     }
 
-    /// Where the waveform goes: under the measurements and the sample's
-    /// controls (which end at `details_top`), down to the bottom; empty when
-    /// there is no room.
-    pub fn envelope_rect(&self, details_top: i32) -> Rect {
+    /// Where the waveform goes: the screen inside its own card, under the
+    /// row the table and the sample share.
+    pub fn envelope_rect(&self) -> Rect {
         let s = self.scale;
-        let y = details_top.max(self.facts_bottom()) + 4 * s;
-        Rect::new(self.left, y, self.list_width, (self.bottom - y - KIT_CARD_PAD * s).min(80 * s))
+        let y = self.wave_y + CARD_HEAD * s + 4 * s;
+        Rect::new(self.left, y, self.inner_width, (self.bottom - y - KIT_CARD_PAD * s).max(0))
     }
 
-    /// Bottom of the measurements' screen: the envelope starts under it.
+    /// Bottom of the measurements' screen, beside the sample's controls.
     pub(super) fn facts_bottom(&self) -> i32 {
         self.detail_y + KIT_FACTS as i32 * KIT_LINE * self.scale + 2 * self.scale
     }
@@ -390,13 +440,14 @@ fn draw_kit_samples(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
 }
 
 /// The kit editor, in the synth editor's hardware look: the metal, the kit's
-/// card, the table's, then the selected sample's (its controls are panel
-/// items; its measurements and its waveform on screens).
+/// card, the table's and the selected sample's side by side (its controls are
+/// panel items; its measurements on a screen), then the waveform's card.
 pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     let scale = layout.scale;
     let fitted = |text: &str, width: i32| fit_start(text, width, scale);
     let fitted_end = |text: &str, width: i32| fit_end(text, width, scale);
-    let right = layout.left + layout.list_width;
+    let right = layout.left + layout.inner_width;
+    let sample_right = layout.sample_x + layout.sample_width;
     hardware::draw_metal(canvas, layout.panel());
 
     // The kit: its name and counts in the band, then the labels of its title
@@ -418,13 +469,19 @@ pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
 
     draw_kit_samples(canvas, kit, layout);
 
-    // The selected sample: its number and file in the band.
-    hardware::draw_card(canvas, layout.sample_card(kit.details_top), Some(layout.head_h()), false, scale);
-    let head_y = layout.head_text_y(layout.sample_y);
-    canvas.text(layout.left, head_y, "SAMPLE", scale, theme::text());
+    // The selected sample, beside the table: its number and file in the band.
+    hardware::draw_card(canvas, layout.sample_card(), Some(layout.head_h()), false, scale);
+    let head_y = layout.head_text_y(layout.table_y);
+    canvas.text(layout.sample_x, head_y, "SAMPLE", scale, theme::text());
     if let Some(name) = kit.samples.get(kit.selected) {
         let shown = format!("{}  {name}", kit.selected + 1);
-        canvas.text(layout.head_x, head_y, &fitted(&shown, right - layout.head_x), scale, theme::text());
+        canvas.text(
+            layout.sample_head_x,
+            head_y,
+            &fitted(&shown, sample_right - layout.sample_head_x),
+            scale,
+            theme::text(),
+        );
     }
 
     // Its measurements, on a screen right of its controls.
@@ -435,11 +492,12 @@ pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     for (line, (label, value)) in kit.facts.iter().enumerate() {
         let y = layout.detail_y + 2 * scale + line as i32 * KIT_LINE * scale;
         canvas.text(layout.facts_x, y, &fitted(label, label_w - 4 * scale), scale, LCD_DIM);
-        canvas.text(value_x, y, &fitted_end(value, right - 4 * scale - value_x), scale, LCD_TEXT);
+        canvas.text(value_x, y, &fitted_end(value, sample_right - 4 * scale - value_x), scale, LCD_TEXT);
     }
 
-    // Its waveform, on a screen: smoothed from the bottom, how it plays over it.
-    let Rect { x, y, w: width, h: height } = layout.envelope_rect(kit.details_top);
+    // The waveform, on a screen of its own: smoothed from the bottom, how it plays over it.
+    hardware::draw_card(canvas, layout.wave_card(), Some(layout.head_h()), false, scale);
+    let Rect { x, y, w: width, h: height } = layout.envelope_rect();
     if kit.envelope.is_empty() || width <= 0 || height <= 4 * scale {
         return;
     }

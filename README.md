@@ -121,7 +121,12 @@ Press **F1** in the app for the full keyboard shortcut list. Keys are the ones t
 keyboard's layout marks (Ctrl Z is the key marked Z on AZERTY too), except the two rows
 that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their place. Common keys:
 
-- **PATTERN** / **SONG** (the mode switch of the header): what **Space** plays, the
+- **The header** is a row of cards, in the note editor's look: PLAY (mode, play, record,
+  tempo), PATTERN (the pattern list, its length, new, duplicate, and INFO: its name, description and tags in one form),
+  EDIT (quantize, humanize, clear, compact), GENERATE (style, ♫, auto, the drum, bass and
+  chord lines, scale, key and the three macros), KIT and VIEW. Everything that acts on the
+  whole pattern is there; the menus keep it too.
+- **PATT** / **SONG** (the mode switch of the header): what **Space** plays, the
   pattern in a loop or the song. Only the switch changes it: the views (grid, piano roll,
   song panel, synth, mixer, and their keys) leave it as it is. In song mode the grid and
   the piano roll show the pattern the song is playing, with its playhead. Back from the
@@ -130,7 +135,7 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   has; a style opens its patterns. A pattern's style is its first tag that is not a feature
   (bass, chords, lead, pad, synth, organ, strings, brass, piano, clavinet, arpeggio,
   polyrhythm, polymeter). Its tags are edited on the song screen, under its description (a
-  click), or with Pattern > Tags...: `funk, bass, chords`, the style first. Style tags teach the
+  click), in the header's INFO form, or with Pattern > Tags...: `funk, bass, chords`, the style first. Style tags teach the
   learned styles; features do not.
 - **Space**: play / stop. A song stops where it is and **Space** goes on from that
   measure; **Home** (or the keypad's **Enter**) goes back to the first beat, or measure.

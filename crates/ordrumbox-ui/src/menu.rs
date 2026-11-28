@@ -9,7 +9,7 @@
 use std::borrow::Cow;
 
 /// What a menu item (or its shortcut) does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Command {
     TrackEditor,
     NoteEditor,
@@ -54,6 +54,8 @@ pub enum Command {
     RenamePattern,
     PatternDescription,
     PatternTags,
+    /// The name, description and tags in one form (the header's INFO).
+    PatternInfo,
     PreviousPattern,
     NextPattern,
     TempoDown,

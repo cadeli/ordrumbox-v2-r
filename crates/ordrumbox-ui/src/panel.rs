@@ -7,6 +7,7 @@
 
 use crate::canvas::{Canvas, Direction, Rgb, char_width, fit, text_width};
 use crate::control::{Spec, Style};
+use crate::menu::Command;
 use crate::sample_overlay::Overlay;
 use crate::scale::Scale;
 use crate::theme;
@@ -219,6 +220,8 @@ pub enum Id {
     KitText(&'static str),
     /// The title of the table's column of tracks playing each sample.
     KitPlayedBy,
+    /// The sample's File measurement: its hover shows the full path.
+    KitSampleFile,
     // Header.
     PatternList,
     KitList,
@@ -235,6 +238,12 @@ pub enum Id {
     GeneratePattern,
     AutoAll,
     Macro(&'static str),
+    /// A button that runs a command of the menus (the pattern's new,
+    /// duplicate, rename…, quantize…, the drum, bass and chord lines).
+    Command(Command),
+    /// The scale and the key the pattern's lines are generated in.
+    PatternScale,
+    PatternKey,
     /// A view button (the song's slot has no button).
     View(ViewButton),
     /// The mode switch: 0 the pattern, 1 the song.
@@ -252,6 +261,8 @@ pub enum Id {
     PatternDescription,
     /// The selected pattern's tags, on the song screen (their entry).
     PatternTags,
+    /// The selected pattern's name, description and tags, in one form.
+    PatternInfo,
     /// The header's PATTERN list, opened as styles and their patterns.
     PatternMenu,
     /// The right-click menu of the song panel.
@@ -376,6 +387,11 @@ pub enum Kind {
         label: String,
         on: bool,
     },
+    /// The transport's button: PLAY, or STOP while `playing`, in a colour
+    /// of its own (green) apart from the other buttons.
+    Transport {
+        playing: bool,
+    },
     /// A control greyed out: shown, not used (a slap's echo feedback), in
     /// the style of the control it stands for (a knob or a fader).
     Disabled {
@@ -407,6 +423,12 @@ pub enum Kind {
     Mark {
         color: Rgb,
     },
+}
+
+/// The transport button's label: PLAY, or STOP while playing.
+#[must_use]
+pub const fn transport_label(playing: bool) -> &'static str {
+    if playing { "STOP" } else { "PLAY" }
 }
 
 impl Kind {
@@ -613,7 +635,7 @@ pub(crate) mod hardware;
 mod tabs;
 pub use draw::draw;
 pub use dropdown::{Choices, Dropdown, MENU_MARK, SUBMENU_MARK};
-pub use entry::Entry;
+pub use entry::{Entry, Field};
 pub use tabs::{EditorTab, GenerationTab, ViewButton};
 
 #[cfg(test)]
@@ -739,8 +761,7 @@ mod tests {
         Dropdown::new(Id::Sample, Rect::new(390, 290, 20, 12), vec!["x".into(); 3], vec!["x".into(); 3], 0)
             .draw(&mut canvas, Scale::ONE);
         let spec = Spec::knob(20.0, 5000.0, 10.0, 500.0);
-        Entry { id: Id::Decay, spec: Some(spec), title: "Enter value".into(), text: "12".into(), at: (390, 290) }
-            .draw(&mut canvas, Scale::ONE);
+        Entry::new(Id::Decay, Some(spec), "Enter value".into(), "12".into(), (390, 290)).draw(&mut canvas, Scale::ONE);
         Dropdown::menu(Id::SongMenu, 390, 290, "Loop".into(), [(LoopAction::Clear, "Clear".into())])
             .draw(&mut canvas, Scale::ONE);
     }

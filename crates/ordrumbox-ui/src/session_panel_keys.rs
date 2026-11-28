@@ -17,7 +17,7 @@ impl Session {
     pub fn panel_key(&mut self, size: (i32, i32, Scale), key: PanelKey, shift: bool, ctrl: bool) -> bool {
         self.chrome.panel_size = size;
         if self.chrome.widgets.entry().is_some() {
-            self.entry_key(key);
+            self.entry_key(key, shift);
             return true;
         }
         if self.chrome.widgets.dropdown().is_some() {
@@ -27,16 +27,27 @@ impl Session {
         self.focused_key(size, key, shift, ctrl)
     }
 
-    /// A key while the number or text entry is open: it takes them all.
-    pub(super) fn entry_key(&mut self, key: PanelKey) {
+    /// A key while the number or text entry is open: it takes them all
+    /// (Shift+Tab: a form's field before).
+    pub(super) fn entry_key(&mut self, key: PanelKey, shift: bool) {
         let Some(entry) = self.chrome.widgets.entry_mut() else { return };
         match key {
             PanelKey::Enter => self.commit_entry(),
             PanelKey::Escape => self.chrome.widgets.close_entry(),
             PanelKey::Backspace => {
-                entry.text.pop();
+                if let Some(text) = entry.text_mut() {
+                    text.pop();
+                }
             }
-            PanelKey::Space if entry.spec.is_none() => entry.text.push(' '),
+            PanelKey::Space if entry.spec.is_none() => {
+                if let Some(text) = entry.text_mut() {
+                    text.push(' ');
+                }
+            }
+            // A form's fields, round.
+            PanelKey::Tab if shift => entry.step_field(-1),
+            PanelKey::Tab | PanelKey::Down => entry.step_field(1),
+            PanelKey::Up => entry.step_field(-1),
             _ => {}
         }
     }
@@ -170,8 +181,8 @@ impl Session {
                 Some(_) => c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | 'e' | 'E'),
                 None => !c.is_control(),
             };
-            if accepted {
-                entry.text.push(c);
+            if accepted && let Some(text) = entry.text_mut() {
+                text.push(c);
             }
             return true;
         }
@@ -223,18 +234,22 @@ impl Session {
     /// holding `text`, opened at the mouse.
     pub(super) fn show_entry(&mut self, id: Id, spec: Option<Spec>, title: String, text: String) {
         let at = self.chrome.widgets.pointer;
-        self.chrome.widgets.open_entry(Entry { id, spec, title, text, at });
+        self.chrome.widgets.open_entry(Entry::new(id, spec, title, text, at));
     }
 
     pub(super) fn commit_entry(&mut self) {
         let Some(entry) = self.chrome.widgets.take_entry() else { return };
-        let Some(spec) = entry.spec else { return self.commit_text(entry.id, &entry.text) };
-        if entry.text.trim().is_empty() {
+        if entry.is_form() {
+            let texts: Vec<&str> = entry.texts().collect();
+            return self.commit_form(entry.id, &texts);
+        }
+        let Some(spec) = entry.spec else { return self.commit_text(entry.id, entry.text()) };
+        if entry.text().trim().is_empty() {
             return;
         }
-        match Value::from(entry.text.as_str()).to_number() {
+        match Value::from(entry.text()).to_number() {
             Some(number) => self.set_value(entry.id, spec.typed(spec.typed_shown(number))),
-            None => self.tell(format!("\"{}\" is not a number", entry.text.trim())),
+            None => self.tell(format!("\"{}\" is not a number", entry.text().trim())),
         }
     }
 }

@@ -435,6 +435,42 @@ pub fn recompose(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) {
     seeded_lines(g, pattern, &Options::default());
 }
 
+/// The key of `pattern`'s generated lines: semitones above the section's
+/// root, 0 when it has none.
+#[must_use]
+pub fn pattern_key(pattern: &Pattern) -> f64 {
+    pattern_value(pattern, KEY_OFFSET).and_then(Value::to_number).unwrap_or(0.0)
+}
+
+/// The scale of `pattern`'s generated lines, when it has one of its own (else
+/// each section's).
+#[must_use]
+pub fn pattern_scale(pattern: &Pattern) -> Option<String> {
+    pattern_value(pattern, SCALE).and_then(Value::to_text).filter(|s| !s.is_empty())
+}
+
+/// The key of `pattern` set to `offset` semitones, its lines made again
+/// from its seed when it has generated ones.
+pub fn set_key(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, offset: f64) {
+    pattern.extra.insert(KEY_OFFSET, Value::Number(offset));
+    redraw_seeded(g, pattern);
+}
+
+/// The scale of `pattern` set to `scale`, its lines made again from its
+/// seed when it has generated ones.
+pub fn set_scale(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, scale: &str) {
+    pattern.extra.insert(SCALE, Value::from(scale));
+    redraw_seeded(g, pattern);
+}
+
+/// The lines of a generated pattern (one with a seed) drawn again from it;
+/// a pattern never generated keeps its notes.
+fn redraw_seeded(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) {
+    if seed_of(pattern).is_some() {
+        seeded_lines(g, pattern, &Options::default());
+    }
+}
+
 /// The pattern's seed, if it has one: a whole number from 0.
 fn seed_of(pattern: &Pattern) -> Option<u64> {
     pattern.extra.get(PATTERN_SEED).and_then(Value::as_f64).and_then(ordrumbox_core::num::whole)

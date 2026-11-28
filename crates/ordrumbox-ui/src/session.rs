@@ -71,6 +71,8 @@ mod session_generators;
 mod session_grid;
 #[path = "session_grid_bar.rs"]
 mod session_grid_bar;
+#[path = "session_header.rs"]
+mod session_header;
 #[path = "session_hints.rs"]
 mod session_hints;
 #[path = "session_history.rs"]
@@ -153,6 +155,8 @@ mod session_panel_input;
 mod session_panel_keys;
 #[path = "session_panel_views.rs"]
 mod session_panel_views;
+#[path = "session_pattern_info.rs"]
+mod session_pattern_info;
 #[path = "session_pattern_loop.rs"]
 mod session_pattern_loop;
 #[path = "session_pattern_tags.rs"]

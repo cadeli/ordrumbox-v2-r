@@ -93,7 +93,7 @@ mod tests {
         s.toggle_song_view();
         let line = s.song_layout(SIZE).tags_line();
         s.song_click(SIZE, line.x + line.w / 2, line.y + 2, Button::Left);
-        assert_eq!(s.chrome.widgets.entry().map(|e| e.text.as_str()), Some("rock"));
+        assert_eq!(s.chrome.widgets.entry().map(|e| e.text()), Some("rock"));
         type_entry(&mut s, " Disco, BASS,disco ");
         assert_eq!(s.pattern().unwrap().tags, ["disco", "bass"]);
         assert_eq!(s.message, "tags set: listed under disco");

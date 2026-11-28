@@ -184,9 +184,9 @@ impl Session {
         self.message = self.kits.export_mapping(self.kit_index, path).unwrap_or_else(|e| e);
     }
 
-    /// The kit editor's widgets above the sample's controls: the kit's title
-    /// and description (a click edits them), the instrument of each sample
-    /// shown in the table.
+    /// The kit editor's widgets: the kit's title and description (a click
+    /// edits them), the instrument of each sample in the table, and the hover
+    /// area of the File measurement (drawn by the view).
     pub(super) fn kit_items(&self, layout: &KitLayout, scale: Scale) -> Vec<Item> {
         let Some(kit) = self.kit().filter(|_| self.kit_editor.is_open()) else { return Vec::new() };
         let mut items = Vec::new();
@@ -216,6 +216,13 @@ impl Session {
         let played_by = Rect { w: text_width(PLAYED_BY, scale).min(column.w), ..column };
         let label = Kind::Text { text: fitted(PLAYED_BY, played_by), color: theme::text() };
         items.push(Item::new(Some(Id::KitPlayedBy), played_by, label));
+        // The File measurement is drawn with the facts; this empty item gives
+        // its value a tooltip with the path it stands for.
+        items.push(Item::new(
+            Some(Id::KitSampleFile),
+            layout.fact_rect(view::KIT_FACTS - 1),
+            Kind::Text { text: String::new(), color: theme::text() },
+        ));
         let first = self.kit_first(layout);
         for (row, (i, s)) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
             let choice = instrument_choice(s.key.as_deref());
@@ -288,8 +295,8 @@ impl Session {
         }
     }
 
-    /// What the kit editor shows; its sample's details start at `details_top`.
-    pub(super) fn kit_view(&self, first: usize, details_top: i32) -> Option<KitView<'_>> {
+    /// What the kit editor shows, from sample `first` in the table.
+    pub(super) fn kit_view(&self, first: usize) -> Option<KitView<'_>> {
         let sample = self.kit_editor.sample?;
         let kit = self.kit()?;
         let samples = kit.samples.iter().map(|i| sample_file_name(&i.path)).collect();
@@ -321,11 +328,22 @@ impl Session {
             users,
             selected: sample,
             first,
-            details_top,
             facts,
             envelope: analysis.map_or(&[][..], |a| &a.envelope),
             overlay,
         })
+    }
+
+    /// The full path under the sample's File field, for its tooltip: where it
+    /// is read from, else its path in the kits.
+    pub(super) fn kit_file_tip(&self) -> Option<String> {
+        let sample = self.kit_editor.sample?;
+        self.kit_editor
+            .files
+            .1
+            .as_ref()
+            .map(|file| file.display().to_string())
+            .or_else(|| self.kit()?.samples.get(sample).map(|s| s.path.clone()))
     }
 }
 
@@ -338,7 +356,7 @@ fn sample_file_name(path: &str) -> &str {
 
 /// What the kit editor shows of a sample: [`view::KIT_FACTS`] lines, label
 /// and value, `-` for what is not known (no sample, no analysis yet). The
-/// file is where it is read from (`file`), else its path in the kits.
+/// file is its name, read from `file` or the kits; its path is the field's tooltip.
 fn kit_facts(
     sample: Option<&KitSample>,
     file: Option<&Path>,
@@ -358,7 +376,10 @@ fn kit_facts(
         ("Detected", detected),
         (
             "File",
-            file.map(|f| f.display().to_string()).or_else(|| sample.map(|i| i.path.clone())).unwrap_or_else(unknown),
+            file.and_then(Path::file_name)
+                .map(|name| name.to_string_lossy().into_owned())
+                .or_else(|| sample.map(|i| sample_file_name(&i.path).to_owned()))
+                .unwrap_or_else(unknown),
         ),
     ];
     debug_assert_eq!(facts.len(), view::KIT_FACTS);
@@ -495,8 +516,7 @@ mod tests {
             let mut s = session();
             let (w, h) = view::min_window_size(scale, view::Shown::all());
             s.set_size((w, h, scale));
-            let layout = s.panel_layout(w, h, scale);
-            let room = view::KitLayout::new(w, h, scale, 1).envelope_rect(layout.details_top).h;
+            let room = s.kit_layout((w, h, scale)).envelope_rect().h;
             assert!(room >= 8 * scale, "scale {scale}: {room} px left for the envelope");
         }
     }
@@ -532,11 +552,22 @@ mod tests {
 
     #[test]
     fn the_table_names_the_files_and_the_folder() {
-        let s = session();
-        let view = s.kit_view(0, 0).unwrap();
+        let mut s = session();
+        let view = s.kit_view(0).unwrap();
         assert_eq!(view.samples, ["kick.wav", "x.wav"]);
         assert_eq!(view.folder, "real");
-        assert_eq!(view.facts.iter().find(|(label, _)| *label == "File").unwrap().1, "real/kick.wav");
+        assert_eq!(view.facts.iter().find(|(label, _)| *label == "File").unwrap().1, "kick.wav");
+        // The field's value is the name; its tooltip is the whole path.
+        let (x, y) = item_at(&s, Id::KitSampleFile);
+        assert!(s.control_hover(SIZE, x, y));
+        let (id, _) = s.chrome.control_hover.expect("a tooltip");
+        let [title, text] = s.control_tip(id).expect("its text");
+        assert_eq!(title, "File");
+        assert_eq!(text, "real/kick.wav");
+        // A click on the value does nothing.
+        let before = s.chrome.widgets.dropdown().is_some() || s.chrome.widgets.entry().is_some();
+        click(&mut s, x, y);
+        assert_eq!(s.chrome.widgets.dropdown().is_some() || s.chrome.widgets.entry().is_some(), before);
     }
 
     #[test]

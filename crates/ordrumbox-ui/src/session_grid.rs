@@ -569,7 +569,7 @@ mod tests {
         pick(&mut s, "Rename track >");
         pick(&mut s, "Free name...");
         assert!(s.chrome.widgets.dropdown().is_none());
-        assert_eq!(s.chrome.widgets.entry().map(|e| (e.id, e.text.as_str())), Some((Id::TrackName(1), "COWBELL")));
+        assert_eq!(s.chrome.widgets.entry().map(|e| (e.id, e.text())), Some((Id::TrackName(1), "COWBELL")));
     }
 
     #[test]
